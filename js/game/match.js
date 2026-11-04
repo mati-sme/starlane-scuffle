@@ -1,33 +1,38 @@
-// Match orchestration: waves, timer, Starstorm, structure rules, win/lose, per-frame rendering.
+// Match orchestration: heroes, waves, timer, Starstorm, XP / level-up picks, structure rules, win/lose, per-frame rendering.
 import * as THREE from 'three';
-import { MATCH, PAL } from '../config.js';
+import { MATCH, HERO, PAL } from '../config.js';
 import { clamp, damp, rand } from '../core/math.js';
 import { bus } from '../core/bus.js';
 import { input, readMove } from '../core/input.js';
 import { particles, FRAME } from '../render/particles.js';
 import { vfx } from '../render/vfx.js';
 import { Hero, screenToWorld } from '../heroes/hero.js';
-import { zip } from '../heroes/zip.js';
+import { HEROES, ROSTER } from '../heroes/index.js';
+import { rollChoices } from '../heroes/upgrades.js';
 import { Tower } from '../world/tower.js';
 import { Core } from '../world/core.js';
 import { MinionSystem } from '../world/minions.js';
 import { Projectiles } from './projectiles.js';
+import { Bot } from './bot.js';
 
 const CONFETTI = [PAL.gold, PAL.sunny, PAL.gloom, PAL.heal, PAL.nebulaB, PAL.star];
+const IDLE = { x: 0, z: 0, attack: false, cast: [false, false, false] };
 
 export class Match {
   constructor(scene, rig, map) {
+    this.scene = scene;
     this.rig = rig;
     this.map = map;
-    this.hero = new Hero(scene, zip, 0);
-    this.heroes = [this.hero];
     this.towers = [0, 1].flatMap((team) => [0, 1].map((idx) => new Tower(scene, team, idx)));
     this.cores = [0, 1].map((team) => new Core(scene, team));
     this.structures = [...this.towers, ...this.cores];
     this.minions = new MinionSystem(scene);
     this.projectiles = new Projectiles(scene);
+    this.timers = [];
+    this.pick = null;
+    this.picksOwed = 0;
 
-    this.intent = { x: 0, z: 0, attack: false };
+    this.intent = { x: 0, z: 0, attack: false, cast: [false, false, false] };
     this._screen = { x: 0, y: 0 };
     this._v = new THREE.Vector2();
     this._ray = new THREE.Raycaster();
@@ -38,7 +43,27 @@ export class Match {
     bus.on('down', (t) => {
       if (t.type === 'tower' || t.type === 'core') rig.shake(0.4);
       if (t.type === 'tower' && t.team === 0) this.towersLost++;
+      if (t.type === 'minion') this._xp(t, HERO.xp[t.kind], HERO.xpRange);
+      else if (t.type === 'hero') {
+        this._xp(t, HERO.xp.hero + HERO.xp.heroPerLevel * t.level, HERO.xpHeroRange);
+        if (t.killer?.type === 'hero') bus.emit('takedown', { killer: t.killer, victim: t });
+      }
     });
+    bus.on('levelUp', (h) => this._levelUp(h));
+    bus.on('cast', ({ hero, slot }) => { if (slot === 2) rig.shake(hero === this.hero ? 0.4 : 0.2); });
+
+    const id = new URLSearchParams(location.search).get('hero');
+    this.setHero(Object.hasOwn(HEROES, id) ? id : 'zip');
+  }
+
+  // The player takes `id`; bots take the others in roster order (friendly first, then the two enemies).
+  setHero(id) {
+    for (const h of this.heroes ?? []) h.dispose();
+    const rest = ROSTER.filter((k) => k !== id), bot = (hero) => new Bot(hero);
+    const roster = [[id, 0, 0, null], [rest[0], 0, 1, bot], [rest[1], 1, 0, bot], [rest[2], 1, 1, bot]];
+    this.heroes = roster.map(([k, team, slot, brain]) => new Hero(this.scene, HEROES[k], team, slot, brain));
+    this.hero = this.heroes[0];
+    this.heroId = id;
     this.reset();
   }
 
@@ -52,7 +77,12 @@ export class Match {
     this.push = 0;
     this.fw = 0;
     this.win = false;
-    this.hero.reset();
+    this.timers.length = 0;
+    this.picksOwed = 0;
+    if (this.pick) { this.pick = null; bus.emit('pickEnd', null); }
+    input.cast.fill(false);
+    input.pick = -1;
+    this.heroes.forEach((h) => h.reset());
     this.towers.forEach((t) => t.reset());
     this.cores.forEach((c) => c.reset());
     this.minions.reset();
@@ -63,6 +93,53 @@ export class Match {
   }
 
   towersAlive(team) { return this.towers.filter((t) => t.team === team && t.alive).length; }
+
+  // Run fn(u in 0..1, dt) every sim step for `dur` seconds after `delay` (final call has u = 1).
+  anim(dur, fn, delay = 0) { this.timers.push({ t: -delay, dur, fn }); }
+  later(delay, fn) { this.timers.push({ t: -delay, dur: 0, fn }); }
+
+  _timers(dt) {
+    for (let i = this.timers.length - 1; i >= 0; i--) {
+      const a = this.timers[i];
+      a.t += dt;
+      if (a.t < 0) continue;
+      a.fn(a.dur > 0 ? Math.min(1, a.t / a.dur) : 1, dt);
+      if (a.t >= a.dur) this.timers.splice(i, 1);
+    }
+  }
+
+  // XP from something that just fell: enemy heroes nearby get it, with gold motes flying to them.
+  _xp(src, amount, range) {
+    for (const h of this.heroes) {
+      if (h.team === src.team || !h.alive || Math.hypot(h.x - src.x, h.z - src.z) > range) continue;
+      h.gainXp(amount);
+      const y = src.hitY ?? 1;
+      for (let k = 0; k < 3; k++) particles.emit(src.x, y, src.z, (h.x - src.x) / 0.6 + rand(-0.5, 0.5), (1.5 - y) / 0.6, (h.z - src.z) / 0.6 + rand(-0.5, 0.5), PAL.gold, 0.45, 0.6, FRAME.dot);
+    }
+  }
+
+  // Level 3 unlocks the ult instead of cards. Bots pick at random; the player gets the big-icon choice.
+  _levelUp(h) {
+    if (h.level === HERO.ultLevel) return;
+    if (!h.isPlayer) { h.addUpgrade(rollChoices(h)[0].id); return; }
+    this.picksOwed++;
+    if (!this.pick) this._openPick();
+  }
+
+  _openPick() {
+    this.picksOwed--;
+    this.pick = { choices: rollChoices(this.hero), t: HERO.pickTime };
+    bus.emit('pickStart', this.pick);
+  }
+
+  choose(i) {
+    if (!this.pick) return;
+    const c = this.pick.choices[i];
+    this.hero.addUpgrade(c.id);
+    this.pick = null;
+    bus.emit('pickEnd', c);
+    if (this.picksOwed > 0) this._openPick();
+  }
 
   _rules() {
     for (const team of [0, 1]) {
@@ -82,6 +159,7 @@ export class Match {
       it.x = this._v.x;
       it.z = this._v.y;
     }
+    for (let i = 0; i < 3; i++) { it.cast[i] = input.cast[i]; input.cast[i] = false; }
     if (input.walkClick) {
       this._ray.setFromCamera(input.walkClick, this.rig.camera);
       if (this._ray.ray.intersectPlane(this._plane, this._hit)) hero.walkTo = { x: this._hit.x, z: this._hit.z };
@@ -90,7 +168,33 @@ export class Match {
     return it;
   }
 
-  update(dt) {
+  // Heroes shove each other apart a little so nobody stacks.
+  _separate() {
+    const L = this.heroes;
+    for (let i = 0; i < L.length; i++) {
+      const a = L[i];
+      if (!a.alive || a.script) continue;
+      for (let j = i + 1; j < L.length; j++) {
+        const b = L[j];
+        if (!b.alive || b.script) continue;
+        const dx = b.x - a.x, dz = b.z - a.z, min = (a.radius + b.radius) * 0.9, d2 = dx * dx + dz * dz;
+        if (d2 >= min * min || d2 === 0) continue;
+        const d = Math.sqrt(d2), p = ((min - d) / d) * 0.5;
+        a.x -= dx * p; a.z -= dz * p;
+        b.x += dx * p; b.z += dz * p;
+      }
+    }
+  }
+
+  update(realDt) {
+    let dt = realDt;
+    if (this.pick) { // level-up choice: the world slows down while the player decides
+      dt *= HERO.pickSlow;
+      this.pick.t -= realDt;
+      if (input.pick >= 0) { const i = input.pick; input.pick = -1; this.choose(i); }
+      else if (this.pick.t <= 0) this.choose(0);
+    } else input.pick = -1;
+
     if (!this.over) {
       this.time += dt;
       if (this.time >= this.nextWave) {
@@ -107,7 +211,12 @@ export class Match {
       }
     }
     this._rules();
-    this.hero.update(dt, this, this.over ? { x: 0, z: 0, attack: false } : this._intent());
+    this._timers(dt);
+    for (const h of this.heroes) {
+      const it = this.over ? IDLE : h === this.hero ? this._intent() : h.brain.think(dt, this);
+      h.update(dt, this, it);
+    }
+    this._separate();
     this.minions.update(dt, this);
     for (const s of this.structures) s.update(dt, this);
     if (!this.over) this._checkEnd();
@@ -127,7 +236,8 @@ export class Match {
     this.over = true;
     this.win = win;
     const stars = win ? 1 + (this.towersLost === 0) + (this.time < MATCH.starTime) : 0;
-    this.hero.celebrate = win;
+    for (const h of this.heroes) h.celebrate = (h.team === 0) === win;
+    if (this.pick) { this.pick = null; this.picksOwed = 0; bus.emit('pickEnd', null); }
     this.rig.follow(this.cores[win ? 1 : 0]);
     this.rig.lead.set(0, 0, 0);
     bus.emit('end', { win, stars, time: this.time });
@@ -135,7 +245,7 @@ export class Match {
 
   // state: 'title' | 'match' | 'results'
   render(alpha, dt, t, state) {
-    this.hero.render(alpha, t, dt);
+    for (const h of this.heroes) h.render(alpha, t, dt);
     for (const s of this.structures) s.render(t);
     this.minions.render(alpha, t);
     if (state !== 'title') this.projectiles.update(dt);

@@ -2,6 +2,7 @@
 export const ORDER_HERO = ['heroes', 'minions', 'structures'];
 export const ORDER_MINION = ['minions', 'heroes', 'structures'];
 export const ORDER_TOWER = ['minions', 'heroes'];
+const ORDER_REST = ['minions', 'structures'];
 
 const lists = {
   heroes: (ctx) => ctx.heroes,
@@ -9,10 +10,12 @@ const lists = {
   structures: (ctx) => ctx.structures,
 };
 
+const valid = (e, team) => e.team !== team && e.alive && e.vulnerable !== false;
+
 function nearest(list, team, x, z, range) {
   let best = null, bestD = range;
   for (const e of list) {
-    if (e.team === team || !e.alive || e.vulnerable === false) continue;
+    if (!valid(e, team)) continue;
     const d = Math.hypot(e.x - x, e.z - z) - e.radius;
     if (d <= bestD) { best = e; bestD = d; }
   }
@@ -26,4 +29,44 @@ export function pickTarget(ctx, team, x, z, range, order) {
     if (t) return t;
   }
   return null;
+}
+
+// Hero priority: the hero that hit us in the last 2 s -> lowest-HP enemy hero -> nearest minion -> structure.
+export function pickHeroTarget(ctx, h, range) {
+  const a = h.attacker;
+  if (a && h.attackerAge < 2 && a.type === 'hero' && valid(a, h.team) && Math.hypot(a.x - h.x, a.z - h.z) - a.radius <= range) return a;
+  let best = null, hp = Infinity;
+  for (const e of ctx.heroes) {
+    if (!valid(e, h.team) || Math.hypot(e.x - h.x, e.z - h.z) - e.radius > range) continue;
+    if (e.hp < hp) { best = e; hp = e.hp; }
+  }
+  return best ?? pickTarget(ctx, h.team, h.x, h.z, range, ORDER_REST);
+}
+
+const pts = [];
+
+// The enemy within `range` (edge distance) with the most enemies inside `radius` of it (heroes count double).
+// Returns { x, z, n, hero, target } where (x, z) is the centroid of that group, or null.
+export function bestCluster(ctx, team, x, z, range, radius) {
+  pts.length = 0;
+  for (const e of ctx.heroes) if (valid(e, team)) pts.push(e, 2);
+  for (const e of ctx.minions.list) if (valid(e, team)) pts.push(e, 1);
+  for (const e of ctx.structures) if (valid(e, team)) pts.push(e, 1);
+
+  let best = null, bestScore = 0, bx = 0, bz = 0, bn = 0, bhero = false;
+  for (let i = 0; i < pts.length; i += 2) {
+    const e = pts[i];
+    const dist = Math.hypot(e.x - x, e.z - z);
+    if (dist - e.radius > range) continue;
+    let score = 0, sx = 0, sz = 0, n = 0, hero = false;
+    for (let j = 0; j < pts.length; j += 2) {
+      const o = pts[j];
+      if (Math.hypot(o.x - e.x, o.z - e.z) > radius) continue;
+      score += pts[j + 1]; sx += o.x; sz += o.z; n++;
+      if (o.type === 'hero') hero = true;
+    }
+    score -= dist * 0.01;
+    if (score > bestScore) { best = e; bestScore = score; bx = sx / n; bz = sz / n; bn = n; bhero = hero; }
+  }
+  return best ? { x: bx, z: bz, n: bn, hero: bhero, target: best } : null;
 }

@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { PAL, TEAM, UNITS, MAP, GROUND, MATCH, sideX } from '../config.js';
 import { rand, lerp, clamp, angleLerp } from '../core/math.js';
 import { toonMat, outlineMat, mergeParts, shadowGeo, shadowMat, SHADOW_Y } from '../render/toon.js';
-import { dealDamage, tickHitFx, dyingScale, poof } from '../game/combat.js';
+import { dealDamage, tickHitFx, tickStatus, airLift, dyingScale, poof } from '../game/combat.js';
 import { pickTarget, ORDER_MINION } from '../game/targeting.js';
 
 const TYPES = ['blobling', 'zapper', 'bigblob'];
@@ -95,6 +95,7 @@ export class MinionSystem {
     return {
       type: 'minion', kind: '', team: 0, x: 0, z: 0, px: 0, pz: 0, rx: 0, rz: 0, hp: 1, maxHp: 1, alive: false,
       radius: 0.5, hitY: 1, barY: 1.5, flash: 0, squash: 0, dying: 0, lunge: 0, cd: 0, facing: 0, yaw: 0, phase: 0, lane: 0,
+      stun: 0, root: 0, slow: 0, air: 0, pull: null,
     };
   }
 
@@ -121,7 +122,7 @@ export class MinionSystem {
     Object.assign(m, {
       kind, team, x: sideX(team, MAP.spawnX), z: rand(-2, 2), hp: st.hp, maxHp: st.hp, alive: true,
       radius: st.radius, hitY: st.hitY, barY: st.barY, flash: 0, squash: 0, dying: 0, lunge: 0, cd: rand(0, 0.5),
-      phase: rand(0, 6), lane: rand(-2.5, 2.5),
+      phase: rand(0, 6), lane: rand(-2.5, 2.5), stun: 0, root: 0, slow: 0, air: 0, pull: null,
     });
     m.px = m.x; m.pz = m.z;
     m.facing = m.yaw = TEAM[team].dir > 0 ? Math.PI / 2 : -Math.PI / 2;
@@ -139,6 +140,7 @@ export class MinionSystem {
       m.px = m.x; m.pz = m.z;
       tickHitFx(m, dt);
       m.lunge = Math.max(0, m.lunge - dt * 5);
+      tickStatus(m, dt);
       if (m.dying > 0) {
         if ((m.dying -= dt) <= 0) { poof(m, 18); this.list.splice(i, 1); this.free.push(m); }
         continue;
@@ -151,6 +153,8 @@ export class MinionSystem {
   _think(m, dt, ctx) {
     const st = UNITS[m.kind];
     m.cd -= dt;
+    if (m.stun > 0 || m.air > 0) return;
+    const go = m.root > 0 ? 0 : st.speed * (m.slow > 0 ? 0.55 : 1) * dt;
     const tgt = pickTarget(ctx, m.team, m.x, m.z, st.aggro, ORDER_MINION);
     if (tgt) {
       const dx = tgt.x - m.x, dz = tgt.z - m.z, d = Math.hypot(dx, dz) || 1;
@@ -166,12 +170,12 @@ export class MinionSystem {
         }
         return;
       }
-      m.x += (dx / d) * st.speed * dt;
-      m.z += (dz / d) * st.speed * dt;
-    } else {
+      m.x += (dx / d) * go;
+      m.z += (dz / d) * go;
+    } else if (go > 0) {
       const dir = TEAM[m.team].dir;
       m.facing = Math.atan2(dir, (m.lane - m.z) * 0.3);
-      m.x += dir * st.speed * dt;
+      m.x += dir * go;
       m.z += clamp(m.lane - m.z, -1, 1) * dt;
     }
     m.z = clamp(m.z, -LANE_Z, LANE_Z);
@@ -208,7 +212,7 @@ export class MinionSystem {
       const sx = dy * (1 + wob + sq), sy = dy * (1 - wob - sq);
       const bob = m.kind === 'zapper' ? Math.sin(t * 3 + m.phase) * 0.15 : 0;
       const lx = Math.sin(m.yaw) * 0.35 * m.lunge, lz = Math.cos(m.yaw) * 0.35 * m.lunge;
-      M.compose(P.set(m.rx + lx, GROUND + bob, m.rz + lz), Q.setFromAxisAngle(this._up, m.yaw), S.set(sx, sy, sx));
+      M.compose(P.set(m.rx + lx, GROUND + bob + airLift(m), m.rz + lz), Q.setFromAxisAngle(this._up, m.yaw), S.set(sx, sy, sx));
       g.mesh.setMatrixAt(i, M);
       g.mesh.setColorAt(i, C.setScalar(1 + (m.flash > 0 ? 3 : 0)));
 

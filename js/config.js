@@ -11,7 +11,7 @@ export const PAL = {
   gloom: 0xFF5D73, gloomDeep: 0xB0284A,
   heal: 0x5BE584, shield: 0x9FE8FF,
   ink: 0x23163A, fog: 0x2A1F5E,
-  zip: 0xFF8A3D,
+  zip: 0xFF8A3D, moss: 0x6BBF59, luma: 0xC9A7FF, clink: 0x3DE0D0,
 };
 
 // Team 0 = Sunny (player side, marches +x), team 1 = Gloom (marches -x).
@@ -38,7 +38,20 @@ export const UNITS = {
   bigblob: { hp: 420, speed: 2.0, range: 1.6, dmg: 24, cd: 1.4, radius: 1.0, aggro: 5, structMul: 2.5, hitY: 1.1, barY: 3.0, max: 8 },
 };
 
-export const TOWER = { range: 8, dmg: 55, cd: 1.2, radius: 1.5, hp: [1200, 1500] };
+export const HERO = {
+  maxLevel: 8, ultLevel: 3, hpPerLevel: 0.12, dmgPerLevel: 0.06, maxUp: 3,
+  xpNeed: (lv) => 30 + 12 * (lv - 1),
+  xpRange: 6, xpHeroRange: 14, xp: { blobling: 10, zapper: 10, bigblob: 30, hero: 50, heroPerLevel: 10 },
+  pickSlow: 0.2, pickTime: 6,
+  baseHeal: { radius: 6, rate: 0.2 },
+};
+
+// Bots: reaction time (s) and damage multiplier per difficulty star (1-3).
+export const DIFFICULTY = { react: [0.8, 0.5, 0.3], dmg: [0.7, 0.85, 1] };
+export const settings = { stars: 2 };
+export const BOT = { aggro: 9, retreatHp: 0.35, returnHp: 0.85 };
+
+export const TOWER ={ range: 8, dmg: 55, cd: 1.2, radius: 1.5, hp: [1200, 1500] };
 export const CORE = { hp: 2200, radius: 2.2 };
 
 export const CAM = { fov: 38, offset: [-7, 20, 15], follow: 6, lead: 2, wideAspect: 1.9 };

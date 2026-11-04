@@ -6,6 +6,8 @@ export const input = {
   attackKey: false,
   attackMouse: false,
   walkClick: null, // {x, y} in NDC, consumed by the match
+  cast: [false, false, false], // skill 1 / skill 2 / ult pressed since the last sim step (consumed by the match)
+  pick: -1,        // level-up card chosen with the 1 / 2 keys
   keys: new Set(),
   get attack() { return this.attackTouch || this.attackKey || this.attackMouse; },
 };
@@ -14,6 +16,8 @@ const AXIS = {
   KeyW: [0, 1], ArrowUp: [0, 1], KeyS: [0, -1], ArrowDown: [0, -1],
   KeyA: [-1, 0], ArrowLeft: [-1, 0], KeyD: [1, 0], ArrowRight: [1, 0],
 };
+
+const CAST_KEYS = { KeyQ: 0, KeyE: 1, KeyR: 2 };
 
 // Fills out.x / out.y; returns true when there is any movement intent.
 export function readMove(out) {
@@ -33,6 +37,11 @@ export function initInput(canvas) {
     if (e.code === 'Space' || e.code in AXIS) e.preventDefault();
     input.keys.add(e.code);
     if (e.code === 'Space' || e.code === 'KeyJ') input.attackKey = true;
+    if (e.repeat) return;
+    const slot = CAST_KEYS[e.code];
+    if (slot !== undefined) input.cast[slot] = true;
+    else if (e.code === 'Digit1' || e.code === 'Numpad1') input.pick = 0;
+    else if (e.code === 'Digit2' || e.code === 'Numpad2') input.pick = 1;
   });
   window.addEventListener('keyup', (e) => {
     input.keys.delete(e.code);

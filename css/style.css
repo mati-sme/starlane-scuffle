@@ -61,6 +61,63 @@ body.touch.playing #touch { display: block; }
 #atk { position: absolute; right: calc(28px + var(--sr)); bottom: calc(28px + var(--sb)); width: 120px; height: 120px; padding: 26px; border-radius: 50%; border: 4px solid var(--ink); background: radial-gradient(circle at 35% 30%, #FF8EA0, var(--gloom)); box-shadow: 0 6px 0 rgba(0,0,0,.35); pointer-events: auto; touch-action: none; cursor: pointer; transition: transform .08s; }
 #atk.down { transform: scale(.92); box-shadow: 0 2px 0 rgba(0,0,0,.35); }
 
+/* ---------- portrait XP / level, takedown, hero dots ---------- */
+.portrait .xp { position: absolute; inset: -7px; border-radius: 50%; background: conic-gradient(var(--gold) calc(var(--p, 0) * 1%), rgba(35,22,58,.65) 0); }
+.portrait .lvl { position: absolute; right: -10px; bottom: -8px; min-width: 32px; height: 32px; padding: 0 4px; display: flex; align-items: center; justify-content: center; border-radius: 16px; border: 3px solid var(--ink); background: var(--gold); color: var(--ink); font-size: 20px; font-weight: 800; line-height: 1; }
+.takedown { position: absolute; left: 50%; top: calc(112px + var(--st)); translate: -50% 0; display: flex; align-items: center; gap: 6px; opacity: 0; }
+.takedown i { width: 46px; height: 46px; padding: 4px; border-radius: 50%; border: 3px solid var(--ink); background: var(--ink); }
+.takedown s { width: 34px; height: 34px; }
+.takedown.pop { animation: takedown 2s ease-out; }
+@keyframes takedown { 0% { scale: .3; opacity: 0; } 12% { scale: 1.12; opacity: 1; } 22% { scale: 1; } 80% { opacity: 1; } 100% { scale: 1; opacity: 0; } }
+.hero-dot.t0 { background: var(--sunny); }
+.hero-dot.t1 { background: var(--gloom); }
+.hero-dot.me { background: var(--gold); z-index: 1; }
+
+/* ---------- skill buttons (arc around Attack) ---------- */
+#abilities { display: none; position: fixed; right: calc(28px + var(--sr)); bottom: calc(28px + var(--sb)); width: 120px; height: 120px; z-index: 4; pointer-events: none; --r: min(150px, 38vh); }
+body.playing #abilities { display: block; }
+.sk { position: absolute; left: 50%; top: 50%; padding: 0; border-radius: 50%; border: 4px solid var(--ink); pointer-events: auto; touch-action: none; cursor: pointer; color: #fff; font-family: inherit;
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c, #FF8A3D) 55%, #fff), var(--c, #FF8A3D)); box-shadow: 0 6px 0 rgba(0,0,0,.35); transition: filter .2s; }
+.sk.s1, .sk.s2 { width: 88px; height: 88px; margin: -44px 0 0 -44px; }
+.sk.ult { width: 104px; height: 104px; margin: -52px 0 0 -52px; }
+.sk.s1 { translate: calc(var(--r) * -1) 0; }
+.sk.s2 { translate: calc(var(--r) * -.71) calc(var(--r) * -.71); }
+.sk.ult { translate: calc(var(--r) * -.12) calc(var(--r) * -1); }
+.sk.down { scale: .92; box-shadow: 0 2px 0 rgba(0,0,0,.35); }
+.sk .face { position: absolute; inset: 15%; display: block; }
+.sk .cd { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(rgba(20,12,40,.68) calc(var(--p, 0) * 1%), transparent 0); }
+.sk .num { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 40px; font-weight: 800; -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; }
+.sk .key { display: none; position: absolute; right: -6px; bottom: -6px; width: 26px; height: 26px; align-items: center; justify-content: center; border-radius: 50%; border: 3px solid var(--ink); background: #fff; color: var(--ink); font-size: 15px; font-weight: 800; text-decoration: none; }
+body:not(.touch) .sk .key { display: flex; }
+.sk .shock { position: absolute; inset: -4px; border-radius: 50%; border: 6px solid var(--gold); opacity: 0; pointer-events: none; }
+.sk.ult.ready { background: radial-gradient(circle at 35% 30%, #FFF2A8, var(--gold)); }
+.sk.ult.ready::after { content: ''; position: absolute; inset: -6px; border-radius: 50%; box-shadow: 0 0 22px 6px rgba(255,210,63,.85); animation: glow 1.2s ease-in-out infinite; pointer-events: none; }
+.sk.ding { animation: ding .5s cubic-bezier(.3, 1.6, .5, 1); }
+.sk.slam { animation: slam .7s cubic-bezier(.2, 1.6, .4, 1); }
+.sk.slam .shock { animation: shock .7s ease-out; }
+.sk.locked { filter: grayscale(1) brightness(.6); }
+.sk.dead { filter: grayscale(.8) brightness(.7); }
+@keyframes ding { 0% { scale: 1; } 35% { scale: 1.25; } 70% { scale: .95; } 100% { scale: 1; } }
+@keyframes slam { 0% { scale: 3; opacity: 0; } 60% { scale: .9; opacity: 1; } 100% { scale: 1; } }
+@keyframes shock { 0% { scale: .6; opacity: 1; } 100% { scale: 3.4; opacity: 0; } }
+@keyframes glow { 50% { opacity: .45; } }
+
+/* ---------- level-up cards ---------- */
+#cards { position: fixed; left: 0; right: 0; top: 50%; translate: 0 -50%; z-index: 4; display: flex; flex-direction: column; align-items: center; gap: 22px; pointer-events: none; }
+#cards[hidden] { display: none; }
+#cards .row { display: flex; gap: 26px; }
+.card { position: relative; width: 160px; height: 160px; padding: 26px; border-radius: 28px; border: 4px solid var(--ink); pointer-events: auto; touch-action: none; cursor: pointer; font-family: inherit;
+  background: radial-gradient(circle at 35% 30%, #B79BF2, #6A47C2); box-shadow: 0 8px 0 rgba(0,0,0,.4); animation: card .35s cubic-bezier(.3, 1.7, .5, 1) both; animation-delay: var(--d, 0s); }
+.card.hero { background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c) 55%, #fff), var(--c)); }
+.card:active { scale: .95; }
+.card .ico { display: block; width: 100%; height: 100%; }
+.card .pips { position: absolute; left: 0; right: 0; bottom: -14px; display: flex; justify-content: center; gap: 6px; }
+.card .pips i { width: 16px; height: 16px; border-radius: 50%; border: 3px solid var(--ink); background: rgba(35,22,58,.8); }
+.card .pips i.on { background: var(--gold); }
+#cards .timer { width: 200px; height: 10px; border-radius: 6px; border: 3px solid var(--ink); background: rgba(35,22,58,.8); overflow: hidden; }
+#cards .timer i { display: block; height: 100%; background: var(--gold); }
+@keyframes card { from { scale: .2; opacity: 0; } to { scale: 1; opacity: 1; } }
+
 /* ---------- screens ---------- */
 #screens { position: fixed; inset: 0; z-index: 5; pointer-events: none; }
 .screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: var(--st) var(--sr) var(--sb) var(--sl); animation: pop .25s cubic-bezier(.3, 1.6, .5, 1); }
