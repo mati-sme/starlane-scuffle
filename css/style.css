@@ -58,7 +58,7 @@ body.touch.playing #touch { display: block; }
 #stick-base { position: fixed; left: 0; top: 0; width: 140px; height: 140px; border-radius: 50%; border: 4px solid var(--ink); background: rgba(255,255,255,.18); opacity: 0; pointer-events: none; }
 #stick-base.on { opacity: 1; }
 #stick-knob { position: absolute; left: 38px; top: 38px; width: 64px; height: 64px; border-radius: 50%; border: 4px solid var(--ink); background: rgba(255,255,255,.7); box-shadow: 0 4px 0 rgba(0,0,0,.3); }
-#atk { position: absolute; right: calc(28px + var(--sr)); bottom: calc(28px + var(--sb)); width: 120px; height: 120px; padding: 26px; border-radius: 50%; border: 4px solid var(--ink); background: radial-gradient(circle at 35% 30%, #FF8EA0, var(--gloom)); box-shadow: 0 6px 0 rgba(0,0,0,.35); pointer-events: auto; touch-action: none; cursor: pointer; transition: transform .08s; }
+#atk { position: absolute; right: calc(16px + var(--sr)); bottom: calc(16px + var(--sb)); width: 100px; height: 100px; padding: 22px; border-radius: 50%; border: 4px solid var(--ink); background: radial-gradient(circle at 35% 30%, #FF8EA0, var(--gloom)); box-shadow: 0 6px 0 rgba(0,0,0,.35); pointer-events: auto; touch-action: none; cursor: pointer; transition: transform .08s; }
 #atk.down { transform: scale(.92); box-shadow: 0 2px 0 rgba(0,0,0,.35); }
 
 /* ---------- portrait XP / level, takedown, hero dots ---------- */
@@ -74,19 +74,20 @@ body.touch.playing #touch { display: block; }
 .hero-dot.me { background: var(--gold); z-index: 1; }
 
 /* ---------- skill buttons (arc around Attack) ---------- */
-#abilities { display: none; position: fixed; right: calc(28px + var(--sr)); bottom: calc(28px + var(--sb)); width: 120px; height: 120px; z-index: 4; pointer-events: none; --r: min(150px, 38vh); }
+#abilities { display: none; position: fixed; right: calc(16px + var(--sr)); bottom: calc(16px + var(--sb)); width: 100px; height: 100px; z-index: 4; pointer-events: none; --r: 92px; }
 body.playing #abilities { display: block; }
 .sk { position: absolute; left: 50%; top: 50%; padding: 0; border-radius: 50%; border: 4px solid var(--ink); pointer-events: auto; touch-action: none; cursor: pointer; color: #fff; font-family: inherit;
   background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c, #FF8A3D) 55%, #fff), var(--c, #FF8A3D)); box-shadow: 0 6px 0 rgba(0,0,0,.35); transition: filter .2s; }
-.sk.s1, .sk.s2 { width: 88px; height: 88px; margin: -44px 0 0 -44px; }
-.sk.ult { width: 104px; height: 104px; margin: -52px 0 0 -52px; }
+.sk { border-width: 3px; box-shadow: 0 4px 0 rgba(0,0,0,.35); }
+.sk.s1, .sk.s2 { width: 60px; height: 60px; margin: -30px 0 0 -30px; }
+.sk.ult { width: 68px; height: 68px; margin: -34px 0 0 -34px; }
 .sk.s1 { translate: calc(var(--r) * -1) 0; }
 .sk.s2 { translate: calc(var(--r) * -.71) calc(var(--r) * -.71); }
-.sk.ult { translate: calc(var(--r) * -.12) calc(var(--r) * -1); }
+.sk.ult { translate: 0 calc(var(--r) * -1); }
 .sk.down { scale: .92; box-shadow: 0 2px 0 rgba(0,0,0,.35); }
 .sk .face { position: absolute; inset: 15%; display: block; }
 .sk .cd { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(rgba(20,12,40,.68) calc(var(--p, 0) * 1%), transparent 0); }
-.sk .num { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 40px; font-weight: 800; -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; }
+.sk .num { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 800; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; }
 .sk .key { display: none; position: absolute; right: -6px; bottom: -6px; width: 26px; height: 26px; align-items: center; justify-content: center; border-radius: 50%; border: 3px solid var(--ink); background: #fff; color: var(--ink); font-size: 15px; font-weight: 800; text-decoration: none; }
 body:not(.touch) .sk .key { display: flex; }
 .sk .shock { position: absolute; inset: -4px; border-radius: 50%; border: 6px solid var(--gold); opacity: 0; pointer-events: none; }
@@ -139,6 +140,54 @@ body.touch .mouse { display: none; }
 .stars i { width: 84px; height: 84px; animation: pop .5s cubic-bezier(.3, 1.8, .5, 1) both; animation-delay: calc(.2s + var(--i) * .2s); }
 .stars i:not(.on) { opacity: .6; transform: scale(.85); }
 .smile { width: 96px; height: 96px; }
+
+/* ---------- title / select / pause / result polish ---------- */
+.screen.modal { pointer-events: auto; }
+.screen.title { background: radial-gradient(ellipse at 50% 45%, rgba(20,15,58,.15), rgba(20,15,58,.7)); gap: 10px; }
+.title h1 { display: flex; flex-direction: column; animation: bob 3s ease-in-out infinite; }
+.title h1 span:first-child { color: var(--gold); }
+.title h1 span:last-child { color: #FF8EC4; margin-top: -.08em; }
+.parade { display: flex; gap: 14px; height: clamp(44px, 11vh, 72px); }
+.parade i { width: clamp(44px, 11vh, 72px); animation: bob 2s ease-in-out infinite; animation-delay: calc(var(--i) * -.4s); filter: drop-shadow(0 4px 0 rgba(0,0,0,.3)); }
+.title .big { width: clamp(84px, 22vh, 110px); height: clamp(84px, 22vh, 110px); }
+.screen.select { background: rgba(20,15,58,.7); backdrop-filter: blur(4px); gap: 10px; }
+.cards { display: flex; gap: clamp(8px, 2vw, 18px); }
+.hcard { position: relative; width: min(19vw, 170px); height: min(48vh, 220px); padding: 8px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; gap: 4px; border-radius: 24px; border: 4px solid var(--ink); color: #fff; font-weight: 800; font-size: clamp(16px, 4.5vh, 24px); font-family: inherit; cursor: pointer;
+  background: radial-gradient(circle at 35% 25%, color-mix(in srgb, var(--c) 55%, #fff), var(--c)); box-shadow: 0 8px 0 rgba(0,0,0,.4); transition: transform .15s; }
+.hcard .pic { flex: 1; min-height: 0; width: 100%; }
+.hcard b { -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; line-height: 1; }
+.hcard .abs { display: flex; gap: 4px; height: clamp(22px, 7vh, 34px); }
+.hcard .abs i { width: clamp(22px, 7vh, 34px); border-radius: 50%; background: rgba(35,22,58,.55); padding: 3px; }
+.hcard.sel { transform: translateY(-8px) scale(1.06); outline: 5px solid var(--gold); outline-offset: 2px; }
+.hcard.jump { animation: jump .45s cubic-bezier(.3, 1.6, .5, 1); }
+.hcard.locked { filter: grayscale(1) brightness(.55); cursor: default; }
+.hcard.nope { animation: nope .3s; }
+.hcard .lock { position: absolute; inset: 0; margin: auto; width: 44%; height: 30%; filter: none; }
+.select .hint { display: flex; align-items: center; gap: 6px; }
+.select .hint svg { width: 22px; height: 22px; }
+.select .big { width: clamp(64px, 17vh, 84px); height: clamp(64px, 17vh, 84px); padding: 16px; }
+.small, #topbtns button { width: 52px; height: 52px; padding: 11px; border-radius: 50%; border: 4px solid var(--ink); background: radial-gradient(circle at 35% 30%, #B79BF2, #6A47C2); box-shadow: 0 5px 0 rgba(0,0,0,.35); cursor: pointer; }
+.small:active, #topbtns button:active { transform: scale(.92); }
+.select .home { position: absolute; left: calc(14px + var(--sl)); top: calc(12px + var(--st)); }
+.screen.pause { background: rgba(20,15,58,.55); backdrop-filter: blur(5px); flex-direction: row; gap: 28px; }
+.result .row { display: flex; align-items: center; gap: 22px; }
+.gift { width: 72px; height: 72px; padding: 8px; border-radius: 50%; border: 4px solid var(--ink); background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c) 55%, #fff), var(--c)); animation: pop .5s cubic-bezier(.3, 1.8, .5, 1) .9s both, pulse 1.2s ease-in-out 1.4s infinite; }
+@media (max-height: 460px) {
+  .result { gap: 8px; }
+  .stars, .stars i { height: 64px; width: 64px; }
+  .stars { width: auto; }
+  .stars i { flex: none; }
+  .smile { width: 72px; height: 72px; }
+  .result .big { width: 84px; height: 84px; padding: 18px; }
+}
+@keyframes bob { 50% { transform: translateY(-8px); } }
+@keyframes jump { 40% { transform: translateY(-26px) scale(1.12); } }
+@keyframes nope { 25% { translate: -6px 0; } 75% { translate: 6px 0; } }
+
+/* ---------- mute / pause ---------- */
+#topbtns { position: fixed; top: calc(12px + var(--st)); right: calc(14px + var(--sr)); z-index: 6; display: flex; gap: 10px; }
+#pause { display: none; }
+body.playing #pause { display: block; }
 
 /* ---------- rotate-phone overlay ---------- */
 #rotate { display: none; position: fixed; inset: 0; z-index: 9; background: #140F3A; align-items: center; justify-content: center; }

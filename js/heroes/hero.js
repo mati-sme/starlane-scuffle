@@ -306,6 +306,7 @@ export class Hero {
     this.cd = b.cd;
     this.lunge = 1;
     this.faceHold = 0.3;
+    bus.emit('swing', this);
     this.face = Math.atan2(t.x - this.x, t.z - this.z);
     if (b.proj) {
       const p = b.proj;
@@ -323,8 +324,8 @@ export class Hero {
       const dx = this.x - s.x, dz = this.z - s.z, d = Math.hypot(dx, dz), min = s.radius + this.radius;
       if (d < min && d > 0) { this.x = s.x + (dx / d) * min; this.z = s.z + (dz / d) * min; }
     }
-    this.x = clamp(this.x, -(MAP.halfLen + 4), MAP.halfLen + 4);
-    this.z = clamp(this.z, -8.5, 8.5);
+    this.x = clamp(this.x, -MAP.heroBound.x, MAP.heroBound.x);
+    this.z = clamp(this.z, -MAP.heroBound.z, MAP.heroBound.z);
   }
 
   spawn() {

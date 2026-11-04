@@ -14,6 +14,12 @@ export const icons = {
   fox: svg('<polygon points="8,8 28,20 12,34" fill="#FF8A3D"/><polygon points="56,8 36,20 52,34" fill="#FF8A3D"/><ellipse cx="32" cy="36" rx="23" ry="19" fill="#FF8A3D"/><ellipse cx="32" cy="46" rx="11" ry="8" fill="#FFF1DC" stroke="none"/><circle cx="23" cy="33" r="4" fill="#23163A" stroke="none"/><circle cx="41" cy="33" r="4" fill="#23163A" stroke="none"/><circle cx="32" cy="44" r="3" fill="#23163A" stroke="none"/>'),
   tower: (c) => svg(`<polygon points="22,56 42,56 38,24 26,24" fill="#F4EEFA"/><polygon points="20,24 44,24 32,8" fill="${c}"/><rect x="18" y="52" width="28" height="8" fill="${c}"/>`),
   core: (c) => svg(`<polygon points="32,4 56,24 46,56 18,56 8,24" fill="${c}"/><polygon points="32,14 44,26 38,44 26,44 20,26" fill="#fff" stroke="none" opacity=".45"/>`),
+  pause: svg('<rect x="14" y="10" width="14" height="44" rx="5" fill="#fff"/><rect x="36" y="10" width="14" height="44" rx="5" fill="#fff"/>'),
+  sound: svg('<polygon points="8,26 20,26 34,14 34,50 20,38 8,38" fill="#fff"/><path d="M42 24Q50 32 42 40M48 15Q62 32 48 49" fill="none" stroke="#fff" stroke-width="5"/>'),
+  mute: svg('<polygon points="6,26 18,26 32,14 32,50 18,38 6,38" fill="#fff"/><path d="M40 24l16 16M56 24L40 40" fill="none" stroke="#FF5D73" stroke-width="7"/>'),
+  home: svg('<polygon points="32,8 58,30 50,30 50,54 14,54 14,30 6,30" fill="#fff"/><rect x="27" y="38" width="10" height="16" fill="#FFD23F"/>'),
+  lock: svg('<path d="M22 28V20a10 10 0 0 1 20 0v8" fill="none" stroke-width="6"/><rect x="14" y="28" width="36" height="28" rx="7" fill="#FFD23F"/>'),
+  check: svg('<path d="M12 34L26 48L52 16" fill="none" stroke="#fff" stroke-width="10"/>'),
   phone: svg('<rect x="10" y="20" width="44" height="26" rx="6" fill="#fff"/><path d="M32 8v8M26 12l6-6 6 6" fill="none" stroke="#FFD23F"/>'),
 
   // hero portraits

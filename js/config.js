@@ -24,7 +24,7 @@ export const sideX = (team, d) => (team === 0 ? -d : d);
 export const GROUND = 0.08;
 export const SIM_STEP = 1 / 30;
 
-export const MAP = { halfLen: 60, halfWidth: 7, towerX: [20, 40], coreX: 54, spawnX: 48, heroX: 46 };
+export const MAP = { halfLen: 60, halfWidth: 7, towerX: [20, 40], coreX: 54, spawnX: 48, heroX: 46, heroBound: { x: 58, z: 7.5 } };
 
 export const MATCH = {
   waveEvery: 25, firstWave: 4, bigBlobFrom: 180, bigBlobEvery: 3,

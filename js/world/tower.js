@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { PAL, TEAM, TOWER, MAP, GROUND, sideX } from '../config.js';
 import { rand } from '../core/math.js';
+import { bus } from '../core/bus.js';
 import { toonMat, toonMesh, mergeParts, makeShadow, makeHalo } from '../render/toon.js';
 import { particles, poofStars, FRAME } from '../render/particles.js';
 import { vfx } from '../render/vfx.js';
@@ -91,6 +92,7 @@ export class Tower {
     if (!tgt) return;
     this.cd = TOWER.cd;
     ctx.projectiles.fire(this, tgt, TOWER.dmg, 14, 1.5, GROUND + CRYSTAL_Y);
+    bus.emit('towerShot', this);
     vfx.ring(this.x, GROUND + CRYSTAL_Y, this.z, TEAM[this.team].main, 1.6, 0.25);
   }
 
