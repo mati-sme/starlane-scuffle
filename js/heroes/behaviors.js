@@ -48,7 +48,7 @@ export function fireBolt(h, ctx, x, z, dx, dz, p, color) {
   vfx.flash(x + dx * 1.2, 1.4, z + dz * 1.2, color, 1.3, 0.14); // muzzle
   for (let k = 0; k < len; k += 0.8) particles.emit(x + dx * k, 1.2 + (Math.random() - 0.5) * 0.3, z + dz * k, (Math.random() - 0.5), 0.4, (Math.random() - 0.5), color, 0.6, 0.4, FRAME.sparkle);
   if (used.length) { vfx.flash(ex, 1.3, ez, color, 1.8, 0.18); vfx.ring(ex, 0.3, ez, color, 1.8, 0.25); }
-  for (const { e } of used) affect(h, e, p, { x, z });
+  for (const { e } of used) { affect(h, e, p, { x, z }); p.onHit?.(e); }
   if (p.explode && used.length) {
     sparks(ex, 0.8, ez, 12, [color, 0xffffff], 4);
     vfx.ring(ex, 0.2, ez, color, p.explode * 1.3, 0.4);
@@ -124,7 +124,8 @@ const BEHAVIORS = {
 
   // Teleport onto the nearest enemy hero (or forward) and strike on arrival.
   blink(h, ab, ctx, aim) {
-    let t = pickTarget(ctx, h.team, h.x, h.z, ab.range, ['heroes']);
+    let t = (ab.markMul && ctx.heroes.find((e) => e.team !== h.team && e.alive && !e.hidden && !e.untarget && e.mark?.src === h && Math.hypot(e.x - h.x, e.z - h.z) - e.radius <= ab.range))
+      ?? pickTarget(ctx, h.team, h.x, h.z, ab.range, ['heroes']);
     if (t && aim.manual) { // an aimed blink only locks on to a hero near the aimed line
       const rx = t.x - h.x, rz = t.z - h.z, along = rx * aim.dx + rz * aim.dz, lat = Math.abs(rx * aim.dz - rz * aim.dx);
       if (along <= 0 || lat > 2 + t.radius) t = null;
@@ -141,7 +142,12 @@ const BEHAVIORS = {
       dur: 0.1, x1: h.x + dx * d, z1: h.z + dz * d, h: 0.6,
       done: (h) => {
         vfx.ring(h.x, 0.25, h.z, fx(h).color, 3, 0.3);
-        if (t?.alive) { affect(h, t, ab); sparks(t.x, 1, t.z, 10, [fx(h).accent, 0xffffff], 4); }
+        if (t?.alive) {
+          const marked = t.mark?.src === h;
+          affect(h, t, marked && ab.markMul ? { ...ab, dmg: ab.dmg * ab.markMul } : ab);
+          if (marked) t.mark = null;
+          sparks(t.x, 1, t.z, 10, [fx(h).accent, 0xffffff], 4);
+        }
       },
     });
   },
@@ -257,6 +263,7 @@ const BEHAVIORS = {
       if (hp) heal(t, hp);
       if (ab.healPct && me) heal(t, t.maxHp * ab.healPct);
       if (ab.cleanse) t.slow = 0;
+      if (ab.undyingT) addBuff(t, 'undying', 1, ab.undyingT);
       if (ab.spd) addBuff(t, 'speed', ab.spd, ab.spdT ?? dur);
       if (ab.aspd) addBuff(t, 'aspd', ab.aspd, ab.aspdT ?? dur);
       sparks(t.x, 1, t.z, 6, [hp ? 0x3EE89A : col, 0xffffff], 2);
@@ -391,7 +398,241 @@ const BEHAVIORS = {
     vfx.ghost(x, z, acc, ab.delay);
     vfx.ring(x, 0.25, z, col, ab.radius * 0.8, ab.delay);
   },
+
+  // Ground slam zones: a line of telegraphed slams marching away from the hero, or rings expanding around it.
+  quake(h, ab, ctx, aim) {
+    const col = fx(h).color, acc = fx(h).accent, tg = telegraph(h);
+    if (ab.rings) {
+      const cx = h.x, cz = h.z, w = ab.width ?? 2;
+      for (let i = 0; i < ab.rings; i++) {
+        const R = (i + 1) * ab.step, wait = 0.3 + i * 0.3, last = i === ab.rings - 1;
+        vfx.ring(cx, 0.2, cz, tg, R * 1.05, wait);
+        ctx.later(wait, () => {
+          vfx.ring(cx, 0.25, cz, acc, R * 1.15, 0.45);
+          vfx.ring(cx, 0.3, cz, 0xffffff, R * 0.9, 0.2);
+          vfx.decal(cx, cz, col, R, 0.7);
+          for (let k = 0; k < 14; k++) {
+            const a = (k / 14) * Math.PI * 2;
+            particles.emit(cx + Math.cos(a) * R, 0.3, cz + Math.sin(a) * R, Math.cos(a) * 2, 3 + Math.random() * 2, Math.sin(a) * 2, k % 2 ? acc : col, 0.8, 0.5, FRAME.sparkle, 4);
+          }
+          ctx.rig.shake(0.18);
+          forEachEnemy(ctx, h.team, cx, cz, R, (e) => {
+            if (Math.hypot(e.x - cx, e.z - cz) - e.radius >= R - w) affect(h, e, ab, { x: cx, z: cz, air: last && ab.lastAir });
+          });
+        });
+      }
+      return;
+    }
+    for (let i = 0; i < ab.count; i++) {
+      const d = 2 + i * ab.gap, x = h.x + aim.dx * d, z = h.z + aim.dz * d, wait = 0.25 + i * 0.2;
+      vfx.decal(x, z, tg, ab.radius, wait + 0.15);
+      vfx.ring(x, 0.2, z, tg, ab.radius * 1.1, wait);
+      ctx.later(wait, () => explodeAt(h, ctx, x, z, ab.radius, ab, col, acc));
+    }
+  },
+
+  // Thrown blade: flies out along the aim line, hits everything once, then curves back to the hero and hits again.
+  boomerang(h, ab, ctx, aim) {
+    const col = fx(h).color, acc = fx(h).accent, ox = h.x, oz = h.z, fx1 = ox + aim.dx * ab.range, fz1 = oz + aim.dz * ab.range;
+    const half = (ab.width ?? 1.4) / 2 + 0.2, seen = [new Set(), new Set()];
+    let flare = 0;
+    ctx.anim(ab.dur ?? 1.2, (u, dt) => {
+      if (u >= 1) return;
+      const out = u < 0.5, k = Math.sin((out ? u * 2 : (1 - u) * 2) * Math.PI / 2);
+      const x = out ? lerp(ox, fx1, k) : lerp(h.x, fx1, k), z = out ? lerp(oz, fz1, k) : lerp(h.z, fz1, k);
+      particles.emit(x, 1.2, z, rand(-1, 1), 0.3, rand(-1, 1), Math.random() < 0.5 ? col : acc, 0.9, 0.35, FRAME.sparkle);
+      if ((flare -= dt) <= 0) { flare = 0.07; vfx.arc(x, 1.2, z, Math.cos(u * 40), Math.sin(u * 40), acc, 1.8, 0.12); }
+      forEachEnemy(ctx, h.team, x, z, half, (e) => {
+        const set = seen[out ? 0 : 1];
+        if (set.has(e)) return;
+        set.add(e);
+        affect(h, e, ab, { x, z });
+        sparks(e.x, 1, e.z, 6, [acc, 0xffffff], 3);
+      });
+    });
+  },
+
+  // Blades circle the hero for a while, cutting anything they touch (each enemy at most every half second).
+  orbit(h, ab, ctx) {
+    const col = fx(h).color, acc = fx(h).accent, last = new Map();
+    let ang = 0, tick = 0, age = 0;
+    vfx.ring(h.x, 0.25, h.z, col, ab.r * 1.6, 0.4);
+    h.effects.push({
+      t: 0, dur: ab.dur,
+      update(h, dt, ctx) {
+        age += dt; ang += dt * 7;
+        const pts = [];
+        for (let k = 0; k < ab.blades; k++) {
+          const a = ang + (k / ab.blades) * Math.PI * 2, x = h.x + Math.cos(a) * ab.r, z = h.z + Math.sin(a) * ab.r;
+          pts.push({ x, z });
+          particles.emit(x, 1.1, z, -Math.sin(a) * 2, 0.2, Math.cos(a) * 2, k % 2 ? acc : col, 1.1, 0.3, FRAME.sparkle);
+          particles.emit(x, 1.1, z, 0, 0, 0, 0xffffff, 0.5, 0.15, FRAME.dot);
+        }
+        if ((tick -= dt) > 0) return;
+        tick = 0.1;
+        for (const p of pts) {
+          forEachEnemy(ctx, h.team, p.x, p.z, 1.0, (e) => {
+            if (age - (last.get(e) ?? -9) < 0.5) return;
+            last.set(e, age);
+            affect(h, e, ab, { x: h.x, z: h.z });
+            sparks(e.x, 1, e.z, 6, [acc, 0xffffff], 3);
+          });
+        }
+      },
+    });
+  },
+
+  // Hex dart: the first enemy hit is marked for a while (see detonate / the blink finisher / basic-attack bonus).
+  mark(h, ab, ctx, aim) {
+    const col = fx(h).color;
+    fireBolt(h, ctx, h.x, h.z, aim.dx, aim.dz, { ...ab, onHit: (e) => putMark(h, e, ab, ctx, col) }, fx(h).accent);
+  },
+
+  // Pop every mark this hero placed in range: damage per mark (+ % max HP on heroes).
+  detonate(h, ab, ctx) {
+    const col = fx(h).color, acc = fx(h).accent, hits = [];
+    forEachEnemy(ctx, h.team, h.x, h.z, ab.range, (e) => { if (e.mark?.src === h) hits.push(e); });
+    if (!hits.length) return false;
+    vfx.ring(h.x, 0.25, h.z, col, 2.5, 0.3);
+    for (const e of hits) {
+      e.mark = null;
+      vfx.link(h, e, acc, 0.3, 1, e.hitY ?? 1);
+      vfx.ring(e.x, 0.3, e.z, col, 3, 0.4);
+      vfx.ring(e.x, 0.4, e.z, 0xffffff, 1.8, 0.2);
+      vfx.flash(e.x, (e.hitY ?? 1) + 0.4, e.z, col, 2.6, 0.25);
+      sparks(e.x, 1, e.z, 14, [col, acc, 0xffffff], 5);
+      affect(h, e, { ...ab, dmg: ab.dmg + (e.type === 'hero' ? e.maxHp * (ab.pct ?? 0) : 0) }, { x: h.x, z: h.z });
+    }
+    ctx.rig.shake(0.15);
+  },
+
+  // Gravity well at the aim point: drags enemies inward and burns them, then collapses for a burst.
+  vortex(h, ab, ctx, aim) {
+    const col = fx(h).color, acc = fx(h).accent, R = ab.radius, d = Math.min(aim.dist, ab.range), x = h.x + aim.dx * d, z = h.z + aim.dz * d;
+    let tick = 0, vis = 0;
+    vfx.rune(x, z, acc, R * 1.6, ab.dur);
+    vfx.ring(x, 0.25, z, col, R * 1.3, 0.5);
+    ctx.anim(ab.dur, (u, dt) => {
+      if (u >= 1) return;
+      forEachEnemy(ctx, h.team, x, z, R, (e) => {
+        if (e.type !== 'hero' && e.type !== 'minion') return;
+        const dx = x - e.x, dz = z - e.z, dd = Math.hypot(dx, dz);
+        if (dd > 0.5) { const s = Math.min(ab.pull * dt, dd - 0.4); e.x += (dx / dd) * s; e.z += (dz / dd) * s; }
+      });
+      if ((tick -= dt) <= 0) {
+        tick = 0.25;
+        forEachEnemy(ctx, h.team, x, z, R, (e) => affect(h, e, { dmg: ab.dps * 0.25, slow: ab.slow, slowT: 0.5 }, { x, z }));
+      }
+      for (let k = 0; k < 3; k++) {
+        const a = Math.random() * Math.PI * 2, r = R * (0.5 + Math.random() * 0.5);
+        particles.emit(x + Math.cos(a) * r, 0.4 + Math.random() * 1.2, z + Math.sin(a) * r, -Math.cos(a) * 3 - Math.sin(a) * 3, 0.3, -Math.sin(a) * 3 + Math.cos(a) * 3, k % 2 ? acc : col, 0.8, 0.4, FRAME.sparkle);
+      }
+      if ((vis -= dt) <= 0) { vis = 0.45; vfx.decal(x, z, col, R, 0.55); }
+    });
+    ctx.later(ab.dur, () => {
+      explodeAt(h, ctx, x, z, R, { dmg: ab.endDmg, stun: ab.endStun }, col, acc);
+    });
+  },
+
+  // Pinball shot: hitscan to the first enemy in line, then ricochets between nearby enemies with falling damage.
+  // `shots` makes it a channel that fires at the nearest enemy each time.
+  ricochet(h, ab, ctx, aim) {
+    const col = fx(h).color, acc = fx(h).accent;
+    if (!ab.shots) {
+      const first = firstInLine(ctx, h, aim.dx, aim.dz, ab.range, ab.width ?? 1);
+      if (first) bounceChain(h, ctx, ab, first, col, acc);
+      else {
+        vfx.streak(h.x, 1.3, h.z, h.x + aim.dx * ab.range, 1.3, h.z + aim.dz * ab.range, col, 0.2, 4);
+        vfx.beam(h.x, 1.3, h.z, h.x + aim.dx * ab.range, 1.3, h.z + aim.dz * ab.range, col, 0.15, 0.2);
+      }
+      return;
+    }
+    for (let i = 0; i < ab.shots; i++) {
+      ctx.later(i * ab.gap, () => {
+        if (!h.alive || h.stun > 0) return;
+        const t = pickTarget(ctx, h.team, h.x, h.z, ab.range, ['heroes', 'minions']);
+        if (!t) return;
+        h.face = Math.atan2(t.x - h.x, t.z - h.z); h.faceHold = 0.3;
+        bounceChain(h, ctx, ab, t, i % 2 ? acc : col, i % 2 ? col : acc);
+      });
+    }
+    h.effects.push({ t: 0, dur: (ab.shots - 1) * ab.gap + 0.05, update(h) { h.noAttack = true; h.moveMul = ab.moveMul ?? 0.7; } });
+  },
+
+  // Soul tether: link to the most hurt ally in range; heals them (and damage-reduces them) while the link holds.
+  tether(h, ab, ctx) {
+    let ally = null;
+    forEachAlly(ctx, h.team, h.x, h.z, ab.range, (a) => {
+      if (a !== h && (!ally || a.hp / a.maxHp < ally.hp / ally.maxHp)) ally = a;
+    });
+    if (!ally) return false;
+    const col = fx(h).color, acc = fx(h).accent;
+    let tick = 0;
+    vfx.ring(ally.x, 0.25, ally.z, col, 2.5, 0.4);
+    h.effects.push({
+      t: 0, dur: ab.dur,
+      update(h, dt) {
+        if (!ally.alive || Math.hypot(ally.x - h.x, ally.z - h.z) > ab.breakR) { this.t = this.dur; return; }
+        if (ab.dr) addBuff(ally, 'dr', ab.dr, 0.3);
+        if ((tick -= dt) > 0) return;
+        tick = 0.25;
+        heal(ally, ab.healPs * 0.25);
+        vfx.link(h, ally, tick % 0.5 ? col : acc, 0.3, 1.2, ally.hitY ?? 1.1, 0.14);
+        sparks(ally.x, 1.2, ally.z, 3, [col, acc], 1.5);
+      },
+    });
+  },
 };
+
+// Marks live until their timer runs out or the target falls; the head sparkle keeps them visible.
+function putMark(h, e, ab, ctx, col) {
+  if (!e.alive || e.type === 'tower' || e.type === 'core') return;
+  const m = { src: h };
+  let vis = 0;
+  e.mark = m;
+  ctx.anim(ab.markT, (u, dt) => {
+    if (e.mark !== m) return;
+    if (u >= 1 || !e.alive) { e.mark = null; return; }
+    particles.emit(e.x + rand(-0.4, 0.4), (e.hitY ?? 1) + 1, e.z + rand(-0.4, 0.4), 0, 1.2, 0, col, 0.7, 0.4, FRAME.sparkle);
+    if ((vis -= dt) <= 0) { vis = 0.5; vfx.flash(e.x, (e.hitY ?? 1) + 1.3, e.z, col, 1.2, 0.3); }
+  });
+}
+
+// First enemy (hero / minion / structure) along a line from the hero.
+function firstInLine(ctx, h, dx, dz, range, width) {
+  let best = null, bd = Infinity;
+  forEachEnemy(ctx, h.team, h.x + dx * range * 0.5, h.z + dz * range * 0.5, range * 0.5 + 1.5, (e) => {
+    const rx = e.x - h.x, rz = e.z - h.z, along = rx * dx + rz * dz, lat = Math.abs(rx * dz - rz * dx);
+    if (along > 0 && along <= range + e.radius && lat <= width / 2 + e.radius && along < bd) { best = e; bd = along; }
+  });
+  return best;
+}
+
+// The chain of enemies a pinball shot visits (planned now, applied 90 ms apart so the bounces read).
+function bounceChain(h, ctx, ab, first, col, acc) {
+  const path = [first], seen = new Set([first]);
+  while (path.length <= ab.bounces) {
+    const from = path[path.length - 1];
+    let next = null, bd = ab.bounceR;
+    forEachEnemy(ctx, h.team, from.x, from.z, ab.bounceR, (e) => {
+      const dd = Math.hypot(e.x - from.x, e.z - from.z);
+      if (!seen.has(e) && e.type !== 'tower' && e.type !== 'core' && dd < bd) { next = e; bd = dd; }
+    });
+    if (!next) break;
+    seen.add(next); path.push(next);
+  }
+  let px = h.x, pz = h.z, dmg = ab.dmg;
+  path.forEach((e, i) => {
+    const fx0 = px, fz0 = pz, d = dmg;
+    ctx.later(i * 0.09, () => {
+      vfx.streak(fx0, 1.3, fz0, e.x, (e.hitY ?? 1) + 0.2, e.z, col, 0.18, 4);
+      vfx.beam(fx0, 1.3, fz0, e.x, (e.hitY ?? 1) + 0.2, e.z, col, 0.14, 0.2);
+      vfx.ring(e.x, 0.3, e.z, acc, 2, 0.25);
+      if (e.alive) { affect(h, e, { ...ab, dmg: d }, { x: fx0, z: fz0 }); sparks(e.x, 1, e.z, 8, [col, acc, 0xffffff], 4); }
+    });
+    px = e.x; pz = e.z; dmg *= ab.falloff ?? 0.8;
+  });
+}
 
 // Chain strike: blink between nearby enemies hitting each, untargetable throughout.
 function chainStrike(h, ab, ctx) {
@@ -427,6 +668,7 @@ const BASICS = {
     const strike = (e, m = 1) => {
       let k = dmg * m;
       if (b.lowBonus && e.type === 'hero' && e.hp < e.maxHp * 0.5) k *= 1 + b.lowBonus;
+      if (b.markBonus && e.mark?.src === h) k *= 1 + b.markBonus;
       dealDamage(e, k, h);
       if (b.slow && e.alive) applyStatus(e, 'slow', b.slow);
     };

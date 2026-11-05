@@ -1,11 +1,11 @@
-// The 18 champions as pure data. `kind` selects a behavior in behaviors.js; `perk` is merged in at max rank.
+// The 24 champions as pure data. `kind` selects a behavior in behaviors.js; `perk` is merged in at max rank.
 // Skill params: cd, range, radius, dmg + kind flags (stun, slow, knock, pull, air, shield, heal, charges, pierce, ...).
 // model: spec for buildChampion (models.js).
 
 export const ROLES = ['tank', 'bruiser', 'assassin', 'blaster', 'shooter', 'support'];
 
 // Rank r > 1 adds +20% to these per rank and -8% cooldown; the perk (at max rank) overrides params.
-const SCALE = ['dmg', 'shield', 'allyShield', 'heal', 'allyHeal', 'healPs', 'dps', 'tDmg'];
+const SCALE = ['dmg', 'shield', 'allyShield', 'heal', 'allyHeal', 'healPs', 'dps', 'tDmg', 'endDmg'];
 
 export function rankStats(ab, rank) {
   const r = Math.max(1, rank), out = { ...ab };
@@ -188,5 +188,65 @@ export const ROSTER_DEFS = [
     s1: { name: 'Garden Patch', kind: 'field', tag: 'heal garden', cd: 11, range: 7, r: 3.5, dur: 5, healPs: 45, place: 'ally', perk: { at: 4, healPs: 70 } },
     s2: { name: 'Thorn Lash', kind: 'bolt', tag: 'rooting vine', cd: 8, range: 9, width: 1.0, dmg: 60, slow: true, slowT: 2.2, perk: { at: 4, stun: 0.8 } },
     ult: { name: 'Full Bloom', kind: 'buff', tag: 'team renewal', cd: 50, allyR: 9, heal: 200, allyHeal: 200, shield: 120, allyShield: 120, dur: 4, cleanse: true, perk: { at: 3, heal: 300, allyHeal: 300 } },
+  },
+  {
+    id: 'tremor', name: 'Tremor', title: 'Quake Warden', role: 'tank', pair: 'D', color: 0xC2703D, accent: 0xFFE0A3,
+    fx: { color: 0xFF9A3D, accent: 0xFFE9B8 },
+    model: { torso: 'heavy', helmet: 'flat', paul: 'huge', arm: 'gauntlet2', back: 'ring', visor: 'slit', w: 1.18 },
+    stats: { hp: 1120, hpLv: 92, speed: 5.8, radius: 0.88 },
+    basic: { name: 'Quake Fist', kind: 'melee', range: 2.3, dmg: 44, cd: 1.0, cleave: 90, color: 0xFFC27A },
+    s1: { name: 'Fault Line', kind: 'quake', tag: 'slam line', cd: 9, count: 4, gap: 2.2, radius: 1.7, dmg: 55, stun: 0.4, perk: { at: 4, count: 5, stun: 0.7 } },
+    s2: { name: 'Granite Pulse', kind: 'nova', tag: 'pulse shield', cd: 10, radius: 3.6, dmg: 50, slow: true, slowT: 1.5, shield: 170, dur: 2.5, perk: { at: 4, knock: 2.5 } },
+    ult: { name: 'Cataclysm', kind: 'quake', tag: 'shock rings', cd: 45, rings: 3, step: 2.6, width: 2.2, dmg: 90, slow: true, slowT: 1.5, lastAir: true, perk: { at: 3, rings: 4 } },
+  },
+  {
+    id: 'rotor', name: 'Rotor', title: 'Blade Whirler', role: 'bruiser', pair: 'D', color: 0xC4283C, accent: 0xFFB3B3,
+    fx: { color: 0xFF4D6D, accent: 0xFFD6DC },
+    model: { torso: 'medium', helmet: 'fin', paul: 'small', arm: 'blade', back: 'stacks', visor: 'v', w: 1.05 },
+    stats: { hp: 930, hpLv: 78, speed: 6.3, radius: 0.75 },
+    basic: { name: 'Saw Swipe', kind: 'melee', range: 2.2, dmg: 52, cd: 0.8, cleave: 140, color: 0xFF8FA3 },
+    s1: { name: 'Axe Boomerang', kind: 'boomerang', tag: 'out and back', cd: 7, range: 8, width: 1.4, dmg: 60, dur: 1.2, perk: { at: 4, range: 10, slow: true, slowT: 1.2 } },
+    s2: { name: 'Blade Orbit', kind: 'orbit', tag: 'orbiting blades', cd: 10, blades: 3, r: 2.2, dur: 4, dmg: 28, slow: true, slowT: 0.8, perk: { at: 4, blades: 4, dur: 5 } },
+    ult: { name: 'Rampage', kind: 'buff', tag: 'frenzy', cd: 40, shield: 150, dur: 5, spd: 0.3, spdT: 5, aspd: 0.5, aspdT: 5, lifesteal: 0.25, lsT: 5, perk: { at: 3, lifesteal: 0.4, shield: 250 } },
+  },
+  {
+    id: 'vesper', name: 'Vesper', title: 'Hex Stalker', role: 'assassin', pair: 'D', color: 0xE8E1D0, accent: 0x3A2A5A,
+    fx: { color: 0xD4FF2A, accent: 0x7A3DFF },
+    model: { torso: 'slim', helmet: 'hood', paul: 'none', arm: 'blade', back: 'coat', visor: 'dot', h: 1.05 },
+    stats: { hp: 700, hpLv: 60, speed: 6.7, radius: 0.65 },
+    basic: { name: 'Hex Slash', kind: 'melee', range: 2.0, dmg: 54, cd: 0.7, markBonus: 0.35, color: 0xE4FF7A },
+    s1: { name: 'Hex Dart', kind: 'mark', tag: 'mark target', cd: 6, range: 10, width: 0.9, dmg: 40, markT: 5, perk: { at: 4, slow: true, slowT: 1.5 } },
+    s2: { name: 'Hexplosion', kind: 'detonate', tag: 'pop marks', cd: 8, range: 13, dmg: 85, pct: 0.06, perk: { at: 4, stun: 0.5 } },
+    ult: { name: 'Death Mark', kind: 'blink', tag: 'mark finisher', cd: 40, range: 10, dmg: 200, markMul: 1.6, stun: 0.5, perk: { at: 3, dmg: 260 } },
+  },
+  {
+    id: 'nyx', name: 'Nyx', title: 'Void Weaver', role: 'blaster', pair: 'D', color: 0x1D1633, accent: 0xA98BFF,
+    fx: { color: 0x8A5BFF, accent: 0xE0D4FF },
+    model: { torso: 'slim', helmet: 'dome', paul: 'discs', arm: 'none', back: 'pylons', visor: 'wide' },
+    stats: { hp: 660, hpLv: 56, speed: 5.8, radius: 0.65 },
+    basic: { name: 'Void Orb', kind: 'proj', range: 7.5, dmg: 40, cd: 0.85, speed: 14, arc: 0.4, splash: 1.3, size: 1.3, color: 0xB89BFF },
+    s1: { name: 'Gravity Well', kind: 'vortex', tag: 'pull vortex', cd: 9, range: 8, radius: 3, dur: 2.5, pull: 4, dps: 30, endDmg: 70, perk: { at: 4, radius: 3.8, endStun: 0.6 } },
+    s2: { name: 'Rift Skip', kind: 'leap', tag: 'skip + pull', cd: 9, range: 6, radius: 2.5, dmg: 50, pull: 2, slow: true, slowT: 1.5, dur: 0.3, height: 2.2, perk: { at: 4, radius: 3.2, stun: 0.5 } },
+    ult: { name: 'Event Horizon', kind: 'vortex', tag: 'collapse', cd: 45, range: 10, radius: 5.5, dur: 3, pull: 6, dps: 55, slow: true, endDmg: 160, endStun: 0.8, perk: { at: 3, radius: 6.5, dur: 3.5 } },
+  },
+  {
+    id: 'rico', name: 'Rico', title: 'Pinball Gunner', role: 'shooter', pair: 'D', color: 0x3A3F4B, accent: 0xFF2E93,
+    fx: { color: 0xFF2E93, accent: 0xFFC2E0 },
+    model: { torso: 'medium', helmet: 'crest', paul: 'small', arm: 'blaster', back: 'drum', visor: 'wide', h: 0.98 },
+    stats: { hp: 650, hpLv: 55, speed: 6.1, radius: 0.7 },
+    basic: { name: 'Pinball Shot', kind: 'proj', range: 8, dmg: 50, cd: 0.85, speed: 26, arc: 0, size: 0.9, color: 0xFF7AC0 },
+    s1: { name: 'Ricochet', kind: 'ricochet', tag: 'bounce shot', cd: 7, range: 10, width: 1.0, bounces: 3, bounceR: 5, dmg: 85, falloff: 0.8, perk: { at: 4, bounces: 5 } },
+    s2: { name: 'Overclock', kind: 'buff', tag: 'rapid fire', cd: 10, aspd: 0.6, aspdT: 3, spd: 0.2, spdT: 3, perk: { at: 4, aspd: 0.9, aspdT: 4 } },
+    ult: { name: 'Pinball Frenzy', kind: 'ricochet', tag: 'bounce volley', cd: 45, range: 9, shots: 4, gap: 0.35, bounces: 3, bounceR: 5, dmg: 60, falloff: 0.85, moveMul: 0.7, perk: { at: 3, shots: 6 } },
+  },
+  {
+    id: 'lumen', name: 'Lumen', title: 'Soul Tether', role: 'support', pair: 'D', color: 0xFFE9A8, accent: 0xFF9F1C,
+    fx: { color: 0xFFD966, accent: 0xFFF6D0 },
+    model: { torso: 'slim', helmet: 'fin', paul: 'discs', arm: 'staff', back: 'drone', visor: 'dot', emblem: 1 },
+    stats: { hp: 730, hpLv: 60, speed: 6.2, radius: 0.65 },
+    basic: { name: 'Sun Mote', kind: 'proj', range: 7, dmg: 32, cd: 0.75, speed: 15, arc: 0.3, healAlly: 10, color: 0xFFE08A },
+    s1: { name: 'Soul Tether', kind: 'tether', tag: 'link heal', cd: 12, range: 8, breakR: 11, dur: 5, healPs: 55, dr: 0.2, perk: { at: 4, healPs: 80, dur: 6 } },
+    s2: { name: 'Flare Burst', kind: 'nova', tag: 'flare knock', cd: 9, radius: 3.5, dmg: 55, knock: 3, spd: 0.3, spdT: 1.5, perk: { at: 4, stun: 0.6 } },
+    ult: { name: 'Second Wind', kind: 'buff', tag: 'team undying', cd: 50, allyR: 9, heal: 140, allyHeal: 140, undyingT: 2, cleanse: true, perk: { at: 3, heal: 220, allyHeal: 220 } },
   },
 ];

@@ -1,4 +1,4 @@
-// v4 stage B: champion-select screenshot (all 18) + per-champion ability smoke test + one abilities-firing shot.
+// v4 stage B: champion-select screenshot (all 24) + per-champion ability smoke test + one abilities-firing shot.
 // Run: node tests/v4-champs.mjs [outDir]  (needs playwright + chromium)
 import { createServer } from 'node:http';
 import { createReadStream, existsSync, mkdirSync, statSync } from 'node:fs';
@@ -41,7 +41,7 @@ await tap('play-btn');
 await sleep(500);
 const ids = await page.$$eval('[data-testid^="champion-card-"]', (els) => els.map((e) => e.dataset.id));
 console.log(`cards: ${ids.length}`);
-if (ids.length !== 18) errors.push(`expected 18 cards, got ${ids.length}`);
+if (ids.length !== 24) errors.push(`expected 24 cards, got ${ids.length}`);
 await page.screenshot({ path: join(OUT, 'champ-select.png') });
 
 // Fire every skill of the picked champion (maxed) next to an enemy hero; report thrown errors / dead casts.
@@ -65,6 +65,6 @@ async function fire(id, shot) {
   await page.evaluate(() => clearInterval(window.__t));
 }
 for (const id of ids) await fire(id, id === process.env.SHOT_HERO || (!process.env.SHOT_HERO && id === 'rime'));
-if (errors.length) { console.log('ERRORS\n' + errors.join('\n')); process.exitCode = 1; } else console.log('ok: all 18 champions fired Q/E/R without errors');
+if (errors.length) { console.log('ERRORS\n' + errors.join('\n')); process.exitCode = 1; } else console.log('ok: all 24 champions fired Q/E/R without errors');
 await browser.close();
 server.close();

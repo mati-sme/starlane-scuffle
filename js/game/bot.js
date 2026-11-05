@@ -6,7 +6,7 @@ import { TOWER, CORE, BOT, DIFFICULTY, settings, MATCH } from '../config.js';
 import { nextItem, atBase } from './gear.js';
 import { rand } from '../core/math.js';
 import { pickTarget, bestCluster } from './targeting.js';
-import { forEachAlly } from './combat.js';
+import { forEachAlly, forEachEnemy } from './combat.js';
 import { PATHS, fountain, structSpot, laneOf } from '../world/arena.js';
 
 const MELEE = { tank: 0, bruiser: 1, assassin: 2 };
@@ -323,6 +323,16 @@ export class Bot {
         if (ab.trail) return near(foe, ab.range - 2) && ult;
         return near(foe, ab.range - 1) && (!ab.radius || Math.hypot(foe.x - h.x, foe.z - h.z) > 2);
       case 'trap': return near(foe, ab.range);
+      case 'quake': return ab.rings ? near(foe, ab.rings * ab.step - 1) : near(foe, 2 + ab.count * ab.gap - 1);
+      case 'boomerang': case 'mark': case 'ricochet': return near(foe, (ab.range ?? 8) - 1);
+      case 'orbit': return near(foe, ab.r + 2);
+      case 'vortex': return !!cluster(ab.range, ab.radius);
+      case 'detonate': {
+        let any = false;
+        forEachEnemy(ctx, h.team, h.x, h.z, ab.range, (e) => { if (e.mark?.src === h) any = true; });
+        return any;
+      }
+      case 'tether': return hurt.some((a) => a !== h);
       case 'decoy': return near(foe, 5);
       case 'bolt': case 'hook': case 'beam':
         return near(foe, ab.range - 0.5);

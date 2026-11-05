@@ -49,6 +49,14 @@ export const icons = {
   beam: svg(`<rect x="4" y="25" width="34" height="14" ${W}/><polygon points="38,32 60,8 60,56" ${W}/>`),
   trap: svg(`<polygon points="32,6 40,24 58,32 40,40 32,58 24,40 6,32 24,24" ${W}/><circle cx="32" cy="32" r="7" fill="${INK}"/>`),
   decoy: svg(`<circle cx="22" cy="20" r="9" ${W}/><path d="M10 56V38a12 12 0 0 1 24 0v18Z" ${W}/><circle cx="44" cy="20" r="9" ${LINE(4)}/><path d="M36 56V38a12 12 0 0 1 20 -8v26" ${LINE(4)}/>`),
+  quake: svg(`<polygon points="4,58 4,44 16,44 16,32 28,32 28,20 40,20 40,8 60,8 60,58" ${W}/><path d="M42 30l8 8M50 30l-8 8" ${LINE(4, INK)}/>`),
+  boomerang: svg(`<path d="M10 14Q54 10 54 54" ${LINE(11)}/><path d="M10 14Q46 18 46 54" ${LINE(4, INK)}/><polygon points="40,50 60,50 50,62" ${W}/>`),
+  orbit: svg(`<circle cx="32" cy="32" r="8" ${W}/><ellipse cx="32" cy="32" rx="26" ry="14" fill="none" stroke="#fff" stroke-width="4"/><polygon points="52,16 62,26 50,28" ${W}/><polygon points="12,48 2,38 14,36" ${W}/>`),
+  mark: svg(`<circle cx="32" cy="32" r="20" ${LINE(5)}/><path d="M32 4v14M32 46v14M4 32h14M46 32h14" ${LINE(5)}/><polygon points="32,22 42,32 32,42 22,32" ${W}/>`),
+  detonate: svg(`<polygon points="32,2 38,22 58,14 44,30 62,38 40,40 40,60 32,46 24,60 24,40 2,38 20,30 6,14 26,22" ${W}/>`),
+  vortex: svg(`<path d="M32 32m0 0a5 5 0 1 1 7 7 12 12 0 1 1-16-16 20 20 0 1 1 28 28" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/><circle cx="32" cy="32" r="4" ${W}/>`),
+  ricochet: svg(`<path d="M6 54L26 20L40 44L58 10" ${LINE(7)}/><circle cx="26" cy="20" r="6" ${W}/><circle cx="40" cy="44" r="6" ${W}/><circle cx="58" cy="10" r="5" ${W}/>`),
+  tether: svg(`<circle cx="14" cy="32" r="10" ${W}/><circle cx="50" cy="32" r="10" ${W}/><path d="M24 32Q32 18 40 32" ${LINE(5)}/><path d="M24 32Q32 46 40 32" ${LINE(5)}/>`),
   bolt: svg(`<path d="M4 32h40" ${LINE(8)}/><polygon points="42,16 62,32 42,48" ${W}/>`),
 
   // target buttons + recall

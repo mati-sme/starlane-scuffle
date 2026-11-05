@@ -48,7 +48,7 @@ export function createMenus(root) {
       (el) => { on(el, '.play', onPlay); on(el, '.online', onOnline); });
     },
 
-    // All 18 champions are always selectable.
+    // All 24 champions are always selectable.
     showSelect({ picked, onPlay, onHome }) {
       let sel = ROSTER.includes(picked) ? picked : ROSTER[0];
       const cards = ROSTER.map((id) => {
