@@ -109,9 +109,12 @@ const until = (page, expr, ms = 30000) => page.waitForFunction(expr, null, { tim
   // Barrier + the default HUD for the screenshot
   await page.evaluate(() => { const h = window.__starlane.match.hero; h.spells = ['flash', 'barrier']; h.spellCd = [0, 0]; });
   await until(page, `document.querySelector('[data-testid="spell-2"]').dataset.spell === 'barrier'`);
+  // The shield drains in real time and software GL polls slowly, so record the peak granted rather than sampling a decayed value.
+  await page.evaluate(() => { window.__sh = { hp: 0, t: 0 }; clearInterval(window.__shI); window.__shI = setInterval(() => { const h = window.__starlane.match.hero; window.__sh.hp = Math.max(window.__sh.hp, h.shieldHp); window.__sh.t = Math.max(window.__sh.t, h.shieldT); }, 5); });
   await tap(page, 'spell-2');
-  await until(page, `${hero(page)}.spellCd[1] > 0`);
-  check('barrier gives a shield', await num(page, `${hero(page)}.shieldHp > 100 && ${hero(page)}.shieldT > 2 && ${hero(page)}.shieldT <= 3`));
+  await until(page, `${hero(page)}.spellCd[1] > 0 && window.__sh.hp > 0`);
+  await page.evaluate(() => clearInterval(window.__shI));
+  check('barrier gives a shield', await num(page, `window.__sh.hp > 100 && window.__sh.t > 2 && window.__sh.t <= 3`), JSON.stringify(await page.evaluate(() => window.__sh)));
   check('barrier on cooldown (90-120s)', await num(page, `${hero(page)}.spellCd[1] > 90 && ${hero(page)}.spellCd[1] <= 120`));
   await page.evaluate(() => { const h = window.__starlane.match.hero; h.spellCd[0] = 37; h.spellCdTotal[0] = 100; }); // one ready, one cooling: both states in the shot
   await sleep(200);

@@ -1,13 +1,17 @@
-// v3 online + skill-up e2e. Run: node tests/v3-online.mjs  (needs playwright + chromium; talks to the live Worker in NET.url).
+// v3 online + skill-up e2e, updated for the v6 ban -> pick draft. Run: node tests/v3-online.mjs  (needs playwright + chromium).
+// Rooms run through tests/local-room.mjs (needs the `ws` package; WS_DIR=<node_modules>) unless WS_URL points at a deployed worker.
 import { createServer } from 'node:http';
 import { createReadStream, existsSync, mkdirSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { startLocalRooms } from './local-room.mjs';
 
 const ROOT = resolve(fileURLToPath(import.meta.url), '../..');
 const OUT = process.env.ARTIFACT_DIR ?? '/workspace/test-artifacts/starlane-scuffle/v3';
 mkdirSync(OUT, { recursive: true });
+const local = process.env.WS_URL ? null : await startLocalRooms();
+const WS = `&ws=${encodeURIComponent(process.env.WS_URL ?? local.url)}`;
 
 const require = createRequire(import.meta.url);
 let pw;
@@ -29,7 +33,8 @@ const server = createServer((req, res) => {
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const BASE = `http://127.0.0.1:${server.address().port}/`;
 
-const browser = await chromium.launch();
+const browser = await chromium.launch(process.env.DEFAULT_GL ? {} : { args: ['--use-gl=angle', '--use-angle=swiftshader', '--ignore-gpu-blocklist'] });
+const open = [];
 const errors = [];
 const results = [];
 
@@ -41,6 +46,7 @@ function watch(page, name) {
 async function newPlayer(name) {
   // iPhone 12 landscape (844x390): the game is landscape-only, portrait shows the rotate-phone overlay.
   const ctx = await browser.newContext({ ...devices['iPhone 12 landscape'] });
+  open.push(ctx);
   const page = await ctx.newPage();
   watch(page, name);
   return { ctx, page, name };
@@ -53,8 +59,11 @@ const state = (page) => page.evaluate(() => window.__starlane.state);
 const waitMatch = (page) => page.waitForFunction(() => window.__starlane.state === 'match' && document.body.classList.contains('playing'), null, { timeout: 20000 });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Software GL is slow to boot two heavy pages, so low gfx + a long load timeout, like the other v6 tests.
+const load = (page) => page.goto(`${BASE}?gfx=low${WS}`, { waitUntil: 'load', timeout: 90000 });
+
 async function openOnline(page) {
-  await page.goto(BASE, { waitUntil: 'load' });
+  await load(page);
   await tap(page, 'online-btn');
 }
 
@@ -90,15 +99,27 @@ async function startFromLobby(host, guest) {
   await sleep(2500); // let a few snapshots flow
 }
 
+// Tap a champion, wait for the lobby echo to settle so Ban is armed, then ban it.
+async function ban(page, id) {
+  await tap(page, `lobby-champ-${id}`);
+  await page.waitForFunction(() => { const b = document.querySelector('[data-testid="ban-btn"]'); return b && !b.disabled; }, null, { timeout: 15000 });
+  await tap(page, 'ban-btn');
+}
+
 async function lobbyRoom(sameTeam) {
   const host = await newPlayer('host'), guest = await newPlayer('guest');
   const code = await createRoom(host);
   await joinRoom(guest.page, code);
   const ids = await host.page.evaluate(() => [...document.querySelectorAll('[data-testid^="lobby-champ-"]')].map((b) => b.dataset.id));
+  // v6 draft: each human bans one champion, then the lobby moves on to picks.
+  await host.page.waitForFunction(() => document.querySelector('[data-testid="player-1"]'), null, { timeout: 15000 }); // a late joiner restarts the draft
+  await ban(host.page, ids[0]);
+  await ban(guest.page, ids[1]);
+  await Promise.all([host, guest].map((p) => p.page.waitForFunction(() => document.querySelector('[data-testid="draft-title"]')?.textContent.includes('Pick'), null, { timeout: 15000 })));
   await tap(host.page, 'team-sunny');
-  await tap(host.page, `lobby-champ-${ids[0]}`);
+  await tap(host.page, `lobby-champ-${ids[2]}`);
   await tap(guest.page, sameTeam ? 'team-sunny' : 'team-gloom');
-  await tap(guest.page, `lobby-champ-${ids[1]}`);
+  await tap(guest.page, `lobby-champ-${ids[3]}`);
   await bothPicked(host, guest);
   return { host, guest, code };
 }
@@ -106,6 +127,7 @@ async function lobbyRoom(sameTeam) {
 async function flow(name, fn) {
   try { await fn(); results.push([name, 'PASS']); }
   catch (e) { results.push([name, `FAIL: ${e.message.split('\n')[0]}`]); console.error(`[${name}]`, e); }
+  finally { await Promise.all(open.splice(0).map((c) => c.close().catch(() => {}))); }
 }
 
 await flow('A same-team', async () => {
@@ -155,8 +177,15 @@ async function joinRoomMidMatch(page, code) {
 
 await flow('D skill-up (offline)', async () => {
   const p = await newPlayer('solo');
-  await p.page.goto(BASE, { waitUntil: 'load' });
+  await load(p.page);
   await tap(p.page, 'play-btn');
+  // offline draft: ban one champion, then pick a free one
+  await tid(p.page, 'ban-btn').waitFor({ state: 'visible' });
+  const cards = await p.page.$$eval('[data-testid^="champion-card-"]', (els) => els.map((e) => e.dataset.id));
+  await tid(p.page, `champion-card-${cards[3]}`).click({ force: true });
+  await tap(p.page, 'ban-btn');
+  await p.page.waitForFunction(() => document.querySelector('[data-testid="draft-title"]')?.textContent.includes('Pick'), null, { timeout: 15000 });
+  await tid(p.page, `champion-card-${cards[0]}`).click({ force: true });
   await tid(p.page, 'go-btn').waitFor({ state: 'visible' });
   await tap(p.page, 'go-btn');
   await waitMatch(p.page);
@@ -174,6 +203,7 @@ await flow('D skill-up (offline)', async () => {
 
 await browser.close();
 server.close();
+local?.close();
 
 console.log('\n=== RESULTS ===');
 for (const [n, r] of results) console.log(`${r === 'PASS' ? 'PASS' : 'FAIL'}  ${n}${r === 'PASS' ? '' : '  ' + r}`);

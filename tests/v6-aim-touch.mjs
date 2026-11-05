@@ -93,14 +93,16 @@ check('tap release: attack cleared', await IN((i) => !i.attackTouch && !i.atkAim
 // 2. drag Attack in two opposite screen directions -> different targets, preview fan visible
 const aimed = async (dx) => {
   await down(1, atk); await move(1, { x: atk.x + dx / 2, y: atk.y }); await move(1, { x: atk.x + dx, y: atk.y });
-  await sleep(500);
+  await page.waitForFunction(() => { const m = window.__starlane.match; return m.preview.root.visible && window.__mins.includes(m.hero.aim); }, null, { timeout: 8000 }).catch(() => {});
   return S(() => ({ i: window.__mins.indexOf(window.__starlane.match.hero.aim), vis: window.__starlane.match.preview.root.visible }));
 };
 const L = await aimed(-80);
 check('drag left: preview fan + a target picked', L.vis && L.i >= 0, JSON.stringify(L));
 await page.screenshot({ path: OUT });
 await up(1); await sleep(600);
-check('drag release: preview hidden', !(await preview()));
+// Software GL runs at a few fps, so wait for a frame to draw the hidden state rather than sleeping a fixed time.
+const hid = await page.waitForFunction(() => !window.__starlane.match.preview.root.visible, null, { timeout: 8000 }).then(() => true, () => false);
+check('drag release: preview hidden', hid && !(await preview()));
 const R = await aimed(80);
 check('drag right picks the opposite target', R.vis && R.i >= 0 && R.i !== L.i, JSON.stringify(R));
 await up(1); await sleep(150);

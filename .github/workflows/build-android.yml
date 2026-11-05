@@ -2,7 +2,7 @@ name: build-android
 on:
   workflow_dispatch:
   push:
-    tags: ['v5*']
+    tags: ['v*']
 permissions:
   contents: write
 jobs:
@@ -25,14 +25,15 @@ jobs:
       - uses: actions/upload-artifact@v4
         with: { name: starlane-scuffle-apk, path: starlane-scuffle.apk }
       - name: Attach to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v5')
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: starlane-scuffle.apk
-      - name: Attach to v5.0.1 Release (manual runs)
+      - name: Attach to the package version's Release (manual runs)
         if: github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view v5.0.1 >/dev/null 2>&1 || gh release create v5.0.1 --title "Starlane Scuffle v5.0.1" --notes "Android APK + macOS (Apple Silicon) dmg. See README for install steps."
-          gh release upload v5.0.1 starlane-scuffle.apk --clobber
+          V=$(node -p "require('./package.json').version")
+          gh release view v$V >/dev/null 2>&1 || gh release create v$V --title "Starlane Scuffle v$V" --notes "Android APK + macOS (Apple Silicon) dmg. See README for install steps."
+          gh release upload v$V starlane-scuffle.apk --clobber

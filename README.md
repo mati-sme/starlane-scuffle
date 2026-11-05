@@ -1,11 +1,11 @@
 # Starlane Scuffle
 
-A sci-fi team-arena brawler for phones and desktops: 5v5 on a three-lane arena, 12 armored champions, no unlocks.
+A sci-fi team-arena brawler for phones and desktops: 5v5 on a three-lane arena, 24 armored champions with portraits, a ban-then-pick draft (every champion unique across both teams), two summoner spells (Flash / Barrier / Ignite), no unlocks.
 Built with three.js, no build step. All art, icons and sound are procedural.
 
 ## Play
 
-- **Champions:** all 12 are unlocked from the start (Bulwark, Magnus, Torque, Corsa, Glint, Volt, Cinder, Prism, Kade, Flint, Aria, Tempo). Pick one on the select screen; your last pick is remembered. You get 4 bot allies and face 5 bot enemies. Both teams always have a blaster, a shooter and a support (each pair is split between the teams, your pick stays on Sunny); the melee slots are random. `?hero=<id>` picks your champion and `?bots=a,b,c,...` forces up to 9 ids (4 allies, then 5 enemies).
+- **Champions:** all 24 are unlocked from the start. Ban one, then pick one on the select screen (no champion appears twice in a match); your last pick is remembered. You get 4 bot allies and face 5 bot enemies. Both teams always have a blaster, a shooter and a support (each pair is split between the teams, your pick stays on Sunny); the melee slots are random. `?hero=<id>` picks your champion and `?bots=a,b,c,...` forces up to 9 ids (4 allies, then 5 enemies).
 - **Phone (landscape):** left thumb moves, the big button attacks and auto-aims, the three skill buttons cast Q / E / R. A gold `+` pops up above each skill button that can take a point; tap it to rank up.
 - **Desktop:** `WASD` / arrows move, right-click walks, `Space` (or left-click) attacks, `Q` `E` `R` cast skills, `Esc` pauses.
 - **Skill upgrades:** every level gives a point (max level 9). A small gold `+` appears above each skill button that can be ranked up (Wild Rift style); tap it. On desktop, `1` / `2` / `3` or `Ctrl+Q` / `Ctrl+E` / `Ctrl+R` rank up Q / E / R. Q and E go to rank 4, R to rank 3 (R rank 1 is free at level 3). Rank 2+ adds damage / healing and shortens the cooldown; the max rank adds a perk. Higher ranks need a minimum level (a skill below its gate shows no `+`). Upgrading never pauses the game.
@@ -22,7 +22,7 @@ Built with three.js, no build step. All art, icons and sound are procedural.
 
 ## Play online (2 humans + bots)
 
-PLAY ONLINE -> CREATE ROOM shows a 4-character code and a share link (`?room=CODE` opens the join flow). Each player picks Sunny / Gloom and a champion: same team = co-op vs bots, different teams = versus; bots fill every side to 5v5. The creator is the sim host (their browser runs the match); the guest sends inputs and mirrors host snapshots, predicting only their own hero. A dropped player resumes the same slot within 45 s. Server and protocol: `worker/README.md`. Local dev: `npx wrangler dev` in `worker/`, then `?ws=ws://localhost:8787`.
+PLAY ONLINE -> CREATE ROOM shows a 4-character code and a share link (`?room=CODE` opens the join flow). Each player bans one champion, then picks Sunny / Gloom, a champion and two summoner spells (picks lock for everyone else): same team = co-op vs bots, different teams = versus; bots fill every side to 5v5. The creator is the sim host (their browser runs the match); the guest sends inputs and mirrors host snapshots, predicting only their own hero. A dropped player resumes the same slot within 45 s. Server and protocol: `worker/README.md`. Local dev: `npx wrangler dev` in `worker/`, then `?ws=ws://localhost:8787`.
 
 ## Install the apps
 
