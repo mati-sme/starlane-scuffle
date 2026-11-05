@@ -15,6 +15,10 @@ const maxHp = Math.max(...ROSTER.map((id) => HEROES[id].stats.hp));
 const maxSpeed = Math.max(...ROSTER.map((id) => HEROES[id].stats.speed));
 const maxRange = Math.max(...ROSTER.map((id) => HEROES[id].basic.range));
 
+const HELP = 'First ban one champion you don\'t want anyone to play, then pick yours.';
+// Greyed, stamped card state: 'banned' (nobody can play it) or 'taken' (someone already picked it).
+const stamp = (kind) => (kind === 'banned' ? 'BANNED' : kind === 'taken' ? 'TAKEN' : '');
+
 const bar = (label, v) => `<div class="stat"><span>${label}</span><i><b style="width:${Math.round(v * 100)}%"></b></i></div>`;
 
 // Basic + Q / E / R rows of the detail strip.
@@ -28,15 +32,30 @@ function skillRows(def) {
 }
 
 export function createMenus(root) {
+  let tick = 0;
   const show = (cls, html, wire) => {
+    clearInterval(tick);
     root.innerHTML = `<div class="screen ${cls}">${html}</div>`;
     wire(root.firstElementChild);
+  };
+  // Counts the .timer element down to `deadline` (performance.now() ms), then calls onEnd once.
+  const countdown = (el, deadline, onEnd) => {
+    const timer = el.querySelector('.timer');
+    if (!timer || !deadline) return;
+    const update = () => {
+      const left = Math.max(0, Math.ceil((deadline - performance.now()) / 1000));
+      timer.textContent = `${left}s`;
+      timer.classList.toggle('low', left <= 5);
+      if (left <= 0) { clearInterval(tick); onEnd?.(); }
+    };
+    update();
+    tick = setInterval(update, 250);
   };
   const on = (el, sel, fn) => el.querySelector(sel).addEventListener('click', fn);
   root.addEventListener('click', (e) => { if (e.target.closest('button')) audio.sfx('click'); });
 
   return {
-    hideAll() { root.innerHTML = ''; },
+    hideAll() { clearInterval(tick); root.innerHTML = ''; },
 
     showTitle(onPlay, onOnline) {
       const row = ROSTER.map((id, i) => `<i style="--i:${i}">${icons.champ(HEROES[id])}</i>`).join('');
@@ -50,18 +69,23 @@ export function createMenus(root) {
       (el) => { on(el, '.play', onPlay); on(el, '.online', onOnline); });
     },
 
-    // All 24 champions are always selectable.
-    showSelect({ picked, onPlay, onHome }) {
-      let sel = ROSTER.includes(picked) ? picked : ROSTER[0];
+    // Offline draft. phase 'ban': tap a champion, BAN it. phase 'pick': banned champions are stamped and locked, tap one, GO.
+    // secs: countdown, then onTimeout(selected id or null). note: one line under the help text.
+    showSelect({ phase = 'pick', picked, banned = [], secs = 0, note = '', onBan, onPlay, onTimeout, onHome }) {
+      const banning = phase === 'ban';
+      const out = new Set(banned);
+      let sel = banning ? null : out.has(picked) ? ROSTER.find((id) => !out.has(id)) : ROSTER.includes(picked) ? picked : ROSTER[0];
       const cards = ROSTER.map((id) => {
-        const def = HEROES[id];
-        return `<button type="button" class="hcard" data-id="${id}" data-testid="champion-card-${id}" aria-pressed="false" style="--c:${def.css}">
+        const def = HEROES[id], gone = out.has(id);
+        return `<button type="button" class="hcard ${gone ? 'out banned' : ''}" data-id="${id}" data-testid="champion-card-${id}" data-stamp="${gone ? stamp('banned') : ''}" aria-pressed="false" ${gone ? 'disabled' : ''} style="--c:${def.css}">
           <span class="pic">${portrait(id)}</span><b>${def.name}</b>
           <span class="role"><i>${icons.role(def.role)}</i>${upper(def.role)}</span></button>`;
       }).join('');
-      show('select modal', `
+      show(`select modal ${banning ? 'banmode' : ''}`, `
         <button class="small home" type="button" aria-label="Back" data-testid="select-back">${icons.home}</button>
-        <h2 class="sel-title">Choose your champion</h2>
+        <h2 class="sel-title" data-testid="draft-title">${banning ? 'Ban — tap to ban' : 'Pick — tap to choose'}</h2>
+        <p class="hint draft-help" data-testid="draft-help">${banning ? HELP : note || 'Banned champions are locked. Now pick yours!'}</p>
+        <span class="timer" data-testid="draft-timer"></span>
         <div class="selwrap">
           <div class="grid" data-testid="champion-grid">${cards}</div>
           <aside class="detail" data-testid="champion-detail"></aside>
@@ -69,6 +93,10 @@ export function createMenus(root) {
       (el) => {
         const list = [...el.querySelectorAll('.hcard')], detail = el.querySelector('.detail');
         const fill = () => {
+          if (!sel) {
+            detail.innerHTML = '<p class="dtitle">Tap a champion you don\'t want anyone to play.</p><button class="btn ban go" type="button" data-testid="ban-btn" disabled>BAN</button>';
+            return;
+          }
           const def = HEROES[sel];
           el.style.setProperty('--sel', def.css);
           detail.innerHTML = `
@@ -77,8 +105,8 @@ export function createMenus(root) {
               <span class="drole" data-testid="detail-role">${upper(def.role)}</span></div></div>
             <div class="stats">${bar('HP', def.stats.hp / maxHp)}${bar('SPD', def.stats.speed / maxSpeed)}${bar('RNG', def.basic.range / maxRange)}</div>
             <ul class="skills">${skillRows(def)}</ul>
-            <button class="btn primary go" type="button" data-testid="go-btn">GO</button>`;
-          on(detail, '.go', () => onPlay(sel));
+            ${banning ? '<button class="btn ban go" type="button" data-testid="ban-btn">BAN</button>' : '<button class="btn primary go" type="button" data-testid="go-btn">GO</button>'}`;
+          on(detail, '.go', () => (banning ? onBan(sel) : onPlay(sel)));
         };
         const mark = () => list.forEach((c) => {
           const on = c.dataset.id === sel;
@@ -97,6 +125,7 @@ export function createMenus(root) {
           });
         }
         on(el, '.home', onHome);
+        countdown(el, secs && performance.now() + secs * 1000, () => onTimeout?.(sel));
       });
     },
 
@@ -120,19 +149,29 @@ export function createMenus(root) {
       });
     },
 
-    // Room lobby: code + link, both players' team / champion, host Start. Re-rendered on every lobby update.
-    showLobby({ code, link, me, players, phase, conn, error }, { onTeam, onHero, onStart, onCopy, onLeave }) {
+    // Room lobby: code + link, both players' team / ban / champion, host Start. Re-rendered on every lobby update.
+    // stage 'ban': tap a champion (banSel), BAN it. stage 'pick': banned / taken champions are stamped and locked.
+    // deadline: performance.now() ms the stage timer ends (0 = no timer).
+    showLobby({ code, link, me, players, phase, stage = 'pick', bans = [], banSel = null, deadline = 0, conn, error }, { onTeam, onHero, onBanSel, onBan, onStart, onCopy, onLeave, onTimeout }) {
       const mine = players.find((p) => p.slot === me), other = players.find((p) => p.slot !== me);
       const isHost = me === 0, two = players.length === 2;
+      const banning = stage === 'ban' && phase === 'lobby';
       const versus = two && players[0].team !== players[1].team;
       const mode = !two ? 'Practice: you + bots' : versus ? 'Versus: you play against each other' : 'Co-op: same team vs bots';
-      const taken = other && other.team === mine?.team ? other.hero : null;
+      const state = (id) => (bans.includes(id) ? 'banned' : other?.hero === id ? 'taken' : '');
       const row = (p) => `<li class="pl t${p.team} ${p.connected ? '' : 'off'}" data-testid="player-${p.slot}"><i class="dot"></i><b>${p.name}${p.slot === me ? ' (you)' : ''}</b>
-        <span class="tm">${TEAM_NAME[p.team]}</span><span class="ch">${p.hero ? `<i>${portrait(p.hero)}</i>${HEROES[p.hero].name}` : '…'}</span></li>`;
-      const cards = ROSTER.map((id) => `<button type="button" class="hcard mini ${mine?.hero === id ? 'sel' : ''}" data-id="${id}" data-testid="lobby-champ-${id}" style="--c:${HEROES[id].css}" ${taken === id ? 'disabled' : ''}>
-        <span class="pic">${portrait(id)}</span><b>${HEROES[id].name}</b></button>`).join('');
-      const canStart = isHost && phase === 'lobby' && two && players.every((p) => p.connected && p.hero);
-      show('lobby modal', `
+        <span class="tm">${TEAM_NAME[p.team]}</span>${p.ban ? `<span class="bn" data-testid="player-ban-${p.slot}">Ban: ${HEROES[p.ban]?.name ?? p.ban}</span>` : ''}<span class="ch">${p.hero ? `<i>${portrait(p.hero)}</i>${HEROES[p.hero].name}` : '…'}</span></li>`;
+      const cards = ROSTER.map((id) => {
+        const st = state(id), gone = !!st, on = banning ? banSel === id : mine?.hero === id;
+        return `<button type="button" class="hcard mini ${on ? 'sel' : ''} ${gone ? `out ${st}` : ''}" data-id="${id}" data-testid="lobby-champ-${id}" data-stamp="${stamp(st)}" style="--c:${HEROES[id].css}" ${gone || (banning && mine?.ban) ? 'disabled' : ''}>
+        <span class="pic">${portrait(id)}</span><b>${HEROES[id].name}</b></button>`;
+      }).join('');
+      const canStart = isHost && phase === 'lobby' && stage === 'pick' && two && players.every((p) => p.connected && p.hero);
+      const help = !banning ? 'Banned champions are locked. Now pick yours!' : mine?.ban ? (two && !other?.ban ? 'Waiting for your friend to ban…' : '') : HELP;
+      const action = banning
+        ? `<button class="btn ban banbtn" type="button" data-testid="ban-btn" ${banSel && !mine?.ban ? '' : 'disabled'}>BAN</button>`
+        : isHost ? `<button class="btn primary start" type="button" data-testid="start-btn" ${canStart || (phase === 'lobby' && stage === 'pick' && !two && mine?.hero) ? '' : 'disabled'}>${two ? 'START' : 'PRACTICE'}</button>` : '<span class="hint">Waiting for the host to start…</span>';
+      show(`lobby modal ${banning ? 'banmode' : ''}`, `
         <button class="small home" type="button" aria-label="Leave" data-testid="lobby-back">${icons.home}</button>
         <div class="roomcode"><span>Room code</span><b data-testid="room-code">${code}</b>
           <button class="btn copy" type="button" data-testid="copy-link">COPY LINK</button></div>
@@ -140,16 +179,20 @@ export function createMenus(root) {
         <ul class="players">${players.map(row).join('')}${two ? '' : '<li class="pl wait"><i class="dot"></i><b>Waiting for a friend…</b></li>'}</ul>
         <div class="teampick"><button type="button" class="tbtn t0 ${mine?.team === 0 ? 'on' : ''}" data-team="0" data-testid="team-sunny">SUNNY</button>
           <button type="button" class="tbtn t1 ${mine?.team === 1 ? 'on' : ''}" data-team="1" data-testid="team-gloom">GLOOM</button></div>
+        <h3 class="stagehead" data-testid="draft-title">${phase === 'play' ? 'Match in progress…' : banning ? 'Ban — tap to ban' : 'Pick — tap to choose'}<span class="timer" data-testid="draft-timer"></span></h3>
+        <p class="hint draft-help" data-testid="draft-help">${help}</p>
         <div class="grid lobbygrid">${cards}</div>
-        <p class="hint" data-testid="lobby-mode">${phase === 'play' ? 'Match in progress…' : mode}</p>
+        <p class="hint" data-testid="lobby-mode">${phase === 'play' ? '' : mode}</p>
         <p class="neterr" data-testid="lobby-error">${conn !== 'open' ? 'Reconnecting…' : error ?? ''}</p>
-        <div class="row">${isHost ? `<button class="btn primary start" type="button" data-testid="start-btn" ${canStart || (phase === 'lobby' && !two && mine?.hero) ? '' : 'disabled'}>${two ? 'START' : 'PRACTICE'}</button>` : '<span class="hint">Waiting for the host to start…</span>'}</div>`,
+        <div class="row">${action}</div>`,
       (el) => {
         for (const b of el.querySelectorAll('.tbtn')) b.addEventListener('click', () => onTeam(+b.dataset.team));
-        for (const b of el.querySelectorAll('.hcard')) b.addEventListener('click', () => onHero(b.dataset.id));
+        for (const b of el.querySelectorAll('.hcard')) b.addEventListener('click', () => (banning ? onBanSel(b.dataset.id) : onHero(b.dataset.id)));
         el.querySelector('.copy').addEventListener('click', () => onCopy(el.querySelector('.copy')));
         el.querySelector('.home').addEventListener('click', onLeave);
         el.querySelector('.start')?.addEventListener('click', () => onStart(!two));
+        el.querySelector('.banbtn')?.addEventListener('click', () => onBan(banSel));
+        if (phase === 'lobby') countdown(el, deadline, () => onTimeout?.());
       });
     },
 

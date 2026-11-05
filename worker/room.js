@@ -10,6 +10,9 @@ const EMPTY_MS = 10 * 60_000;     // an empty room is wiped after this
 const MAX_MSG = 32 * 1024;
 const FORWARD = { in: 1, snap: 1, ev: 1 };
 const TEAMS = [0, 1];
+const BAN_MS = 20_000;            // draft: ban stage, then pick stage (timers only run with two humans)
+const PICK_MS = 30_000;
+const STAGE_GRACE_MS = 1000;      // clients auto-ban at the buzzer; a `stage` skip is honoured this long after it
 
 export class GameRoom extends DurableObject {
   constructor(ctx, env) {
@@ -56,7 +59,8 @@ export class GameRoom extends DurableObject {
       return;
     }
     switch (m.t) {
-      case 'pick': return this._pick(p, m);
+      case 'pick': return this._pick(ws, p, m);
+      case 'stage': return this._stage(p);
       case 'start': return this._start(ws, p, m);
       case 'leave': return this._leave(p);
       case 'abort': return this._abort(p); // host reloaded mid-match and lost the sim: back to the lobby
@@ -95,9 +99,10 @@ export class GameRoom extends DurableObject {
     let s = this.s;
     if (!s) {
       if (!m.create) return this._err(ws, 'noroom', 'No such room');
-      s = this.s = { code, phase: 'lobby', seed: 0, players: [], created: Date.now(), emptySince: null };
+      s = this.s = { code, phase: 'lobby', seed: 0, players: [], created: Date.now(), emptySince: null, stage: 'ban', stageEnd: null };
     } else if (m.create && !s.players.length) {
       s.phase = 'lobby'; // stale empty room under a recycled code
+      this._draft();
     }
 
     let p = m.token ? s.players.find((q) => q.token === m.token) : null;
@@ -105,8 +110,9 @@ export class GameRoom extends DurableObject {
       if (m.create && s.players.length) return this._err(ws, 'exists', 'Room code already in use');
       if (s.phase !== 'lobby') return this._err(ws, 'started', 'Match already started');
       if (s.players.length >= MAX_HUMANS) return this._err(ws, 'full', 'Room is full');
-      p = { token: crypto.randomUUID(), slot: s.players.length, name: clean(m.name, 12) || (s.players.length ? 'Player 2' : 'Player 1'), team: s.players[0]?.team ?? 0, hero: null, seen: Date.now() };
+      p = { token: crypto.randomUUID(), slot: s.players.length, name: clean(m.name, 12) || (s.players.length ? 'Player 2' : 'Player 1'), team: s.players[0]?.team ?? 0, hero: null, ban: null, seen: Date.now() };
       s.players.push(p);
+      this._draft(); // a new face: everyone bans and picks again
     }
     for (const old of this.ctx.getWebSockets()) { // a resumed player replaces their stale socket
       if (old !== ws && old.deserializeAttachment()?.token === p.token) { old.serializeAttachment({ code, token: null }); try { old.close(4000, 'replaced'); } catch { /* already closed */ } }
@@ -122,10 +128,48 @@ export class GameRoom extends DurableObject {
     await this._schedule();
   }
 
-  async _pick(p, m) {
-    if (this.s.phase !== 'lobby') return;
+  // New draft: nobody has banned or picked yet. The timer only runs when two humans are here to race it.
+  _draft() {
+    const s = this.s;
+    s.stage = 'ban';
+    for (const p of s.players) { p.ban = null; p.hero = null; }
+    this._timer(BAN_MS);
+  }
+
+  _timer(ms) { this.s.stageEnd = this.s.players.length === 2 ? Date.now() + ms : null; }
+
+  _bans() { return new Set(this.s.players.map((p) => p.ban).filter(Boolean)); }
+
+  // team / ban / hero. A ban only counts once, during the ban stage; a hero must be neither banned nor already taken.
+  async _pick(ws, p, m) {
+    const s = this.s;
+    if (s.phase !== 'lobby') return;
+    let bad = null;
     if (TEAMS.includes(m.team)) p.team = m.team;
-    if (typeof m.hero === 'string' && m.hero.length < 24) p.hero = m.hero;
+    if (typeof m.ban === 'string' && m.ban.length < 24 && s.stage === 'ban' && !p.ban) {
+      if (this._bans().has(m.ban)) bad = ['banned', 'Already banned, ban another one'];
+      else {
+        p.ban = m.ban;
+        for (const q of s.players) if (q.hero === m.ban) q.hero = null;
+        if (s.players.every((q) => q.ban)) { s.stage = 'pick'; this._timer(PICK_MS); }
+      }
+    }
+    if (typeof m.hero === 'string' && m.hero.length < 24) {
+      if (this._bans().has(m.hero)) bad = ['banned', 'That champion is banned'];
+      else if (s.players.some((q) => q !== p && q.hero === m.hero)) bad = ['taken', 'Already picked, choose another one'];
+      else p.hero = m.hero;
+    }
+    await this._save();
+    if (bad) this._err(ws, bad[0], bad[1]);
+    this._lobby();
+  }
+
+  // Ban timer ran out (a client asks): move on even if someone never banned.
+  async _stage(p) {
+    const s = this.s;
+    if (s.phase !== 'lobby' || s.stage !== 'ban' || !s.stageEnd || Date.now() < s.stageEnd + STAGE_GRACE_MS) return;
+    s.stage = 'pick';
+    this._timer(PICK_MS);
     await this._save();
     this._lobby();
   }
@@ -146,6 +190,7 @@ export class GameRoom extends DurableObject {
   async _abort(p) {
     if (p.slot !== 0 || this.s.phase !== 'play') return;
     this.s.phase = 'lobby';
+    this._draft();
     await this._save();
     this._broadcast({ t: 'closed', why: 'aborted' });
     this._lobby();
@@ -169,12 +214,13 @@ export class GameRoom extends DurableObject {
     await this._schedule();
   }
 
-  _startMsg() { return { seed: this.s.seed, picks: this.s.players.map((p) => ({ slot: p.slot, team: p.team, hero: p.hero, name: p.name })) }; }
+  _startMsg() { return { seed: this.s.seed, bans: [...this._bans()].sort(), picks: this.s.players.map((p) => ({ slot: p.slot, team: p.team, hero: p.hero, name: p.name })) }; }
 
   _lobby() {
     const s = this.s, live = this._live();
     if (!s) return;
-    const msg = { t: 'lobby', code: s.code, phase: s.phase, players: s.players.map((p) => ({ slot: p.slot, name: p.name, team: p.team, hero: p.hero, connected: live.has(p.token) })) };
+    const left = s.stageEnd && s.players.length === 2 ? Math.max(0, Math.ceil((s.stageEnd - Date.now()) / 1000)) : 0;
+    const msg = { t: 'lobby', code: s.code, phase: s.phase, stage: s.stage, left, bans: [...this._bans()], players: s.players.map((p) => ({ slot: p.slot, name: p.name, team: p.team, hero: p.hero, ban: p.ban, connected: live.has(p.token) })) };
     this._broadcast(msg);
   }
 

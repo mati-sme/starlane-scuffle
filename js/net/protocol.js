@@ -1,6 +1,6 @@
 // Message types shared by the lobby, the host sim and the guest mirror (the worker uses the same literals).
 export const T = {
-  hello: 'hello', pick: 'pick', rename: 'rename', start: 'start', abort: 'abort', leave: 'leave',
+  hello: 'hello', pick: 'pick', rename: 'rename', start: 'start', stage: 'stage', abort: 'abort', leave: 'leave',
   welcome: 'welcome', lobby: 'lobby', peer: 'peer', closed: 'closed', err: 'err',
   input: 'in', snap: 'snap', event: 'ev',
 };

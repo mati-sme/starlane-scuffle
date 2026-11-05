@@ -16,7 +16,7 @@ import { icons } from './ui/icons.js';
 import { audio } from './audio.js';
 import { lockLandscape } from './orient.js';
 import { save } from './save.js';
-import { ROSTER } from './heroes/index.js';
+import { HEROES, ROSTER } from './heroes/index.js';
 import { NetClient } from './net/client.js';
 import { Session } from './net/session.js';
 import { T, randomCode, cleanCode, shareLink } from './net/protocol.js';
@@ -51,6 +51,9 @@ let lastBanner = '';
 let state = 'title'; // title | select | online | lobby | match | paused | results
 let t = 0;
 let resultTimer = 0;
+let draftBans = []; // offline: champions banned this draft
+const BAN_SECS = 20, PICK_SECS = 30;
+const pickOne = (ids) => ids[(Math.random() * ids.length) | 0];
 let picked = save.get('hero', ROSTER[0]);
 if (!ROSTER.includes(picked)) picked = ROSTER[0];
 
@@ -105,7 +108,7 @@ function joinRoom(raw) {
 function connectRoom(code, create, tries) {
   net.close();
   leave('online');
-  online = { code, lobby: null, error: '', tries };
+  online = { code, lobby: null, error: '', tries, banSel: null, leftAt: 0, draftKey: '', timedOut: false };
   menus.showOnline({ code: create ? '' : code, busy: true, error: 'Connecting…', onCreate() {}, onJoin() {}, onBack: toTitle });
   net.connect(code, { create });
 }
@@ -115,15 +118,33 @@ const myPick = () => online?.lobby?.players.find((p) => p.slot === net.slot);
 function renderLobby() {
   const L = online?.lobby;
   if (!L || state !== 'lobby') return;
+  const stage = L.stage ?? 'pick', bans = L.bans ?? []; // an older worker has no draft: straight to picking
+  const me = myPick(), other = L.players.find((p) => p.slot !== net.slot);
+  const free = () => ROSTER.filter((id) => !bans.includes(id) && id !== other?.hero);
   const send = (patch) => {
-    const me = myPick();
     if (me) Object.assign(me, patch); // optimistic; the room echoes it back
     net.send({ t: T.pick, ...patch });
     renderLobby();
   };
-  menus.showLobby({ code: online.code, link: shareLink(online.code), me: net.slot, players: L.players, phase: L.phase, conn: net.status, error: online.error }, {
+  const draftKey = `${stage}:${bans.length}:${L.players.length}`;
+  if (online.draftKey !== draftKey) { online.draftKey = draftKey; online.timedOut = false; }
+  menus.showLobby({ code: online.code, link: shareLink(online.code), me: net.slot, players: L.players, phase: L.phase, stage, bans, banSel: online.banSel, deadline: L.left ? online.leftAt + L.left * 1000 : 0, conn: net.status, error: online.error }, {
     onTeam: (team) => send({ team }),
-    onHero: (hero) => { picked = hero; save.set('hero', hero); send({ hero }); },
+    onHero: (hero) => { online.error = ''; picked = hero; save.set('hero', hero); send({ hero }); },
+    onBanSel: (id) => { online.banSel = id; renderLobby(); },
+    onBan: (ban) => { online.error = ''; send({ ban }); },
+    onTimeout() { // the stage clock ran out: do the sensible thing for this player, once
+      if (online.timedOut) return;
+      online.timedOut = true;
+      if (stage === 'ban') {
+        if (me && !me.ban) send({ ban: online.banSel && free().includes(online.banSel) ? online.banSel : pickOne(free().filter((id) => id !== picked)) });
+        setTimeout(() => net.send({ t: T.stage }), 1500);
+      } else if (me && !me.hero) {
+        const id = free().includes(picked) ? picked : pickOne(free());
+        picked = id;
+        send({ hero: id });
+      }
+    },
     onStart: (practice) => { online.error = ''; net.send({ t: T.start, practice }); },
     onCopy(btn) {
       const link = shareLink(online.code), done = () => { btn.textContent = 'COPIED!'; };
@@ -142,9 +163,9 @@ function toLobby(error = '') {
   renderLobby();
 }
 
-function startOnline({ seed, picks }, role) {
+function startOnline({ seed, picks, bans = [] }, role) {
   const list = [...picks].sort((a, b) => a.slot - b.slot);
-  const { blue, red } = composeOnline(list.map((p) => ({ team: p.team, hero: p.hero })), seeded(seed));
+  const { blue, red } = composeOnline(list.map((p) => ({ team: p.team, hero: p.hero })), seeded(seed), bans);
   const at = (p) => ({ team: p.team, idx: list.filter((q) => q.team === p.team && q.slot < p.slot).length });
   const me = list.find((p) => p.slot === net.slot), peer = list.find((p) => p.slot !== net.slot);
   if (!me) return toLobby('Could not join the match');
@@ -163,8 +184,6 @@ function startOnline({ seed, picks }, role) {
 net.on('welcome', (m) => {
   if (!online) return;
   online.tries = 0;
-  const me = { t: T.pick, hero: picked };
-  if (m.phase === 'lobby') net.send(me);
   if (m.phase === 'play' && m.start) {
     if (state === 'match' || state === 'results') return; // plain reconnect, the sim is still here
     if (m.slot === 0) net.send({ t: T.abort }); // reloaded host: the sim is gone, back to the lobby
@@ -173,6 +192,8 @@ net.on('welcome', (m) => {
 }).on(T.lobby, (m) => {
   if (!online) return;
   online.lobby = m;
+  online.leftAt = performance.now();
+  if (m.stage === 'pick') online.banSel = null;
   if (state === 'online') { state = 'lobby'; document.body.classList.remove('playing'); }
   renderLobby();
 }).on('start', (m) => {
@@ -196,16 +217,31 @@ net.on('welcome', (m) => {
   renderLobby();
 });
 
+// Offline draft: ban one champion, the bots ban two more (one for each side), then pick.
 function toSelect() {
   leave('select');
-  menus.showSelect({ picked, onPlay: startMatch, onHome: toTitle });
+  draftBans = [];
+  menus.showSelect({
+    phase: 'ban', picked, secs: BAN_SECS, onBan: botBans, onHome: toTitle,
+    onTimeout: (sel) => botBans(sel ?? pickOne(ROSTER.filter((id) => id !== picked))),
+  });
+}
+
+function botBans(id) {
+  draftBans = [id];
+  for (let i = 0; i < 2; i++) draftBans.push(pickOne(ROSTER.filter((k) => !draftBans.includes(k) && k !== picked)));
+  const names = draftBans.slice(1).map((k) => HEROES[k].name).join(' and ');
+  menus.showSelect({
+    phase: 'pick', picked, banned: draftBans, secs: PICK_SECS, note: `The bots banned ${names}. Banned champions are locked.`,
+    onPlay: startMatch, onTimeout: (sel) => startMatch(sel), onHome: toTitle,
+  });
 }
 
 function startMatch(id = picked) {
   clearTimeout(resultTimer);
   picked = id;
   save.set('hero', id);
-  match.setHero(id); // fresh heroes + a fresh random bot line-up each match
+  match.setHero(id, undefined, draftBans); // fresh heroes + a fresh random bot line-up each match
   menus.hideAll();
   match.reset();
   rig.follow(match.hero);

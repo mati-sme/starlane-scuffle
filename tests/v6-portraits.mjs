@@ -42,6 +42,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const imgs = () => page.evaluate(() => [...document.querySelectorAll('.hcard .pic img, .dport img')].map((i) => ({ src: i.getAttribute('src'), w: i.naturalWidth })));
 await page.goto(BASE + '?gfx=low', { waitUntil: 'load', timeout: 90000 });
 await tap('play-btn');
+await page.locator('[data-testid="champion-card-lumen"]').click({ force: true }); await page.locator('[data-testid="ban-btn"]').click({ force: true }); // v6 draft: ban first (lumen), then pick
+await new Promise((r) => setTimeout(r, 300));
 await page.waitForFunction(() => [...document.querySelectorAll('.hcard .pic img')].every((i) => i.complete && i.naturalWidth > 0), null, { timeout: 20000 }).catch(() => {});
 await page.locator('[data-testid="champion-card-nyx"]').click({ force: true }); await sleep(600);
 const list = await imgs();

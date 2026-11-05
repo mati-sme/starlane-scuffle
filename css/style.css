@@ -368,3 +368,30 @@ body.playing #pause { display: block; }
 .toast { position: absolute; left: 50%; top: calc(88px + var(--st)); translate: -50% 0; opacity: 0; white-space: nowrap; font-weight: 800; font-size: clamp(14px, 2.4vw, 20px); color: #fff; -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; text-shadow: 0 3px 0 var(--ink); }
 .toast.t0 { color: var(--sunny); } .toast.t1 { color: var(--gloom); } .toast.t2 { color: #C58CFF; }
 .toast.pop { animation: kopop 4s ease-out; }
+
+/* ---------- draft: ban + pick ---------- */
+.draft-help { flex: none; max-width: 92vw; }
+.screen.select .draft-help { margin-top: -2px; }
+.timer { display: inline-block; min-width: 46px; margin-left: 10px; padding: 1px 8px; font-weight: 800; font-size: 16px; letter-spacing: .06em; color: var(--ink); background: var(--gold); font-variant-numeric: tabular-nums; }
+.screen.select > .timer { position: absolute; right: 110px; top: calc(12px + var(--st)); margin: 0; z-index: 2; }
+.timer.low { background: #E5484D; color: #fff; }
+.stagehead { margin: 0; font-size: 20px; font-style: italic; text-transform: uppercase; }
+.banmode .stagehead, .banmode .sel-title { color: #FF7A7A; }
+.banmode .hcard.sel { outline-color: #E5484D; background: linear-gradient(180deg, #5a1d27, #0B1020); }
+.banmode .detail { border-color: #E5484D; }
+.btn.ban { background: #E5484D; color: #fff; border-color: var(--ink); }
+.btn.ban:disabled { opacity: .45; }
+.pl .bn { margin-left: 8px; font-size: 11px; font-weight: 800; letter-spacing: .08em; color: #FF7A7A; text-transform: uppercase; }
+/* locked cards: greyed, with a stamp across the middle */
+.hcard.out { cursor: default; opacity: 1; }
+.hcard.out .pic img { filter: grayscale(1) brightness(.45) !important; }
+.hcard.out.sel { transform: none; }
+.hcard.out::before { content: attr(data-stamp); position: absolute; left: 50%; top: 42%; z-index: 3; translate: -50% -50%; rotate: -14deg; padding: 1px 5px; border: 2px solid #E5484D; color: #E5484D; background: rgba(8,10,20,.82); font-weight: 900; font-size: 13px; letter-spacing: .08em; white-space: nowrap; pointer-events: none; }
+.hcard.out.taken::before { border-color: #8FB8FF; color: #8FB8FF; }
+.hcard.mini.out::before { font-size: 8px; padding: 0 3px; border-width: 1px; top: 50%; }
+.hcard.mini:disabled { opacity: 1; }
+@media (max-width: 1000px), (max-height: 520px) {
+  .screen.select .sel-title { display: block; position: absolute; top: calc(4px + var(--st)); left: 64px; right: 170px; margin: 0; text-align: center; font-size: 19px; }
+  .screen.select .draft-help { position: absolute; top: calc(28px + var(--st)); left: 64px; right: 170px; margin: 0; font-size: 11px; line-height: 1.15; }
+  .screen.select .detail .dtitle { font-size: 12px; }
+}

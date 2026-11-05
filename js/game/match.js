@@ -90,11 +90,11 @@ export class Match {
     this.setHero(Object.hasOwn(HEROES, id) ? id : ROSTER[0], q.get('bots')?.split(','));
   }
 
-  // The player takes `id` on Sunny with 4 bot allies against 5 Gloom bots (see compose.js); `bots` (?bots=a,b,...) forces ids.
-  setHero(id, bots) {
+  // The player takes `id` on Sunny with 4 bot allies against 5 Gloom bots (see compose.js); `bots` (?bots=a,b,...) forces ids; `banned` ids never show up.
+  setHero(id, bots, banned = []) {
     this.role = 'solo'; this.myTeam = 0; this.peerHero = null; this.outbox = null; sim.guest = false;
     for (const h of this.heroes ?? []) h.dispose();
-    const { blue, red } = composeTeams(id, bots ?? []), bot = (hero) => new Bot(hero);
+    const { blue, red } = composeTeams(id, bots ?? [], banned), bot = (hero) => new Bot(hero);
     const roster = [...blue.map((k, i) => [k, 0, i, i ? bot : null]), ...red.map((k, i) => [k, 1, i, bot])];
     this.heroes = roster.map(([k, team, slot, brain]) => new Hero(this.scene, HEROES[k], team, slot, brain));
     this.hero = this.heroes[0];

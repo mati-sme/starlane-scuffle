@@ -42,6 +42,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 await page.goto(BASE + '?gfx=low', { waitUntil: 'load', timeout: 90000 });
 await tap('play-btn');
+await page.locator('[data-testid="champion-card-lumen"]').click({ force: true }); await page.locator('[data-testid="ban-btn"]').click({ force: true }); // v6 draft: ban first (lumen), then pick
+await new Promise((r) => setTimeout(r, 300));
 await sleep(400);
 await page.locator('[data-testid^="champion-card-"]').nth(PICK).click({ force: true });
 await sleep(300);
