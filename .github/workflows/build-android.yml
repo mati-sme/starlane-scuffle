@@ -14,7 +14,6 @@ jobs:
         with: { node-version: 20, cache: npm }
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }
-      - uses: android-actions/setup-android@v3
       - run: npm ci
       - run: npm run build:www
       - run: npx cap sync android
@@ -30,3 +29,10 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: starlane-scuffle.apk
+      - name: Attach to v4.0.0 Release (manual runs)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view v4.0.0 >/dev/null 2>&1 || gh release create v4.0.0 --title "Starlane Scuffle v4.0.0" --notes "Android APK + macOS (Apple Silicon) dmg. See README for install steps."
+          gh release upload v4.0.0 starlane-scuffle.apk --clobber
