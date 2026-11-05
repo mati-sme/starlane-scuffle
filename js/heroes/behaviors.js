@@ -119,8 +119,12 @@ const BEHAVIORS = {
 
   // Teleport onto the nearest enemy hero (or forward) and strike on arrival.
   blink(h, ab, ctx, aim) {
-    const t = pickTarget(ctx, h.team, h.x, h.z, ab.range, ['heroes']);
-    let dx = aim.dx, dz = aim.dz, d = ab.range;
+    let t = pickTarget(ctx, h.team, h.x, h.z, ab.range, ['heroes']);
+    if (t && aim.manual) { // an aimed blink only locks on to a hero near the aimed line
+      const rx = t.x - h.x, rz = t.z - h.z, along = rx * aim.dx + rz * aim.dz, lat = Math.abs(rx * aim.dz - rz * aim.dx);
+      if (along <= 0 || lat > 2 + t.radius) t = null;
+    }
+    let dx = aim.dx, dz = aim.dz, d = aim.manual ? Math.min(aim.dist, ab.range) : ab.range;
     if (t) {
       dx = t.x - h.x; dz = t.z - h.z;
       const full = Math.hypot(dx, dz) || 1;
@@ -287,7 +291,8 @@ const BEHAVIORS = {
       return;
     }
     let x = h.x, z = h.z;
-    if (ab.place === 'ally') {
+    if (aim.manual && ab.range) { x = h.x + aim.dx * Math.min(aim.dist, ab.range); z = h.z + aim.dz * Math.min(aim.dist, ab.range); }
+    else if (ab.place === 'ally') {
       let best = -1;
       forEachAlly(ctx, h.team, h.x, h.z, ab.range, (a) => {
         let n = 0;

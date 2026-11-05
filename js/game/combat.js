@@ -33,6 +33,7 @@ export function dealDamage(t, amount, src, skill = false) {
   if (t.buf?.undying && t.hp < 1) t.hp = 1;
   t.flash = 0.08;
   t.squash = 1;
+  if (src?.type === 'hero') vfx.ring(t.x, t.hitY ?? 1, t.z, SPARK.color, 1.2, 0.15); // every hero hit gets a visible flash
   particles.burst(t.x, t.hitY ?? 1, t.z, 6, SPARK);
   if (t.type === 'minion' && src) {
     const dx = t.x - src.x, dz = t.z - src.z, d = Math.hypot(dx, dz) || 1;

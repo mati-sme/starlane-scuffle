@@ -11,6 +11,7 @@ const decalGeo = new THREE.CircleGeometry(1, 32).rotateX(-Math.PI / 2);
 const tubeGeo = new THREE.CylinderGeometry(0.3, 1, 1, 6, 1, true).translate(0, 0.5, 0); // tapered, base at origin, +Y
 const ghostGeo = new THREE.SphereGeometry(1, 10, 8);
 const streakGeo = new THREE.CylinderGeometry(0.02, 0.16, 1, 5); // fat head at -Y, thin tail at +Y
+const targetRingGeo = new THREE.RingGeometry(0.86, 1, 40).rotateX(-Math.PI / 2); // under the current auto-attack target
 const chevGeo = new THREE.ConeGeometry(0.3, 0.55, 4).rotateX(Math.PI);
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -34,6 +35,10 @@ class Vfx {
     this.marker = new THREE.Mesh(chevGeo, new THREE.MeshBasicMaterial({ color: PAL.gloom, toneMapped: false }));
     this.marker.visible = false;
     scene.add(this.marker);
+    this.tring = new THREE.Mesh(targetRingGeo, new THREE.MeshBasicMaterial({ color: new THREE.Color(0xFF5566).multiplyScalar(1.6), transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
+    this.tring.visible = false;
+    this.tring.renderOrder = 5;
+    scene.add(this.tring);
   }
 
   _start(kind, geo, color, dur, size) {
@@ -142,7 +147,11 @@ class Vfx {
     }
     const tg = this.target;
     this.marker.visible = !!tg;
+    this.tring.visible = !!tg;
     if (tg) {
+      const r = ((tg.radius ?? 0.6) + 0.35) * (1 + Math.sin(t * 7) * 0.05);
+      this.tring.position.set(tg.rx ?? tg.x, 0.22, tg.rz ?? tg.z);
+      this.tring.scale.set(r, 1, r);
       this.marker.position.set(
         tg.rx ?? tg.x,
         (tg.hitY ?? 1) + (tg.radius ?? 0.5) + 1.1 + Math.abs(Math.sin(t * 6)) * 0.3,

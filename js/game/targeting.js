@@ -44,6 +44,32 @@ export function pickHeroTarget(ctx, h, range) {
   return best ?? pickTarget(ctx, h.team, h.x, h.z, range, ORDER_REST);
 }
 
+// Held target buttons. 1 = last-hit: the weakest minion in range (then camps); 2 = structure: towers / cores, then minions.
+export function pickPrefTarget(ctx, h, range, pref) {
+  if (pref === 1) {
+    let best = null, hp = Infinity;
+    for (const e of ctx.minions.list) {
+      if (!valid(e, h.team) || Math.hypot(e.x - h.x, e.z - h.z) - e.radius > range) continue;
+      if (e.hp < hp) { best = e; hp = e.hp; }
+    }
+    return best ?? pickTarget(ctx, h.team, h.x, h.z, range, ['camps', 'structures', 'heroes']);
+  }
+  return pickTarget(ctx, h.team, h.x, h.z, range, ['structures', 'camps', 'minions', 'heroes']);
+}
+
+const STICK = 0.6; // extra reach before a locked target is dropped
+
+// Keep `cur` while it is still a valid enemy in (slightly stretched) range, unless `best` outranks it
+// (an enemy champion walked into range, or the target buttons changed).
+export function stickyTarget(h, cur, best, range, pref) {
+  if (!cur || !best || cur === best) return best;
+  if (!valid(cur, h.team) || Math.hypot(cur.x - h.x, cur.z - h.z) - cur.radius > range + STICK) return best;
+  if (pref) return pref === 1 ? (cur.type === 'minion' ? (best.type === 'minion' && best.hp < cur.hp * 0.5 ? best : cur) : best) : (cur.type === 'tower' || cur.type === 'core' ? cur : best);
+  if (best.type === 'hero' && cur.type !== 'hero') return best;
+  if (cur.type === 'hero' && best.type !== 'hero') return cur;
+  return cur;
+}
+
 const pts = [];
 
 // The enemy within `range` (edge distance) with the most enemies inside `radius` of it (heroes count double).

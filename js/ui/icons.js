@@ -51,6 +51,11 @@ export const icons = {
   decoy: svg(`<circle cx="22" cy="20" r="9" ${W}/><path d="M10 56V38a12 12 0 0 1 24 0v18Z" ${W}/><circle cx="44" cy="20" r="9" ${LINE(4)}/><path d="M36 56V38a12 12 0 0 1 20 -8v26" ${LINE(4)}/>`),
   bolt: svg(`<path d="M4 32h40" ${LINE(8)}/><polygon points="42,16 62,32 42,48" ${W}/>`),
 
+  // target buttons + recall
+  target_minion: svg(`<circle cx="32" cy="34" r="18" ${W}/><circle cx="25" cy="30" r="3.5" fill="${INK}"/><circle cx="39" cy="30" r="3.5" fill="${INK}"/><path d="M24 42Q32 48 40 42" ${LINE(3, INK)}/><path d="M32 4v8M32 56v6M4 34h8M52 34h8" ${LINE(5)}/>`),
+  target_tower: svg(`<polygon points="20,58 44,58 40,26 24,26" ${W}/><polygon points="16,26 48,26 32,6" ${W}/><rect x="28" y="36" width="8" height="12" fill="${INK}"/>`),
+  recall: svg(`<path d="M32 6a24 24 0 1 0 24 24" ${LINE(7)}/><polygon points="46,6 58,22 38,24" ${W}/><polygon points="32,20 44,32 40,46 24,46 20,32" ${W}/>`),
+
   // basic attacks
   basic_melee: svg(`<path d="M12 54L50 12" ${LINE(9)}/><path d="M8 20Q32 26 56 56" ${LINE(5)}/>`),
   basic_line: svg(`<path d="M6 58L48 16" ${LINE(6)}/><polygon points="44,6 60,4 58,20 50,22" ${W}/>`),

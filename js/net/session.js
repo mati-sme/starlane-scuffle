@@ -84,8 +84,13 @@ export class Session {
       if (!o) return;
       if (this.paused) { o.x = o.z = 0; o.attack = false; } // frozen sim: do not leave the hero walking on the host
       const bits = (a) => a.reduce((n, v, i) => n | (v ? 1 << i : 0), 0);
-      this.net.send({ t: T.input, x: Math.round(o.x * 100) / 100, z: Math.round(o.z * 100) / 100, a: o.attack ? 1 : 0, c: bits(o.cast), s: bits(o.spend) });
-      o.cast.fill(false); o.spend.fill(false);
+      const q = [];
+      o.aim.forEach((v, i) => { if (v && o.cast[i]) q.push([i, Math.round(Math.atan2(v.dx, v.dz) * 100), Math.round(v.dist * 10)]); });
+      const msg = { t: T.input, x: Math.round(o.x * 100) / 100, z: Math.round(o.z * 100) / 100, a: o.attack ? 1 : 0, c: bits(o.cast), s: bits(o.spend), p: o.pref };
+      if (q.length) msg.q = q; // aimed casts: [slot, angle * 100, distance * 10]
+      if (o.recall) msg.r = 1;
+      this.net.send(msg);
+      o.cast.fill(false); o.spend.fill(false); o.aim.fill(null); o.recall = false;
     }
   }
 }

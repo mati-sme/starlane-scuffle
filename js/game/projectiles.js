@@ -9,6 +9,8 @@ import { inCover } from '../world/arena.js';
 
 const POOL = 48;
 const geo = new THREE.SphereGeometry(0.2, 8, 6);
+const tailGeo = new THREE.CylinderGeometry(0.03, 0.2, 1, 6, 1, true).translate(0, 0.5, 0); // head at origin, tail along +Y
+const UP = new THREE.Vector3(0, 1, 0), _back = new THREE.Vector3();
 let glowTex;
 
 const _white = new THREE.Color(0xffffff);
@@ -25,7 +27,10 @@ export class Projectiles {
       mesh.add(halo);
       mesh.visible = false;
       scene.add(mesh);
-      this.list.push({ mesh, on: false, src: null, tgt: null, dmg: 0, speed: 0, arc: 0, sx: 0, sy: 0, sz: 0, total: 1, prog: 0, color: 0, frame: FRAME.dot, onHit: null });
+      const tail = new THREE.Mesh(tailGeo, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+      tail.visible = false;
+      scene.add(tail);
+      this.list.push({ tail, mesh, on: false, src: null, tgt: null, dmg: 0, speed: 0, arc: 0, sx: 0, sy: 0, sz: 0, total: 1, prog: 0, color: 0, frame: FRAME.dot, onHit: null });
     }
   }
 
@@ -46,9 +51,15 @@ export class Projectiles {
     p.mesh.scale.setScalar(opts.size ?? 1);
     p.mesh.position.set(p.sx, p.sy, p.sz);
     p.mesh.visible = true;
+    p.tail.material.color.set(p.color).multiplyScalar(1.5);
+    p.tail.scale.set(opts.size ?? 1, 1.6 + speed * 0.07, opts.size ?? 1);
+    const fx = tgt.x - src.x, fz = tgt.z - src.z, fd = Math.hypot(fx, fz) || 1;
+    p.tail.position.set(p.sx, p.sy, p.sz);
+    p.tail.quaternion.setFromUnitVectors(UP, _back.set(-fx / fd, 0, -fz / fd));
+    p.tail.visible = true;
   }
 
-  reset() { for (const p of this.list) { p.on = false; p.mesh.visible = false; } }
+  reset() { for (const p of this.list) { p.on = false; p.mesh.visible = false; p.tail.visible = false; } }
 
   update(dt) {
     for (const p of this.list) {
@@ -61,11 +72,13 @@ export class Projectiles {
         if (tg.alive) {
           dealDamage(tg, p.dmg, p.src);
           p.onHit?.(tg);
-          particles.burst(m.x, m.y, m.z, 6, { color: [p.color, 0xffffff], speed: 3, up: 1.5, size: 0.45, life: 0.3, frame: FRAME.sparkle, grav: 2 });
-          vfx.ring(m.x, m.y, m.z, p.color, 0.9, 0.18);
+          particles.burst(m.x, m.y, m.z, 10, { color: [p.color, 0xffffff], speed: 4, up: 1.5, size: 0.55, life: 0.35, frame: FRAME.sparkle, grav: 2 });
+          vfx.ring(m.x, m.y, m.z, p.color, 1.5, 0.22);
+          vfx.ring(m.x, m.y, m.z, 0xffffff, 0.8, 0.12);
         } else particles.emit(m.x, m.y, m.z, 0, 0, 0, p.color, 0.6, 0.25, FRAME.sparkle);
         p.on = false;
         p.mesh.visible = false;
+        p.tail.visible = false;
         continue;
       }
       m.x += (dx / d) * step;
@@ -74,12 +87,15 @@ export class Projectiles {
         particles.burst(m.x, m.y, m.z, 5, { color: p.color, speed: 2, up: 1, size: 0.4, life: 0.3, frame: FRAME.sparkle, grav: 0 });
         p.on = false;
         p.mesh.visible = false;
+        p.tail.visible = false;
         continue;
       }
       p.prog = Math.min(1, 1 - d / p.total);
       const ty = (tg.hitY ?? 1) + GROUND;
       m.y = p.sy + (ty - p.sy) * p.prog + Math.sin(Math.PI * p.prog) * p.arc;
-      particles.emit(m.x, m.y, m.z, 0, 0, 0, p.color, 0.45, 0.25, p.frame);
+      particles.emit(m.x, m.y, m.z, 0, 0, 0, p.color, 0.6, 0.3, p.frame);
+      p.tail.position.copy(m);
+      p.tail.quaternion.setFromUnitVectors(UP, _back.set(-dx / d, 0, -dz / d));
     }
   }
 }

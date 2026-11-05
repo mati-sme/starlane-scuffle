@@ -9,7 +9,7 @@ import { vfx } from '../render/vfx.js';
 import { particles, FRAME } from '../render/particles.js';
 import { bus } from '../core/bus.js';
 import { sim, tickHitFx, tickStatus, tickBuffs, buff, airLift, dyingScale, poof } from '../game/combat.js';
-import { pickHeroTarget, bestCluster } from '../game/targeting.js';
+import { pickHeroTarget, pickPrefTarget, stickyTarget, bestCluster } from '../game/targeting.js';
 import { BEHAVIORS, BASICS } from './behaviors.js';
 import { rankStats } from './roster.js';
 
@@ -22,6 +22,7 @@ const HERO_SCALE = 1.3; // visual only; hitboxes and ranges are unscaled
 const ASSIST_RANGE = 7; // holding Attack with no stick steps toward a nearby enemy
 const WINDUP = 0.15;    // anticipation crouch before a skill fires
 const BOOST = { t: 4, mul: 1.6 }; // launch boost after leaving the fountain
+export const RECALL_T = 4; // seconds of channel before the teleport home
 
 export class Hero {
   // brain: optional (hero) => controller with think(dt, ctx) -> intent. No brain = the human player.
@@ -89,6 +90,8 @@ export class Hero {
     this.blink = 3;
     this.celebrate = false;
     this.aim = null;
+    this.manual = null;
+    this.recall = 0;
     this.walkTo = null;
     this.attacker = null;
     this.attackerAge = 99;
@@ -178,9 +181,11 @@ export class Hero {
     this.chg = [0, 0, 0]; this.chgT = [0, 0, 0]; this.chgFull = [0, 0, 0];
     this.castAt = [-99, -99, -99];
     this.swings = 0;
+    this.recall = 0;
+    this.manual = null;
   }
 
-  // it: { x, z (world move dir, |v| <= 1), attack, cast: [bool, bool, bool] }
+  // it: { x, z (world move dir, |v| <= 1), attack, cast: [bool, bool, bool], aim?: [{ dx, dz, dist } | null x3], pref?: 0 auto | 1 minion | 2 structure, recall?: bool }
   update(dt, ctx, it) {
     this.px = this.x; this.pz = this.z;
     tickHitFx(this, dt);
@@ -236,27 +241,28 @@ export class Hero {
       if (e.t >= e.dur) { e.end?.(this, ctx, e); this.effects.splice(i, 1); }
     }
 
-    if (this.script) { this._runScript(dt, ctx); return; }
+    if (this.script) { this.recall = 0; this._runScript(dt, ctx); return; }
 
     const stunned = this.stun > 0 || this.air > 0;
+    this._recall(dt, ctx, it, stunned);
     if (this.windup > 0) {
       this.windup -= dt;
       if (this.windup <= 0) this._fire(ctx);
     } else if (!stunned) {
       for (let i = 2; i >= 0; i--) {
         if (!it.cast[i]) continue;
-        if (this._canCast(i)) { this._begin(i, ctx); break; }
+        if (this._canCast(i)) { this._begin(i, ctx, it.aim?.[i]); break; }
         if (this.isPlayer && this.ranks[i] === 0) bus.emit('noCast', { hero: this, slot: i, why: 'locked' });
       }
     }
 
     const manual = Math.hypot(it.x, it.z) > 0.05;
-    this.aim = pickHeroTarget(ctx, this, this.basicRange);
+    this.aim = this._target(ctx, this.basicRange, it.pref);
 
     let mx = it.x, mz = it.z;
     if (manual) this.walkTo = null;
     else if (this.isPlayer && it.attack && !this.aim) {
-      const near = pickHeroTarget(ctx, this, ASSIST_RANGE);
+      const near = this._target(ctx, ASSIST_RANGE, it.pref);
       if (near) [mx, mz] = this._toward(near.x, near.z);
     } else if (this.walkTo) {
       [mx, mz] = this._toward(this.walkTo.x, this.walkTo.z);
@@ -276,6 +282,47 @@ export class Hero {
     this._collide(ctx);
 
     if (it.attack && this.aim && this.cd <= 0 && !stunned && this.windup <= 0 && !this.noAttack) this._swing(ctx);
+  }
+
+  // The basic-attack target: a held target button picks minions / structures, otherwise champions > minions > structures.
+  // The current target sticks while it stays valid and in range, so the highlight ring does not flicker between neighbours.
+  _target(ctx, range, pref) {
+    if (!this.isPlayer) return pickHeroTarget(ctx, this, range);
+    const best = pref ? pickPrefTarget(ctx, this, range, pref) : pickHeroTarget(ctx, this, range);
+    return stickyTarget(this, this.aim, best, range, pref);
+  }
+
+  // Recall: hold still for RECALL_T seconds, then land on the fountain pad. Damage, a move, a cast or a stun breaks it.
+  _recall(dt, ctx, it, stunned) {
+    if (this.recall > 0) {
+      const moved = Math.hypot(it.x, it.z) > 0.05 || this.walkTo, hurt = this.flash > 0 || this.hp < this._rcHp - 0.01;
+      this._rcHp = this.hp;
+      if (moved || hurt || stunned || it.cast.some(Boolean) || this.windup > 0) { this._recallEnd(false); return; }
+      this.recall += dt;
+      if (this.recall >= RECALL_T) this._recallEnd(true, ctx);
+    } else if (it.recall && !stunned && this.windup <= 0 && Math.hypot(it.x, it.z) <= 0.05) {
+      const fo = fountain(this.team);
+      if (Math.hypot(this.x - fo.x, this.z - fo.z) < ARENA.fountainR) return; // already home
+      this.recall = 0.001; this._rcHp = this.hp; this.walkTo = null;
+      vfx.ring(this.x, 0.2, this.z, PAL.shield, 3, 0.5);
+      bus.emit('recallStart', this);
+    }
+  }
+
+  _recallEnd(done, ctx) {
+    this.recall = 0;
+    if (!done) { bus.emit('recallCancel', this); return; }
+    vfx.column(this.x, this.z, PAL.shield, 0.6);
+    particles.burst(this.x, 1, this.z, 14, { color: [PAL.shield, 0xffffff], speed: 3, up: 4, size: 0.6, life: 0.7, frame: FRAME.sparkle, grav: 2 });
+    if (sim.guest) { bus.emit('recallEnd', this); return; } // the host moves us; the snapshot brings us home
+    const fo = fountain(this.team), ang = (this.slot / 5) * Math.PI * 2; // the pads sit outside the heal circle: land inside it
+    this.x = this.px = fo.x + Math.cos(ang) * 2.5; this.z = this.pz = fo.z + Math.sin(ang) * 2.5;
+    this.boost = BOOST.t;
+    this.attacker = null;
+    vfx.column(this.x, this.z, PAL.shield, 0.9);
+    vfx.ring(this.x, 0.2, this.z, PAL.gold, 4, 0.5);
+    particles.burst(this.x, 1, this.z, 16, { color: [PAL.gold, PAL.star], speed: 3, up: 5, size: 0.6, life: 0.8, frame: FRAME.star, grav: 3 });
+    bus.emit('recallEnd', this);
   }
 
   _toward(x, z) {
@@ -309,7 +356,11 @@ export class Hero {
 
   // Skills auto-aim at the best cluster; with nothing in range they go toward the stick or facing direction.
   _aim(ctx, ab) {
-    const range = ab.range ?? 6;
+    const range = ab.range ?? 6, m = this.manual;
+    if (m) { // the player aimed it: direction + distance (clamped to the skill's range)
+      const dist = Math.min(Math.max(m.dist, 0.5), range);
+      return { x: this.x + m.dx * dist, z: this.z + m.dz * dist, dx: m.dx, dz: m.dz, dist, has: true, manual: true, n: 0, hero: false, target: null };
+    }
     const c = ab.aim === 'move' ? null : bestCluster(ctx, this.team, this.x, this.z, range, ab.radius ?? 3);
     let dx, dz;
     if (c) { dx = c.x - this.x; dz = c.z - this.z; }
@@ -322,8 +373,9 @@ export class Hero {
     return { x: this.x + dx * range * 0.6, z: this.z + dz * range * 0.6, dx, dz, dist: range * 0.6, has: false, n: 0, hero: false, target: null };
   }
 
-  _begin(i, ctx) {
+  _begin(i, ctx, manual = null) {
     this.pend = i;
+    this.manual = manual;
     this.windup = WINDUP;
     const a = this._aim(ctx, this.rs[i]);
     this.face = Math.atan2(a.dx, a.dz);
@@ -335,6 +387,7 @@ export class Hero {
     this.pend = -1;
     if (!this.alive || this.stun > 0 || this.air > 0) return;
     const aim = this._aim(ctx, ab);
+    this.manual = null;
     this.face = Math.atan2(aim.dx, aim.dz);
     this.faceHold = 0.4;
     if (!ab.hide) { delete this.buf.hidden; this.atkAge = 0; } // attacking breaks stealth
@@ -458,6 +511,17 @@ export class Hero {
       B.scale.set(w, w, this.beam.len);
       B.userData.tex.repeat.set(1, 4);
       B.userData.tex.offset.y -= dt * 3;
+    }
+    if (this.recall > 0) { // recall channel: ground rings pulse, a spiral of light rises and tightens with progress
+      const u = this.recall / RECALL_T;
+      if ((this._rcT = (this._rcT ?? 0) - dt) <= 0) {
+        this._rcT = 0.05;
+        for (let k = 0; k < 3; k++) {
+          const a = t * 7 + (k * Math.PI * 2) / 3, r = 1.7 - u * 0.6;
+          particles.emit(this.rx + Math.cos(a) * r, 0.2, this.rz + Math.sin(a) * r, 0, 3 + u * 5, 0, k ? PAL.shield : 0xffffff, 0.65, 0.55, FRAME.sparkle);
+        }
+      }
+      if ((this._rcR = (this._rcR ?? 0) - dt) <= 0) { this._rcR = 0.45; vfx.ring(this.rx, 0.2, this.rz, PAL.shield, 2.6 - u, 0.45); }
     }
     if ((this._amb = (this._amb ?? 0) - dt) <= 0) { // role-colored ambient sparks
       this._amb = 0.16;

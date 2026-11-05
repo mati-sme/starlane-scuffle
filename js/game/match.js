@@ -19,6 +19,8 @@ import { MinionSystem } from '../world/minions.js';
 import { Projectiles } from './projectiles.js';
 import { Zones } from './zones.js';
 import { Bot, assignLanes } from './bot.js';
+import { aimShape } from './aiming.js';
+import { AimPreview } from '../render/aimpreview.js';
 
 const CONFETTI = [PAL.gold, PAL.sunny, PAL.gloom, PAL.heal, PAL.nebulaB, PAL.star];
 const IDLE = { x: 0, z: 0, attack: false, cast: [false, false, false] };
@@ -35,17 +37,20 @@ export class Match {
     this.camps = new Camps(scene);
     this.projectiles = new Projectiles(scene);
     this.zones = new Zones(scene);
+    this.preview = new AimPreview(scene);
     this.projectiles.blocker = this.zones;
     this.timers = [];
     this.role = 'solo'; // solo | host | guest (online: see net/session.js)
     this.myTeam = 0;
     this.peerHero = null;
-    this.peerIn = { x: 0, z: 0, attack: false, cast: [false, false, false], spend: [false, false, false], at: 0 };
-    this.peerIt = { x: 0, z: 0, attack: false, cast: [false, false, false] };
+    this.peerIn = { x: 0, z: 0, attack: false, cast: [false, false, false], spend: [false, false, false], aim: [null, null, null], pref: 0, recall: false, at: 0 };
+    this.peerIt = { x: 0, z: 0, attack: false, cast: [false, false, false], aim: [null, null, null], pref: 0, recall: false };
     this.outbox = null; // guest: { x, z, attack, cast[], spend[] } collected for the next input message
     this.snapAt = 0;
 
-    this.intent = { x: 0, z: 0, attack: false, cast: [false, false, false] };
+    this.intent = { x: 0, z: 0, attack: false, cast: [false, false, false], aim: [null, null, null], pref: 0, recall: false };
+    this._dir = { dx: 0, dz: 1 };
+    this._aim = { dx: 0, dz: 1, dist: 1 };
     this._screen = { x: 0, y: 0 };
     this._v = new THREE.Vector2();
     this._ray = new THREE.Raycaster();
@@ -96,7 +101,7 @@ export class Match {
   // role 'host' runs everything, 'guest' mirrors the host (net/snapshot.js).
   setOnline({ blue, red, me, peer = null }, role) {
     for (const h of this.heroes ?? []) h.dispose();
-    this.role = role; this.myTeam = me.team; this.outbox = role === 'guest' ? { x: 0, z: 0, attack: false, cast: [false, false, false], spend: [false, false, false] } : null;
+    this.role = role; this.myTeam = me.team; this.outbox = role === 'guest' ? { x: 0, z: 0, attack: false, cast: [false, false, false], spend: [false, false, false], aim: [null, null, null], pref: 0, recall: false } : null;
     sim.guest = role === 'guest';
     const human = (team, i) => (me.team === team && me.idx === i) || (peer && peer.team === team && peer.idx === i);
     const bot = (hero) => new Bot(hero);
@@ -114,6 +119,15 @@ export class Match {
     const p = this.peerIn;
     p.x = +m.x || 0; p.z = +m.z || 0; p.attack = !!m.a; p.at = performance.now();
     for (let i = 0; i < 3; i++) { if (m.c & (1 << i)) p.cast[i] = true; if (m.s & (1 << i)) p.spend[i] = true; }
+    p.pref = m.p === 1 || m.p === 2 ? m.p : 0;
+    if (m.r) p.recall = true;
+    if (Array.isArray(m.q)) { // aimed casts: [slot, angle (1/100 rad), distance (1/10)]
+      for (const [slot, ang, dist] of m.q) {
+        if (!(slot >= 0 && slot < 3) || !Number.isFinite(ang) || !Number.isFinite(dist)) continue;
+        const a = ang / 100;
+        p.aim[slot] = { dx: Math.sin(a), dz: Math.cos(a), dist: Math.min(30, Math.max(0, dist / 10)) };
+      }
+    }
   }
 
   // The guest left for good: their hero plays on as a bot.
@@ -143,6 +157,10 @@ export class Match {
     this.snapAt = 0;
     input.cast.fill(false);
     input.spend.fill(false);
+    input.aimCast.fill(null);
+    input.aiming = null;
+    input.recall = false;
+    this.preview.hide();
     this.heroes.forEach((h) => h.reset());
     this.towers.forEach((t) => t.reset());
     this.cores.forEach((c) => c.reset());
@@ -250,14 +268,20 @@ export class Match {
       it.x = this._v.x;
       it.z = this._v.y;
     }
+    it.pref = input.prefNo;
+    it.recall = input.recall; input.recall = false;
     for (let i = 0; i < 3; i++) {
       it.cast[i] = input.cast[i]; input.cast[i] = false;
+      it.aim[i] = it.cast[i] && input.aimCast[i] ? this._aimed(input.aimCast[i], hero, i) : null;
+      input.aimCast[i] = null;
       if (input.spend[i]) { hero.spendPoint(i); this.lastSpend = performance.now(); if (this.outbox) this.outbox.spend[i] = true; input.spend[i] = false; }
     }
     if (this.outbox) {
       const o = this.outbox;
       o.x = it.x; o.z = it.z; o.attack = it.attack;
-      for (let i = 0; i < 3; i++) if (it.cast[i]) o.cast[i] = true;
+      for (let i = 0; i < 3; i++) if (it.cast[i]) { o.cast[i] = true; o.aim[i] = it.aim[i]; }
+      o.pref = it.pref;
+      if (it.recall) o.recall = true;
     }
     if (input.walkClick) {
       this._ray.setFromCamera(input.walkClick, this.rig.camera);
@@ -265,6 +289,39 @@ export class Match {
       input.walkClick = null;
     }
     return it;
+  }
+
+  // Screen drag / mouse cursor -> world { dx, dz, dist } for skill `slot` (null for skills that have nothing to aim).
+  _aimed(a, hero, slot, out = {}) {
+    const shape = aimShape(hero.rs[slot]);
+    if (shape.type === 'self') return null;
+    if (a.mouse) {
+      if (!input.mouse) return null;
+      this._ray.setFromCamera(input.mouse, this.rig.camera);
+      if (!this._ray.ray.intersectPlane(this._plane, this._hit)) return null;
+      const dx = this._hit.x - hero.x, dz = this._hit.z - hero.z, d = Math.hypot(dx, dz);
+      if (d < 0.2) return null;
+      out.dx = dx / d; out.dz = dz / d; out.dist = Math.min(d, shape.range);
+      return out;
+    }
+    screenToWorld(a.sx, a.sy, this._v);
+    const d = this._v.length() || 1;
+    out.dx = this._v.x / d; out.dz = this._v.y / d; out.dist = Math.max(0.5, shape.range * a.frac);
+    return out;
+  }
+
+  // Draws the ground preview while a skill button (or Q / E / R on desktop) is held.
+  _preview(t, state) {
+    const a = input.aiming, h = this.hero;
+    if (!a || state !== 'match' || !h.alive || h.rs[a.slot] == null) { this.preview.hide(); return; }
+    const shape = aimShape(h.rs[a.slot]), dragged = a.mouse || a.dragged;
+    let dir = this._dir, dist = shape.range;
+    if (dragged && shape.type !== 'self') {
+      const r = this._aimed(a, h, a.slot, this._aim);
+      if (r) { dir = r; dist = r.dist; }
+    }
+    if (!dir.dx && !dir.dz) { dir.dx = Math.sin(h.face); dir.dz = Math.cos(h.face); }
+    this.preview.show(h, shape, dir, dist, !!dragged, a.cancel, t);
   }
 
   // Heroes shove each other apart a little so nobody stacks.
@@ -331,8 +388,11 @@ export class Match {
   _peerIntent() {
     const p = this.peerIn, it = this.peerIt, stale = performance.now() - p.at > 1000;
     it.x = stale ? 0 : p.x; it.z = stale ? 0 : p.z; it.attack = !stale && p.attack;
+    it.pref = stale ? 0 : p.pref;
+    it.recall = p.recall; p.recall = false;
     for (let i = 0; i < 3; i++) {
       it.cast[i] = p.cast[i]; p.cast[i] = false;
+      it.aim[i] = it.cast[i] ? p.aim[i] : null; p.aim[i] = null;
       if (p.spend[i]) { this.peerHero.spendPoint(i); p.spend[i] = false; }
     }
     return it;
@@ -412,6 +472,7 @@ export class Match {
     this.map.update(t, dt, this.push);
 
     vfx.setMarker(state === 'match' && this.hero.alive ? this.hero.aim : null);
+    this._preview(t, state);
     if (state === 'match') this.rig.lead.set(this.hero.dirx * this.hero.moveAmt, 0, this.hero.dirz * this.hero.moveAmt);
 
     if (this.over && this.win === (this.myTeam === 0)) { // fireworks + confetti over the shattered enemy Core
