@@ -20,6 +20,7 @@ import { Projectiles } from './projectiles.js';
 import { Zones } from './zones.js';
 import { Bot, assignLanes } from './bot.js';
 import { aimShape } from './aiming.js';
+import { AA_ARC } from './targeting.js';
 import { autoBuy, atBase } from './gear.js';
 import { AimPreview } from '../render/aimpreview.js';
 
@@ -168,6 +169,7 @@ export class Match {
     input.spend.fill(false);
     input.aimCast.fill(null);
     input.aiming = null;
+    input.atkAim = null;
     input.recall = false;
     this.preview.hide();
     this.heroes.forEach((h) => h.reset());
@@ -372,6 +374,7 @@ export class Match {
       it.z = this._v.y;
     }
     it.pref = input.prefNo;
+    it.dir = this._atkDir(hero);
     it.recall = input.recall; input.recall = false;
     for (let i = 0; i < 3; i++) {
       it.cast[i] = input.cast[i]; input.cast[i] = false;
@@ -413,9 +416,33 @@ export class Match {
     return out;
   }
 
+  // Drag-aimed basic attack -> world { dx, dz } (touch: Attack dragged; desktop: Shift + attack key aims at the cursor), else null (auto-target).
+  _atkDir(hero) {
+    let a = input.atkAim;
+    if (!a && input.mouse && input.attackKey && (input.keys.has('ShiftLeft') || input.keys.has('ShiftRight'))) a = this._mouseAtk ??= { mouse: true };
+    if (!a || !(a.mouse || a.dragged)) return null;
+    const out = this._atkd ??= { dx: 0, dz: 1 };
+    if (a.mouse) {
+      this._ray.setFromCamera(input.mouse, this.rig.camera);
+      if (!this._ray.ray.intersectPlane(this._plane, this._hit)) return null;
+      const dx = this._hit.x - hero.x, dz = this._hit.z - hero.z, d = Math.hypot(dx, dz);
+      if (d < 0.2) return null;
+      out.dx = dx / d; out.dz = dz / d;
+      return out;
+    }
+    screenToWorld(a.sx, a.sy, this._v);
+    const d = this._v.length() || 1;
+    out.dx = this._v.x / d; out.dz = this._v.y / d;
+    return out;
+  }
+
   // Draws the ground preview while a skill button (or Q / E / R on desktop) is held.
   _preview(t, state) {
     const a = input.aiming, h = this.hero;
+    if (!a && state === 'match' && h.alive) { // Attack dragged: a fan as long as the basic-attack range
+      const d = this._atkDir(h), reach = h.basicRange + h.radius; // range is measured to the target's edge
+      if (d) { this.preview.show(h, { type: 'cone', range: reach, arc: AA_ARC, strong: true }, d, reach, true, false, t); return; }
+    }
     if (!a || state !== 'match' || !h.alive || h.rs[a.slot] == null) { this.preview.hide(); return; }
     const shape = aimShape(h.rs[a.slot]), dragged = a.mouse || a.dragged;
     let dir = this._dir, dist = shape.range;

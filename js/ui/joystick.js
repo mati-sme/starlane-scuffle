@@ -3,6 +3,7 @@ import { input } from '../core/input.js';
 import { icons } from './icons.js';
 
 const BASE = 140, DEAD = 12;
+const AIM_START = 14, AIM_FULL = 90; // px of drag before Attack turns from auto-target into an aim; px for full strength
 
 export function initTouchControls() {
   const zone = document.getElementById('stick-zone');
@@ -43,14 +44,35 @@ export function initTouchControls() {
     zone.addEventListener(type, (e) => { if (e.pointerId === id) reset(); });
   }
 
+  // Attack: hold = auto-target; drag = aim the basic attack that way (the match draws the fan). Its own pointerId, like every control.
+  let aid = null, ax = 0, ay = 0;
+  const atkEnd = () => {
+    aid = null;
+    input.attackTouch = false;
+    input.atkAim = null;
+    atk.classList.remove('down', 'aiming');
+  };
   atk.addEventListener('pointerdown', (e) => {
-    if (e.pointerType === 'mouse') return;
-    atk.setPointerCapture(e.pointerId);
+    if (aid !== null) return;
+    e.preventDefault();
+    aid = e.pointerId;
+    atk.setPointerCapture(aid);
+    ax = e.clientX; ay = e.clientY;
     input.attackTouch = true;
+    input.atkAim = { sx: 0, sy: 0, frac: 0, dragged: false };
     atk.classList.add('down');
   });
-  for (const type of ['pointerup', 'pointercancel']) {
-    atk.addEventListener(type, () => { input.attackTouch = false; atk.classList.remove('down'); });
+  atk.addEventListener('pointermove', (e) => {
+    if (e.pointerId !== aid || !input.atkAim) return;
+    const dx = e.clientX - ax, dy = e.clientY - ay, len = Math.hypot(dx, dy), a = input.atkAim;
+    if (len > AIM_START) a.dragged = true;
+    if (!a.dragged) return;
+    a.sx = dx / len; a.sy = -dy / len;
+    a.frac = Math.min(1, len / AIM_FULL);
+    atk.classList.add('aiming');
+  });
+  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+    atk.addEventListener(type, (e) => { if (e.pointerId === aid) atkEnd(); });
   }
   atk.addEventListener('contextmenu', (e) => e.preventDefault());
 }

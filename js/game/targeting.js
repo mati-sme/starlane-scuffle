@@ -57,6 +57,25 @@ export function pickPrefTarget(ctx, h, range, pref) {
   return pickTarget(ctx, h.team, h.x, h.z, range, ['structures', 'camps', 'minions', 'heroes']);
 }
 
+// Drag-aimed basic attack: the enemy inside the aim cone (CONE_HALF either side of dir) that sits closest to the aim line.
+export const AA_ARC = 70;
+const CONE_HALF = Math.cos((AA_ARC / 2) * Math.PI / 180);
+export function pickDirTarget(ctx, h, range, dx, dz) {
+  let best = null, bestScore = -Infinity;
+  for (const kind of ORDER_HERO) {
+    for (const e of lists[kind](ctx)) {
+      if (!valid(e, h.team)) continue;
+      const vx = e.x - h.x, vz = e.z - h.z, d = Math.hypot(vx, vz);
+      if (d - e.radius > range) continue;
+      const cos = d < 0.01 ? 1 : (vx * dx + vz * dz) / d;
+      if (cos < CONE_HALF) continue;
+      const score = cos - d * 0.01;
+      if (score > bestScore) { best = e; bestScore = score; }
+    }
+  }
+  return best;
+}
+
 const STICK = 0.6; // extra reach before a locked target is dropped
 
 // Keep `cur` while it is still a valid enemy in (slightly stretched) range, unless `best` outranks it

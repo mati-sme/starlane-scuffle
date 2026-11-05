@@ -9,7 +9,7 @@ import { vfx } from '../render/vfx.js';
 import { particles, FRAME } from '../render/particles.js';
 import { bus } from '../core/bus.js';
 import { sim, tickHitFx, tickStatus, tickBuffs, buff, airLift, dyingScale, poof } from '../game/combat.js';
-import { pickHeroTarget, pickPrefTarget, stickyTarget, bestCluster } from '../game/targeting.js';
+import { pickDirTarget, pickHeroTarget, pickPrefTarget, stickyTarget, bestCluster } from '../game/targeting.js';
 import { BEHAVIORS, BASICS } from './behaviors.js';
 import { rankStats } from './roster.js';
 import { gearStats, emptyGear } from '../game/gear.js';
@@ -271,11 +271,12 @@ export class Hero {
     }
 
     const manual = Math.hypot(it.x, it.z) > 0.05;
-    this.aim = this._target(ctx, this.basicRange, it.pref);
+    this.aim = this.isPlayer && it.dir ? pickDirTarget(ctx, this, this.basicRange, it.dir.dx, it.dir.dz) : this._target(ctx, this.basicRange, it.pref);
+    if (this.isPlayer && it.dir && it.attack && !manual && this.faceHold <= 0) this.face = Math.atan2(it.dir.dx, it.dir.dz);
 
     let mx = it.x, mz = it.z;
     if (manual) this.walkTo = null;
-    else if (this.isPlayer && it.attack && !this.aim) {
+    else if (this.isPlayer && it.attack && !this.aim && !it.dir) {
       const near = this._target(ctx, ASSIST_RANGE, it.pref);
       if (near) [mx, mz] = this._toward(near.x, near.z);
     } else if (this.walkTo) {

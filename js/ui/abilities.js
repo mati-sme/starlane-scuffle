@@ -35,8 +35,16 @@ export class Abilities {
       up.dataset.testid = `skill-up-${s.key.toLowerCase()}`;
       up.setAttribute('aria-label', `Rank up ${s.key}`);
       up.innerHTML = '<span>+</span>';
-      up.addEventListener('pointerdown', (e) => e.stopPropagation()); // never leaks into the attack / stick zones
-      up.addEventListener('click', () => this.match.hero.spendPoint(i)); // click so taps, mouse and synthetic clicks all work
+      let upId = null; // spends on its own pointerup: browsers drop the synthesized click while other fingers are down
+      up.addEventListener('pointerdown', (e) => { e.stopPropagation(); upId = e.pointerId; up.setPointerCapture(upId); }); // never leaks into the attack / stick zones
+      up.addEventListener('pointerup', (e) => {
+        if (e.pointerId !== upId) return;
+        upId = null;
+        const r = up.getBoundingClientRect();
+        if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) this.match.hero.spendPoint(i);
+      });
+      up.addEventListener('pointercancel', () => { upId = null; });
+      up.addEventListener('click', (e) => { if (e.detail === 0) this.match.hero.spendPoint(i); }); // keyboard / assistive activation (no pointer)
       up.addEventListener('contextmenu', (e) => e.preventDefault());
       this.root.appendChild(up);
       this.ups.push(up);
@@ -84,8 +92,8 @@ export class Abilities {
       for (const type of ['pointerup', 'pointercancel']) el.addEventListener(type, () => { input.pref[k] = false; el.classList.remove('down'); });
     });
     this.rc = mk('recall', 'recall', 'Recall to base', `<i class="face">${icons.recall}</i><i class="rprog"></i>`, 'B');
-    this.rc.addEventListener('pointerdown', (e) => { e.preventDefault(); input.recall = true; this.rc.classList.add('down'); });
-    for (const type of ['pointerup', 'pointercancel', 'pointerleave']) this.rc.addEventListener(type, () => this.rc.classList.remove('down'));
+    this.rc.addEventListener('pointerdown', (e) => { e.preventDefault(); this.rc.setPointerCapture(e.pointerId); input.recall = true; this.rc.classList.add('down'); });
+    for (const type of ['pointerup', 'pointercancel']) this.rc.addEventListener(type, () => this.rc.classList.remove('down'));
     this.rp = -1;
   }
 

@@ -91,7 +91,7 @@ export class AimPreview {
     } else if (type === 'cone') {
       if (!this.fans.has(shape.arc)) this.fans.set(shape.arc, sector(shape.arc));
       this.fan.geometry = this.fans.get(shape.arc);
-      on(this.fan, 0.5 * pulse).scale.set(range, 1, range);
+      on(this.fan, (shape.strong ? 1 : 0.5) * pulse).scale.set(range, 1, range);
       const half = (shape.arc / 2) * Math.PI / 180;
       for (const [i, s] of [[0, -1], [1, 1]]) {
         const e = on(this.edge[i], 0.95);

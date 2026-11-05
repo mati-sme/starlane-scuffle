@@ -10,6 +10,7 @@ export const input = {
   spend: [false, false, false], // 1 / 2 / 3 or Ctrl+Q / E / R pressed: rank up Q / E / R (consumed by the match)
   aimCast: [null, null, null], // drag-aimed casts waiting with cast[]: { sx, sy, frac } screen drag, or { mouse: true } (consumed with cast[])
   aiming: null, // live skill aim while a skill button / Q E R is held: { slot, sx, sy, frac, cancel, mouse }
+  atkAim: null, // live basic-attack aim while Attack is dragged: { sx, sy, frac, dragged } (touch) or { mouse: true } (Shift + attack key)
   mouse: null, // last mouse position in NDC { x, y } (desktop aim)
   pref: [false, false], // held target buttons: last-hit minion / structure
   recall: false, // recall pressed since the last sim step (consumed by the match)
@@ -70,6 +71,7 @@ export function initInput(canvas) {
     input.attackKey = input.attackMouse = false;
     input.pref[0] = input.pref[1] = false;
     input.aiming = null;
+    input.atkAim = null;
   });
   window.addEventListener('pointermove', (e) => {
     if (e.pointerType === 'mouse') input.mouse = { x: (e.clientX / innerWidth) * 2 - 1, y: -((e.clientY / innerHeight) * 2 - 1) };
