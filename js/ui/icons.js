@@ -64,6 +64,11 @@ export const icons = {
   target_tower: svg(`<polygon points="20,58 44,58 40,26 24,26" ${W}/><polygon points="16,26 48,26 32,6" ${W}/><rect x="28" y="36" width="8" height="12" fill="${INK}"/>`),
   recall: svg(`<path d="M32 6a24 24 0 1 0 24 24" ${LINE(7)}/><polygon points="46,6 58,22 38,24" ${W}/><polygon points="32,20 44,32 40,46 24,46 20,32" ${W}/>`),
 
+  // summoner spells: white glyphs (the button supplies the color)
+  spell_flash: svg(`<polygon points="40,4 14,36 28,36 22,60 50,26 35,26" ${W}/><path d="M6 20h12M4 32h10M8 44h12" ${LINE(4)}/>`),
+  spell_barrier: svg(`<path d="M32 4L56 13V32C56 46 46 56 32 61 18 56 8 46 8 32V13Z" ${W}/><path d="M32 16L46 21V32C46 40 40 46 32 50 24 46 18 40 18 32V21Z" fill="none" stroke="${INK}" stroke-width="4"/>`),
+  spell_ignite: svg(`<path d="M32 3C34 14 50 20 50 38A18 18 0 0 1 14 38C14 30 19 26 22 22 22 29 26 31 28 31 26 20 28 10 32 3Z" ${W}/><path d="M32 60A9 9 0 0 1 23 50C23 44 28 41 32 36 36 41 41 44 41 50A9 9 0 0 1 32 60Z" fill="#FFC83D"/>`),
+
   // basic attacks
   basic_melee: svg(`<path d="M12 54L50 12" ${LINE(9)}/><path d="M8 20Q32 26 56 56" ${LINE(5)}/>`),
   basic_line: svg(`<path d="M6 58L48 16" ${LINE(6)}/><polygon points="44,6 60,4 58,20 50,22" ${W}/>`),

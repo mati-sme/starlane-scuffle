@@ -13,6 +13,7 @@ export const input = {
   atkAim: null, // live basic-attack aim while Attack is dragged: { sx, sy, frac, dragged } (touch) or { mouse: true } (Shift + attack key)
   mouse: null, // last mouse position in NDC { x, y } (desktop aim)
   pref: [false, false], // held target buttons: last-hit minion / structure
+  spell: [false, false], // summoner spell 1 / 2 pressed since the last sim step (F / G, consumed by the match)
   recall: false, // recall pressed since the last sim step (consumed by the match)
   keys: new Set(),
   get attack() { return this.attackTouch || this.attackKey || this.attackMouse || this.pref[0] || this.pref[1]; },
@@ -49,6 +50,8 @@ export function initInput(canvas) {
     if (slot !== undefined && (e.ctrlKey || e.metaKey)) { input.spend[slot] = true; e.preventDefault(); } // Ctrl+Q / E / R ranks up instead of casting
     else if (slot !== undefined) { if (input.mouse) input.aiming = { slot, mouse: true, cancel: false }; else input.cast[slot] = true; } // desktop: hold to aim at the cursor, release to cast
     else if (e.code === 'KeyB') input.recall = true;
+    else if (e.code === 'KeyF') input.spell[0] = true;
+    else if (e.code === 'KeyG') input.spell[1] = true;
     else if (e.code === 'KeyC') input.pref[0] = true;
     else if (e.code === 'KeyV') input.pref[1] = true;
     else if (e.code === 'Digit1' || e.code === 'Numpad1') input.spend[0] = true;

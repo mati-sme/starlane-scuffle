@@ -5,6 +5,7 @@ import { input } from '../core/input.js';
 import { bus } from '../core/bus.js';
 import { icons } from './icons.js';
 import { RECALL_T } from '../heroes/hero.js';
+import { SPELLS } from '../game/spells.js';
 
 const DRAG_START = 14; // px of drag before a press turns from a tap (quick-cast) into an aim
 const DRAG_FULL = 90;  // px of drag = full skill range
@@ -95,6 +96,18 @@ export class Abilities {
     this.rc.addEventListener('pointerdown', (e) => { e.preventDefault(); this.rc.setPointerCapture(e.pointerId); input.recall = true; this.rc.classList.add('down'); });
     for (const type of ['pointerup', 'pointercancel']) this.rc.addEventListener(type, () => this.rc.classList.remove('down'));
     this.rp = -1;
+    // Summoner spells: two buttons left of Recall (F / G on desktop), radial cooldown wipe like the skills.
+    this.spb = [0, 1].map((k) => {
+      const el = mk(`spell sp${k}`, `spell-${k + 1}`, `Summoner spell ${k + 1}`, '<i class="face"></i><i class="cd"></i><b class="num"></b>', 'FG'[k]);
+      el.addEventListener('pointerdown', (e) => { e.preventDefault(); el.setPointerCapture(e.pointerId); input.spell[k] = true; el.classList.add('down'); });
+      for (const type of ['pointerup', 'pointercancel']) el.addEventListener(type, () => el.classList.remove('down'));
+      return { el, face: el.querySelector('.face'), cd: el.querySelector('.cd'), num: el.querySelector('.num'), p: -1, n: -1, id: '' };
+    });
+    bus.on('noSpell', ({ hero, slot }) => {
+      if (hero !== this.match.hero) return;
+      this.note.textContent = 'No target';
+      for (const [node, cls] of [[this.spb[slot].el, 'nope'], [this.note, 'pop']]) { node.classList.remove(cls); void node.offsetWidth; node.classList.add(cls); }
+    });
   }
 
   // Wild Rift style: press + drag aims (the match draws the ground preview), release casts, a tap quick-casts,
@@ -143,6 +156,7 @@ export class Abilities {
   setHero(hero) {
     this.root.style.setProperty('--c', hero.def.css);
     this.btns.forEach((b, i) => { b.face.innerHTML = icons[hero.ab[i].kind]; b.p = b.n = -1; });
+    this.spb.forEach((b, k) => { b.id = ''; b.p = b.n = -1; });
   }
 
   _slam() {
@@ -157,6 +171,16 @@ export class Abilities {
     const rp = h.recall > 0 ? Math.round((h.recall / RECALL_T) * 100) : 0;
     if (rp !== this.rp) { this.rp = rp; this.rc.style.setProperty('--p', rp); this.rc.classList.toggle('on', rp > 0); }
     this.rc.classList.toggle('dead', !h.alive);
+    this.spb.forEach((b, k) => {
+      const id = h.spells[k], left = Math.max(0, h.spellCd[k]);
+      if (b.id !== id) { b.id = id; b.face.innerHTML = icons[`spell_${id}`]; b.el.style.setProperty('--sc', '#' + SPELLS[id].color.toString(16).padStart(6, '0')); b.el.setAttribute('aria-label', SPELLS[id].name); b.el.dataset.spell = id; }
+      const p = left > 0 ? Math.round((left / (h.spellCdTotal[k] || 1)) * 1000) / 10 : 0;
+      if (p !== b.p) { b.cd.style.setProperty('--p', p); b.p = p; }
+      const n = left > 0 ? Math.ceil(left) : '';
+      if (n !== b.n) { b.num.textContent = n; b.n = n; }
+      b.el.classList.toggle('ready', left <= 0);
+      b.el.classList.toggle('dead', !h.alive);
+    });
     this.btns.forEach((b, i) => {
       const locked = h.ranks[i] === 0;
       const left = locked ? 0 : Math.max(0, h.cds[i]);

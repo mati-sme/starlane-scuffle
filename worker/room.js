@@ -12,6 +12,8 @@ const FORWARD = { in: 1, snap: 1, ev: 1 };
 const TEAMS = [0, 1];
 const BAN_MS = 20_000;            // draft: ban stage, then pick stage (timers only run with two humans)
 const PICK_MS = 30_000;
+const SPELLS = ['flash', 'barrier', 'ignite']; // summoner spells (js/game/spells.js); everyone carries two, default Flash + Barrier
+const DEFAULT_SPELLS = ['flash', 'barrier'];
 const STAGE_GRACE_MS = 1000;      // clients auto-ban at the buzzer; a `stage` skip is honoured this long after it
 
 export class GameRoom extends DurableObject {
@@ -110,7 +112,7 @@ export class GameRoom extends DurableObject {
       if (m.create && s.players.length) return this._err(ws, 'exists', 'Room code already in use');
       if (s.phase !== 'lobby') return this._err(ws, 'started', 'Match already started');
       if (s.players.length >= MAX_HUMANS) return this._err(ws, 'full', 'Room is full');
-      p = { token: crypto.randomUUID(), slot: s.players.length, name: clean(m.name, 12) || (s.players.length ? 'Player 2' : 'Player 1'), team: s.players[0]?.team ?? 0, hero: null, ban: null, seen: Date.now() };
+      p = { token: crypto.randomUUID(), slot: s.players.length, name: clean(m.name, 12) || (s.players.length ? 'Player 2' : 'Player 1'), team: s.players[0]?.team ?? 0, hero: null, ban: null, spells: [...DEFAULT_SPELLS], seen: Date.now() };
       s.players.push(p);
       this._draft(); // a new face: everyone bans and picks again
     }
@@ -154,6 +156,7 @@ export class GameRoom extends DurableObject {
         if (s.players.every((q) => q.ban)) { s.stage = 'pick'; this._timer(PICK_MS); }
       }
     }
+    if (Array.isArray(m.spells) && m.spells.length === 2 && m.spells[0] !== m.spells[1] && m.spells.every((id) => SPELLS.includes(id))) p.spells = [...m.spells];
     if (typeof m.hero === 'string' && m.hero.length < 24) {
       if (this._bans().has(m.hero)) bad = ['banned', 'That champion is banned'];
       else if (s.players.some((q) => q !== p && q.hero === m.hero)) bad = ['taken', 'Already picked, choose another one'];
@@ -214,13 +217,13 @@ export class GameRoom extends DurableObject {
     await this._schedule();
   }
 
-  _startMsg() { return { seed: this.s.seed, bans: [...this._bans()].sort(), picks: this.s.players.map((p) => ({ slot: p.slot, team: p.team, hero: p.hero, name: p.name })) }; }
+  _startMsg() { return { seed: this.s.seed, bans: [...this._bans()].sort(), picks: this.s.players.map((p) => ({ slot: p.slot, team: p.team, hero: p.hero, name: p.name, spells: p.spells ?? DEFAULT_SPELLS })) }; }
 
   _lobby() {
     const s = this.s, live = this._live();
     if (!s) return;
     const left = s.stageEnd && s.players.length === 2 ? Math.max(0, Math.ceil((s.stageEnd - Date.now()) / 1000)) : 0;
-    const msg = { t: 'lobby', code: s.code, phase: s.phase, stage: s.stage, left, bans: [...this._bans()], players: s.players.map((p) => ({ slot: p.slot, name: p.name, team: p.team, hero: p.hero, ban: p.ban, connected: live.has(p.token) })) };
+    const msg = { t: 'lobby', code: s.code, phase: s.phase, stage: s.stage, left, bans: [...this._bans()], players: s.players.map((p) => ({ slot: p.slot, name: p.name, team: p.team, hero: p.hero, ban: p.ban, spells: p.spells ?? DEFAULT_SPELLS, connected: live.has(p.token) })) };
     this._broadcast(msg);
   }
 

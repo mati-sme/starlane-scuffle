@@ -23,9 +23,10 @@ import { aimShape } from './aiming.js';
 import { AA_ARC } from './targeting.js';
 import { autoBuy, atBase } from './gear.js';
 import { AimPreview } from '../render/aimpreview.js';
+import { DEFAULT_SPELLS } from './spells.js';
 
 const CONFETTI = [PAL.gold, PAL.sunny, PAL.gloom, PAL.heal, PAL.nebulaB, PAL.star];
-const IDLE = { x: 0, z: 0, attack: false, cast: [false, false, false] };
+const IDLE = { x: 0, z: 0, attack: false, cast: [false, false, false], spell: [false, false] };
 
 export class Match {
   constructor(scene, rig, map) {
@@ -47,12 +48,12 @@ export class Match {
     this.role = 'solo'; // solo | host | guest (online: see net/session.js)
     this.myTeam = 0;
     this.peerHero = null;
-    this.peerIn = { x: 0, z: 0, attack: false, cast: [false, false, false], spend: [false, false, false], aim: [null, null, null], pref: 0, recall: false, at: 0 };
-    this.peerIt = { x: 0, z: 0, attack: false, cast: [false, false, false], aim: [null, null, null], pref: 0, recall: false };
+    this.peerIn = { x: 0, z: 0, attack: false, cast: [false, false, false], spell: [false, false], spend: [false, false, false], aim: [null, null, null], pref: 0, recall: false, at: 0 };
+    this.peerIt = { x: 0, z: 0, attack: false, cast: [false, false, false], spell: [false, false], aim: [null, null, null], pref: 0, recall: false };
     this.outbox = null; // guest: { x, z, attack, cast[], spend[] } collected for the next input message
     this.snapAt = 0;
 
-    this.intent = { x: 0, z: 0, attack: false, cast: [false, false, false], aim: [null, null, null], pref: 0, recall: false };
+    this.intent = { x: 0, z: 0, attack: false, cast: [false, false, false], spell: [false, false], aim: [null, null, null], pref: 0, recall: false };
     this._dir = { dx: 0, dz: 1 };
     this._aim = { dx: 0, dz: 1, dist: 1 };
     this._screen = { x: 0, y: 0 };
@@ -91,13 +92,14 @@ export class Match {
   }
 
   // The player takes `id` on Sunny with 4 bot allies against 5 Gloom bots (see compose.js); `bots` (?bots=a,b,...) forces ids; `banned` ids never show up.
-  setHero(id, bots, banned = []) {
+  setHero(id, bots, banned = [], spells = DEFAULT_SPELLS) {
     this.role = 'solo'; this.myTeam = 0; this.peerHero = null; this.outbox = null; sim.guest = false;
     for (const h of this.heroes ?? []) h.dispose();
     const { blue, red } = composeTeams(id, bots ?? [], banned), bot = (hero) => new Bot(hero);
     const roster = [...blue.map((k, i) => [k, 0, i, i ? bot : null]), ...red.map((k, i) => [k, 1, i, bot])];
     this.heroes = roster.map(([k, team, slot, brain]) => new Hero(this.scene, HEROES[k], team, slot, brain));
     this.hero = this.heroes[0];
+    this.hero.spells = [...spells];
     this.heroId = id;
     assignLanes(this.heroes);
     this.reset();
@@ -107,7 +109,7 @@ export class Match {
   // role 'host' runs everything, 'guest' mirrors the host (net/snapshot.js).
   setOnline({ blue, red, me, peer = null }, role) {
     for (const h of this.heroes ?? []) h.dispose();
-    this.role = role; this.myTeam = me.team; this.outbox = role === 'guest' ? { x: 0, z: 0, attack: false, cast: [false, false, false], spend: [false, false, false], aim: [null, null, null], pref: 0, recall: false } : null;
+    this.role = role; this.myTeam = me.team; this.outbox = role === 'guest' ? { x: 0, z: 0, attack: false, cast: [false, false, false], spell: [false, false], spend: [false, false, false], aim: [null, null, null], pref: 0, recall: false } : null;
     sim.guest = role === 'guest';
     const human = (team, i) => (me.team === team && me.idx === i) || (peer && peer.team === team && peer.idx === i);
     const bot = (hero) => new Bot(hero);
@@ -115,6 +117,8 @@ export class Match {
     this.heroes = roster.map(([k, team, slot, brain]) => new Hero(this.scene, HEROES[k], team, slot, brain));
     this.hero = this.heroes[me.team * 5 + me.idx];
     this.peerHero = peer ? this.heroes[peer.team * 5 + peer.idx] : null;
+    this.hero.spells = [...(me.spells ?? DEFAULT_SPELLS)];
+    if (this.peerHero) this.peerHero.spells = [...(peer.spells ?? DEFAULT_SPELLS)];
     this.heroId = this.hero.id;
     assignLanes(this.heroes);
     this.reset();
@@ -124,6 +128,7 @@ export class Match {
   applyPeerInput(m) {
     const p = this.peerIn;
     p.x = +m.x || 0; p.z = +m.z || 0; p.attack = !!m.a; p.at = performance.now();
+    for (let i = 0; i < 2; i++) if (m.d & (1 << i)) p.spell[i] = true;
     for (let i = 0; i < 3; i++) { if (m.c & (1 << i)) p.cast[i] = true; if (m.s & (1 << i)) p.spend[i] = true; }
     p.pref = m.p === 1 || m.p === 2 ? m.p : 0;
     if (m.r) p.recall = true;
@@ -171,6 +176,7 @@ export class Match {
     input.aiming = null;
     input.atkAim = null;
     input.recall = false;
+    input.spell.fill(false);
     this.preview.hide();
     this.heroes.forEach((h) => h.reset());
     this.towers.forEach((t) => t.reset());
@@ -376,6 +382,7 @@ export class Match {
     it.pref = input.prefNo;
     it.dir = this._atkDir(hero);
     it.recall = input.recall; input.recall = false;
+    for (let i = 0; i < 2; i++) { it.spell[i] = input.spell[i]; input.spell[i] = false; }
     for (let i = 0; i < 3; i++) {
       it.cast[i] = input.cast[i]; input.cast[i] = false;
       it.aim[i] = it.cast[i] && input.aimCast[i] ? this._aimed(input.aimCast[i], hero, i) : null;
@@ -388,6 +395,7 @@ export class Match {
       for (let i = 0; i < 3; i++) if (it.cast[i]) { o.cast[i] = true; o.aim[i] = it.aim[i]; }
       o.pref = it.pref;
       if (it.recall) o.recall = true;
+      for (let i = 0; i < 2; i++) if (it.spell[i]) o.spell[i] = true;
     }
     if (input.walkClick) {
       this._ray.setFromCamera(input.walkClick, this.rig.camera);
@@ -521,6 +529,7 @@ export class Match {
     it.x = stale ? 0 : p.x; it.z = stale ? 0 : p.z; it.attack = !stale && p.attack;
     it.pref = stale ? 0 : p.pref;
     it.recall = p.recall; p.recall = false;
+    for (let i = 0; i < 2; i++) { it.spell[i] = p.spell[i]; p.spell[i] = false; }
     for (let i = 0; i < 3; i++) {
       it.cast[i] = p.cast[i]; p.cast[i] = false;
       it.aim[i] = it.cast[i] ? p.aim[i] : null; p.aim[i] = null;

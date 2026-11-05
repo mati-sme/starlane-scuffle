@@ -13,6 +13,7 @@ import { pickDirTarget, pickHeroTarget, pickPrefTarget, stickyTarget, bestCluste
 import { BEHAVIORS, BASICS } from './behaviors.js';
 import { rankStats } from './roster.js';
 import { gearStats, emptyGear } from '../game/gear.js';
+import { SPELLS, DEFAULT_SPELLS, castSpell, tickBurn, burnFx } from '../game/spells.js';
 
 // Screen-space axes projected onto the ground, derived from the camera offset.
 const FWD = new THREE.Vector2(-CAM.offset[0], -CAM.offset[2]).normalize();
@@ -45,6 +46,7 @@ export class Hero {
     this.baseHp = def.stats.hp;
     this.basic = def.abilities.basic;
     this.ab = [def.abilities.s1, def.abilities.s2, def.abilities.ult];
+    this.spells = [...DEFAULT_SPELLS]; // summoner spells (game/spells.js), set by the match
 
     this.model = def.buildModel(team);
     this.holder = new THREE.Group();
@@ -95,6 +97,8 @@ export class Hero {
     this.cd = 0;
     this.cds = [0, 0, 0];
     this.cdTotal = [1, 1, 1];
+    this.spellCd = [0, 0];
+    this.spellCdTotal = [1, 1];
     this.face = this.yaw = this.team === 0 ? Math.PI / 2 : -Math.PI / 2;
     this.dirx = this.dirz = 0;
     this.moveAmt = 0;
@@ -186,6 +190,7 @@ export class Hero {
     this.stun = this.root = this.slow = this.air = 0;
     this.pull = null;
     this.shieldHp = this.shieldT = 0;
+    this.burn = null; this.burnVis = false;
     this.moveMul = 1;
     this.noAttack = false;
     this.buf = {};
@@ -223,6 +228,9 @@ export class Hero {
     if (ctx.over) { this.moveAmt = 0; this.aim = null; return; }
 
     for (let i = 0; i < 3; i++) if (this.cds[i] > 0) this.cds[i] -= dt;
+    for (let i = 0; i < 2; i++) if (this.spellCd[i] > 0) this.spellCd[i] -= dt;
+    tickBurn(this, dt);
+    if (!this.alive) return;
     this.cd -= dt;
     this.attackerAge += dt;
     this.aggroAge += dt;
@@ -255,6 +263,7 @@ export class Hero {
       if (e.t >= e.dur) { e.end?.(this, ctx, e); this.effects.splice(i, 1); }
     }
 
+    if (!this.script) for (let i = 0; i < 2; i++) if (it.spell?.[i] && this.spellCd[i] <= 0) this._spell(i, ctx);
     if (this.script) { this.recall = 0; this._runScript(dt, ctx); return; }
 
     const stunned = this.stun > 0 || this.air > 0;
@@ -312,7 +321,7 @@ export class Hero {
     if (this.recall > 0) {
       const moved = Math.hypot(it.x, it.z) > 0.05 || this.walkTo, hurt = this.flash > 0 || this.hp < this._rcHp - 0.01;
       this._rcHp = this.hp;
-      if (moved || hurt || stunned || it.cast.some(Boolean) || this.windup > 0) { this._recallEnd(false); return; }
+      if (moved || hurt || stunned || it.cast.some(Boolean) || it.spell?.some(Boolean) || this.windup > 0) { this._recallEnd(false); return; }
       this.recall += dt;
       if (this.recall >= RECALL_T) this._recallEnd(true, ctx);
     } else if (it.recall && !stunned && this.windup <= 0 && Math.hypot(it.x, it.z) <= 0.05) {
@@ -365,6 +374,15 @@ export class Hero {
       this.yOff = this.tilt = 0;
       s.done?.(this, ctx);
     }
+  }
+
+  // Summoner spell in slot i (0 / 1). Nothing to do (Ignite with nobody close) = no cooldown, and the player is told.
+  _spell(i, ctx) {
+    const id = this.spells[i], r = castSpell(this, id, ctx);
+    if (r === false) { if (this.isPlayer) bus.emit('noSpell', { hero: this, slot: i }); return; }
+    this.spellCd[i] = this.spellCdTotal[i] = SPELLS[id].cd;
+    this.windup = 0; this.pend = -1;
+    bus.emit('spell', { hero: this, id, slot: i, target: r === true ? null : r });
   }
 
   _canCast(i) { return this.ranks[i] > 0 && this.cds[i] <= 0; }
@@ -609,6 +627,7 @@ export class Hero {
       }
       if ((this._rcR = (this._rcR ?? 0) - dt) <= 0) { this._rcR = 0.45; vfx.ring(this.rx, 0.2, this.rz, PAL.shield, 2.6 - u, 0.45); }
     }
+    if (this.burn || this.burnVis) burnFx(this, dt);
     if ((this._amb = (this._amb ?? 0) - dt) <= 0) { // role-colored ambient sparks
       this._amb = 0.16;
       particles.emit(this.rx + (Math.random() - 0.5) * 1.2, 0.6 + Math.random() * 2, this.rz + (Math.random() - 0.5) * 1.2, 0, 0.5, 0, this.def.accent, 0.35, 0.6, FRAME.sparkle);

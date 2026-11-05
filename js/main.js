@@ -21,6 +21,7 @@ import { NetClient } from './net/client.js';
 import { Session } from './net/session.js';
 import { T, randomCode, cleanCode, shareLink } from './net/protocol.js';
 import { composeOnline, seeded } from './game/compose.js';
+import { DEFAULT_SPELLS, cleanSpells } from './game/spells.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -56,6 +57,8 @@ const BAN_SECS = 20, PICK_SECS = 30;
 const pickOne = (ids) => ids[(Math.random() * ids.length) | 0];
 let picked = save.get('hero', ROSTER[0]);
 if (!ROSTER.includes(picked)) picked = ROSTER[0];
+let spells = cleanSpells(save.get('spells')) ?? [...DEFAULT_SPELLS]; // summoner spells: Flash + Barrier unless changed
+const setSpells = (s) => { spells = s; save.set('spells', s); };
 
 // Read-only debug surface for browser tests.
 window.__starlane = { match, net, session, gfx, get state() { return state; } };
@@ -128,11 +131,12 @@ function renderLobby() {
   };
   const draftKey = `${stage}:${bans.length}:${L.players.length}`;
   if (online.draftKey !== draftKey) { online.draftKey = draftKey; online.timedOut = false; }
-  menus.showLobby({ code: online.code, link: shareLink(online.code), me: net.slot, players: L.players, phase: L.phase, stage, bans, banSel: online.banSel, deadline: L.left ? online.leftAt + L.left * 1000 : 0, conn: net.status, error: online.error }, {
+  menus.showLobby({ code: online.code, link: shareLink(online.code), me: net.slot, players: L.players, phase: L.phase, stage, bans, banSel: online.banSel, spells: [...(cleanSpells(me?.spells) ?? spells)], deadline: L.left ? online.leftAt + L.left * 1000 : 0, conn: net.status, error: online.error }, {
     onTeam: (team) => send({ team }),
     onHero: (hero) => { online.error = ''; picked = hero; save.set('hero', hero); send({ hero }); },
     onBanSel: (id) => { online.banSel = id; renderLobby(); },
     onBan: (ban) => { online.error = ''; send({ ban }); },
+    onSpells: (s) => { setSpells(s); send({ spells: s }); },
     onTimeout() { // the stage clock ran out: do the sensible thing for this player, once
       if (online.timedOut) return;
       online.timedOut = true;
@@ -166,7 +170,7 @@ function toLobby(error = '') {
 function startOnline({ seed, picks, bans = [] }, role) {
   const list = [...picks].sort((a, b) => a.slot - b.slot);
   const { blue, red } = composeOnline(list.map((p) => ({ team: p.team, hero: p.hero })), seeded(seed), bans);
-  const at = (p) => ({ team: p.team, idx: list.filter((q) => q.team === p.team && q.slot < p.slot).length });
+  const at = (p) => ({ team: p.team, idx: list.filter((q) => q.team === p.team && q.slot < p.slot).length, spells: cleanSpells(p.spells) ?? (p.slot === net.slot ? spells : null) });
   const me = list.find((p) => p.slot === net.slot), peer = list.find((p) => p.slot !== net.slot);
   if (!me) return toLobby('Could not join the match');
   clearTimeout(resultTimer);
@@ -193,6 +197,8 @@ net.on('welcome', (m) => {
   if (!online) return;
   online.lobby = m;
   online.leftAt = performance.now();
+  const mp = m.players.find((p) => p.slot === net.slot);
+  if (mp && !online.spSent && cleanSpells(mp.spells)?.join() !== spells.join()) { online.spSent = true; net.send({ t: T.pick, spells }); } // once: tell the room my saved spells
   if (m.stage === 'pick') online.banSel = null;
   if (state === 'online') { state = 'lobby'; document.body.classList.remove('playing'); }
   renderLobby();
@@ -222,7 +228,7 @@ function toSelect() {
   leave('select');
   draftBans = [];
   menus.showSelect({
-    phase: 'ban', picked, secs: BAN_SECS, onBan: botBans, onHome: toTitle,
+    phase: 'ban', picked, spells: [...spells], secs: BAN_SECS, onBan: botBans, onHome: toTitle,
     onTimeout: (sel) => botBans(sel ?? pickOne(ROSTER.filter((id) => id !== picked))),
   });
 }
@@ -232,7 +238,7 @@ function botBans(id) {
   for (let i = 0; i < 2; i++) draftBans.push(pickOne(ROSTER.filter((k) => !draftBans.includes(k) && k !== picked)));
   const names = draftBans.slice(1).map((k) => HEROES[k].name).join(' and ');
   menus.showSelect({
-    phase: 'pick', picked, banned: draftBans, secs: PICK_SECS, note: `The bots banned ${names}. Banned champions are locked.`,
+    phase: 'pick', picked, banned: draftBans, spells: [...spells], onSpells: setSpells, secs: PICK_SECS, note: `The bots banned ${names}. Banned champions are locked.`,
     onPlay: startMatch, onTimeout: (sel) => startMatch(sel), onHome: toTitle,
   });
 }
@@ -241,7 +247,7 @@ function startMatch(id = picked) {
   clearTimeout(resultTimer);
   picked = id;
   save.set('hero', id);
-  match.setHero(id, undefined, draftBans); // fresh heroes + a fresh random bot line-up each match
+  match.setHero(id, undefined, draftBans, spells); // fresh heroes + a fresh random bot line-up each match
   menus.hideAll();
   match.reset();
   rig.follow(match.hero);

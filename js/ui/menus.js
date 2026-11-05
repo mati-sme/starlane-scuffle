@@ -4,6 +4,7 @@ import { audio } from '../audio.js';
 import { PAL } from '../config.js';
 import { HEROES, ROSTER } from '../heroes/index.js';
 import { TEAM_NAME } from '../net/protocol.js';
+import { SPELLS, SPELL_IDS } from '../game/spells.js';
 
 const hex = (n) => '#' + n.toString(16).padStart(6, '0');
 const mmss = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
@@ -29,6 +30,25 @@ function skillRows(def) {
     + row('Q', def.s1, icons[def.s1.kind], 'detail-q')
     + row('E', def.s2, icons[def.s2.kind], 'detail-e')
     + row('R', def.ult, icons[def.ult.kind], 'detail-r');
+}
+
+// Summoner-spell chooser: 3 chips, exactly 2 are on (tapping a third swaps out the older pick). The numbers show which button each lands on.
+const css = (c) => '#' + c.toString(16).padStart(6, '0');
+const spellPick = (spells) => `<div class="spellpick" data-testid="spell-pick"><span>Spells · pick 2</span>${SPELL_IDS.map((id) => {
+  const n = spells.indexOf(id) + 1;
+  return `<button type="button" class="spchip ${n ? 'on' : ''}" data-spell="${id}" data-n="${n || ''}" data-testid="spell-chip-${id}" aria-pressed="${!!n}" style="--sc:${css(SPELLS[id].color)}"><i>${icons[`spell_${id}`]}</i><span><b>${SPELLS[id].name}</b><small>${SPELLS[id].blurb}</small></span></button>`;
+}).join('')}</div>`;
+function wireSpells(el, spells, onChange) {
+  const paint = () => el.querySelectorAll('.spchip').forEach((c) => {
+    const n = spells.indexOf(c.dataset.spell) + 1;
+    c.classList.toggle('on', !!n); c.dataset.n = n || ''; c.setAttribute('aria-pressed', String(!!n));
+  });
+  el.querySelectorAll('.spchip').forEach((c) => c.addEventListener('click', () => {
+    const id = c.dataset.spell;
+    if (spells.includes(id)) return; // always two on: tap another one to swap
+    spells.shift(); spells.push(id);
+    paint(); onChange([...spells]);
+  }));
 }
 
 export function createMenus(root) {
@@ -71,7 +91,7 @@ export function createMenus(root) {
 
     // Offline draft. phase 'ban': tap a champion, BAN it. phase 'pick': banned champions are stamped and locked, tap one, GO.
     // secs: countdown, then onTimeout(selected id or null). note: one line under the help text.
-    showSelect({ phase = 'pick', picked, banned = [], secs = 0, note = '', onBan, onPlay, onTimeout, onHome }) {
+    showSelect({ phase = 'pick', picked, banned = [], spells = [], secs = 0, note = '', onBan, onPlay, onTimeout, onHome, onSpells }) {
       const banning = phase === 'ban';
       const out = new Set(banned);
       let sel = banning ? null : out.has(picked) ? ROSTER.find((id) => !out.has(id)) : ROSTER.includes(picked) ? picked : ROSTER[0];
@@ -86,6 +106,7 @@ export function createMenus(root) {
         <h2 class="sel-title" data-testid="draft-title">${banning ? 'Ban — tap to ban' : 'Pick — tap to choose'}</h2>
         <p class="hint draft-help" data-testid="draft-help">${banning ? HELP : note || 'Banned champions are locked. Now pick yours!'}</p>
         <span class="timer" data-testid="draft-timer"></span>
+        ${banning ? '' : spellPick(spells)}
         <div class="selwrap">
           <div class="grid" data-testid="champion-grid">${cards}</div>
           <aside class="detail" data-testid="champion-detail"></aside>
@@ -124,6 +145,7 @@ export function createMenus(root) {
             audio.sfx('skill', { def: HEROES[sel], isPlayer: true });
           });
         }
+        if (!banning) wireSpells(el, spells, onSpells);
         on(el, '.home', onHome);
         countdown(el, secs && performance.now() + secs * 1000, () => onTimeout?.(sel));
       });
@@ -152,7 +174,7 @@ export function createMenus(root) {
     // Room lobby: code + link, both players' team / ban / champion, host Start. Re-rendered on every lobby update.
     // stage 'ban': tap a champion (banSel), BAN it. stage 'pick': banned / taken champions are stamped and locked.
     // deadline: performance.now() ms the stage timer ends (0 = no timer).
-    showLobby({ code, link, me, players, phase, stage = 'pick', bans = [], banSel = null, deadline = 0, conn, error }, { onTeam, onHero, onBanSel, onBan, onStart, onCopy, onLeave, onTimeout }) {
+    showLobby({ code, link, me, players, phase, stage = 'pick', bans = [], banSel = null, spells = [], deadline = 0, conn, error }, { onTeam, onHero, onBanSel, onBan, onSpells, onStart, onCopy, onLeave, onTimeout }) {
       const mine = players.find((p) => p.slot === me), other = players.find((p) => p.slot !== me);
       const isHost = me === 0, two = players.length === 2;
       const banning = stage === 'ban' && phase === 'lobby';
@@ -181,6 +203,7 @@ export function createMenus(root) {
           <button type="button" class="tbtn t1 ${mine?.team === 1 ? 'on' : ''}" data-team="1" data-testid="team-gloom">GLOOM</button></div>
         <h3 class="stagehead" data-testid="draft-title">${phase === 'play' ? 'Match in progress…' : banning ? 'Ban — tap to ban' : 'Pick — tap to choose'}<span class="timer" data-testid="draft-timer"></span></h3>
         <p class="hint draft-help" data-testid="draft-help">${help}</p>
+        ${phase === 'lobby' ? spellPick(spells) : ''}
         <div class="grid lobbygrid">${cards}</div>
         <p class="hint" data-testid="lobby-mode">${phase === 'play' ? '' : mode}</p>
         <p class="neterr" data-testid="lobby-error">${conn !== 'open' ? 'Reconnecting…' : error ?? ''}</p>
@@ -188,6 +211,7 @@ export function createMenus(root) {
       (el) => {
         for (const b of el.querySelectorAll('.tbtn')) b.addEventListener('click', () => onTeam(+b.dataset.team));
         for (const b of el.querySelectorAll('.hcard')) b.addEventListener('click', () => (banning ? onBanSel(b.dataset.id) : onHero(b.dataset.id)));
+        if (phase === 'lobby') wireSpells(el, spells, onSpells);
         el.querySelector('.copy').addEventListener('click', () => onCopy(el.querySelector('.copy')));
         el.querySelector('.home').addEventListener('click', onLeave);
         el.querySelector('.start')?.addEventListener('click', () => onStart(!two));

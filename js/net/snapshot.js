@@ -1,10 +1,10 @@
 // Host -> guest state. encodeSnap packs the whole match into small arrays (sent ~10 Hz);
 // applySnap lays it onto the guest's mirror Match. Events ride along in `e` so they stay ordered with the state.
 //   hero row:   [x, z, face, hp, maxHp, flags, level, xp, points, ranks, cd0, cd1, cd2, respawn, respawnTotal, gold, [item index...]]
-//   flags:      1 alive · 2 hidden · 4 stunned · 8 shielded
+//   flags:      1 alive · 2 hidden · 4 stunned · 8 shielded · 16 burning (Ignite)
 //   struct row: [hp, flags]            1 alive · 2 vulnerable · 4 shielded · 8 nexus pulse
 //   minion row: [id, team, kind, lane, x, z, hp, facing]      camp / boss row: [alive, hp, x, z, spawnIn, variant]   buffs bf: [[fire, ice, gale, dragonT, titanT, heraldT] x 2]
-//   events:     ['c', hero, slot] cast · ['w', hero] swing · ['p', src, tgt, speed, arc, y] shot · ['k', victim, killer] takedown
+//   events:     ['c', hero, slot] cast · ['s', hero, spell id, burn target or -1] summoner spell · ['w', hero] swing · ['p', src, tgt, speed, arc, y] shot · ['k', victim, killer] takedown
 //   refs (src / tgt): 0-9 hero index · 20+ structure index · 100+ minion id
 import { bus } from '../core/bus.js';
 import { DYING } from '../game/combat.js';
@@ -12,6 +12,7 @@ import { vfx } from '../render/vfx.js';
 import { PAL } from '../config.js';
 import { reconcile } from './client.js';
 import { ITEM_IDS } from '../game/gear.js';
+import { SPELLS, spellFx } from '../game/spells.js';
 
 const KINDS = ['blobling', 'zapper', 'bigblob'];
 const r1 = (v) => Math.round(v * 10) / 10;
@@ -36,7 +37,7 @@ export function encodeSnap(match, seq, events) {
     t: 'snap', n: seq, tm: r2(match.time), st: match.storm ? 1 : 0, wv: match.waveNo, k: match.kills, d: match.destroyed, tl: match.towersLost,
     h: match.heroes.map((h) => [
       r1(h.x), r1(h.z), r2(h.face), Math.round(h.hp), h.maxHp,
-      (h.alive ? 1 : 0) | (h.hidden ? 2 : 0) | (h.stun > 0 ? 4 : 0) | (h.shieldHp > 0 && h.shieldT > 0 ? 8 : 0),
+      (h.alive ? 1 : 0) | (h.hidden ? 2 : 0) | (h.stun > 0 ? 4 : 0) | (h.shieldHp > 0 && h.shieldT > 0 ? 8 : 0) | (h.burn ? 16 : 0),
       h.level, Math.round(h.xp), h.points, h.ranks[0] | (h.ranks[1] << 3) | (h.ranks[2] << 6),
       r1(h.cds[0]), r1(h.cds[1]), r1(h.cds[2]), r1(h.respawn), r1(h.respawnTotal),
       Math.floor(h.gold), h.items.map((id) => ITEM_IDS.indexOf(id)),
@@ -85,6 +86,7 @@ export function applySnap(match, s) {
     if (hp < h.hp && alive) { h.flash = 0.08; h.squash = 1; }
     h.hp = alive ? hp : 0; h.maxHp = maxHp;
     h.brushHidden = !!(f & 2);
+    h.burnVis = !!(f & 16);
     if (!me) {
       h.hidden = !!(f & 2);
       if (f & 4 && !(h.stun > 0)) h.stun = 0.3;
@@ -137,6 +139,12 @@ export function applyEvents(match, events) {
         h.lunge = 1;
         vfx.ring(h.x, 0.2, h.z, e[2] === 2 ? PAL.gold : h.def.accent, e[2] === 2 ? 5 : 3, 0.35);
         bus.emit('cast', { hero: h, slot: e[2] });
+        break;
+      }
+      case 's': { // summoner spell: the burst only (the host already moved / shielded / burned them)
+        const h = match.heroes[e[1]];
+        if (!h || h === match.hero || !(e[2] in SPELLS)) break;
+        spellFx(h, e[2], match.heroes[e[3]] ?? null);
         break;
       }
       case 'w': { // basic swing

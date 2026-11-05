@@ -20,6 +20,7 @@ export class Session {
 
     const push = (e) => { if (this.role === 'host') this.events.push(e); };
     bus.on('cast', ({ hero, slot }) => push(['c', match.heroes.indexOf(hero), slot]));
+    bus.on('spell', ({ hero, id, slot, target }) => push(['s', match.heroes.indexOf(hero), id, target ? match.heroes.indexOf(target) : -1]));
     bus.on('swing', (h) => { if (h.type === 'hero') push(['w', match.heroes.indexOf(h)]); });
     bus.on('takedown', ({ killer, victim }) => push(['k', match.heroes.indexOf(victim), match.heroes.indexOf(killer)]));
     match.projectiles.onFire = (src, tgt, speed, arc, y) => {
@@ -87,10 +88,11 @@ export class Session {
       const q = [];
       o.aim.forEach((v, i) => { if (v && o.cast[i]) q.push([i, Math.round(Math.atan2(v.dx, v.dz) * 100), Math.round(v.dist * 10)]); });
       const msg = { t: T.input, x: Math.round(o.x * 100) / 100, z: Math.round(o.z * 100) / 100, a: o.attack ? 1 : 0, c: bits(o.cast), s: bits(o.spend), p: o.pref };
+      if (o.spell.some(Boolean)) msg.d = bits(o.spell); // summoner spells
       if (q.length) msg.q = q; // aimed casts: [slot, angle * 100, distance * 10]
       if (o.recall) msg.r = 1;
       this.net.send(msg);
-      o.cast.fill(false); o.spend.fill(false); o.aim.fill(null); o.recall = false;
+      o.cast.fill(false); o.spell.fill(false); o.spend.fill(false); o.aim.fill(null); o.recall = false;
     }
   }
 }
