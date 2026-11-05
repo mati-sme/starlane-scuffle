@@ -52,7 +52,7 @@ let picked = save.get('hero', ROSTER[0]);
 if (!ROSTER.includes(picked)) picked = ROSTER[0];
 
 // Read-only debug surface for browser tests.
-window.__starlane = { match, net, session, get state() { return state; } };
+window.__starlane = { match, net, session, gfx, get state() { return state; } };
 
 const muteBtn = $('mute');
 const syncMute = () => { muteBtn.innerHTML = audio.muted ? icons.mute : icons.sound; };
@@ -259,7 +259,7 @@ const loop = createLoop({
     rig.update(dt, gfx.camera.aspect);
     gfx.camera.updateMatrixWorld(); // health bars project with this frame's camera
     hud.update(dt);
-    gfx.renderer.render(gfx.scene, gfx.camera);
+    gfx.render(rig.look);
     gfx.adapt(realDt);
     session.tick(performance.now());
     const banner = session.banner;

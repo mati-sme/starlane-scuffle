@@ -80,4 +80,4 @@ export const CORE = { hp: 2800, radius: 2.4 };
 export const CAM = { fov: 38, offset: [-7, 20, 15], follow: 6, lead: 2, wideAspect: 2.0, zoom: 1.22 };
 // Online rooms: worker URL (override with ?ws=wss://host), snapshot / input rates in Hz.
 export const NET = { url: (typeof location === 'undefined' ? null : new URLSearchParams(location.search).get('ws')) ?? 'wss://starlane-scuffle.mati-sme.workers.dev', snapHz: 10, inputHz: 20 };
-export const BUDGET = { dprMax: 2, scaleMin: 0.6, maxParticles: 1500 };
+export const BUDGET = { dprMax: 2, scaleMin: 0.6, maxParticles: 1500, shadows: true };

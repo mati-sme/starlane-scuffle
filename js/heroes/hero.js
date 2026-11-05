@@ -44,7 +44,7 @@ export class Hero {
     this.shadow = makeShadow(1.9);
     this.ring = new THREE.Mesh(
       brain ? new THREE.TorusGeometry(0.95, 0.06, 6, 28).rotateX(Math.PI / 2) : new THREE.TorusGeometry(1.2, 0.13, 6, 32).rotateX(Math.PI / 2), // the player's ring is bigger and thicker
-      new THREE.MeshBasicMaterial({ color: brain ? TEAM[team].main : PAL.gold }),
+      new THREE.MeshBasicMaterial({ color: brain ? TEAM[team].main : PAL.gold, toneMapped: false }),
     );
     this.ring.position.y = 0.1;
     this.holder.add(this.shadow, this.ring);

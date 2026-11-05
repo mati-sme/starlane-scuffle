@@ -69,7 +69,7 @@ export class MinionSystem {
     this.nid = 0;
     this.byId = new Map(); // guest mirror: host id -> minion
     this.free = Array.from({ length: MAX_TOTAL }, () => this._blank());
-    this.mat = toonMat({ vertexColors: true });
+    this.mat = toonMat({ vertexColors: true, roughness: 0.5, metalness: 0.15, rim: 0.3 });
     this.groups = {};
     for (const team of [0, 1]) {
       for (const type of TYPES) {
@@ -79,6 +79,7 @@ export class MinionSystem {
         const outline = new THREE.InstancedMesh(geo, outlineMat(0.025), max);
         outline.instanceMatrix = mesh.instanceMatrix;
         mesh.frustumCulled = outline.frustumCulled = false;
+        mesh.castShadow = true;
         mesh.setColorAt(0, new THREE.Color(1, 1, 1));
         mesh.count = outline.count = 0;
         scene.add(mesh, outline);

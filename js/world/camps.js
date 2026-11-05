@@ -21,7 +21,7 @@ export class Camps {
       const group = new THREE.Group();
       group.position.set(p.x, GROUND, p.z);
       group.add(makeShadow(3.2));
-      const mat = toonMat({ vertexColors: true });
+      const mat = toonMat({ vertexColors: true, roughness: 0.55, metalness: 0.1, rim: 0.3 });
       const body = toonMesh(geo, mat);
       group.add(body);
       scene.add(group);

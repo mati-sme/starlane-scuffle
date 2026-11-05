@@ -1,12 +1,13 @@
 // Pooled mesh VFX (rings, swipe arcs, light columns, decals, vine tubes, ghosts, falling streaks) and the auto-aim chevron.
 import * as THREE from 'three';
 import { PAL } from '../config.js';
+import { shockTexture } from './atlas.js';
 
 const POOL = 32;
-const ringGeo = new THREE.RingGeometry(0.82, 1, 32).rotateX(-Math.PI / 2);
-const arcGeo = new THREE.RingGeometry(0.55, 1, 16, 1, -0.95, 1.9).rotateX(-Math.PI / 2);
+const ringGeo = new THREE.CircleGeometry(1, 40).rotateX(-Math.PI / 2); // shock texture paints the soft rim + faint fill
+const arcGeo = new THREE.RingGeometry(0.4, 1, 20, 1, -0.95, 1.9).rotateX(-Math.PI / 2); // planar UVs: bright leading edge
 const columnGeo = new THREE.CylinderGeometry(1, 1, 12, 16, 1, true);
-const decalGeo = new THREE.CircleGeometry(1, 24).rotateX(-Math.PI / 2);
+const decalGeo = new THREE.CircleGeometry(1, 32).rotateX(-Math.PI / 2);
 const tubeGeo = new THREE.CylinderGeometry(0.3, 1, 1, 6, 1, true).translate(0, 0.5, 0); // tapered, base at origin, +Y
 const ghostGeo = new THREE.SphereGeometry(1, 10, 8);
 const streakGeo = new THREE.CylinderGeometry(0.02, 0.16, 1, 5); // fat head at -Y, thin tail at +Y
@@ -19,16 +20,18 @@ class Vfx {
   constructor() { this.items = []; this.marker = null; this.target = null; }
 
   attach(scene) {
+    const shock = shockTexture();
+    this.shock = shock;
     for (let i = 0; i < POOL; i++) {
       const mat = new THREE.MeshBasicMaterial({
-        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false,
       });
       const mesh = new THREE.Mesh(ringGeo, mat);
       mesh.visible = false;
       scene.add(mesh);
       this.items.push({ mesh, kind: '', age: 0, dur: 1, size: 1, on: false, a: null, b: null, ay: 0, by: 0, dir: new THREE.Vector3() });
     }
-    this.marker = new THREE.Mesh(chevGeo, new THREE.MeshBasicMaterial({ color: PAL.gloom }));
+    this.marker = new THREE.Mesh(chevGeo, new THREE.MeshBasicMaterial({ color: PAL.gloom, toneMapped: false }));
     this.marker.visible = false;
     scene.add(this.marker);
   }
@@ -37,7 +40,9 @@ class Vfx {
     const it = this.items.find((i) => !i.on) ?? this.items[0];
     it.on = true; it.kind = kind; it.age = 0; it.dur = dur; it.size = size;
     it.mesh.geometry = geo;
-    it.mesh.material.color.set(color);
+    const textured = geo === ringGeo || geo === arcGeo || geo === decalGeo;
+    if ((it.mesh.material.map === this.shock) !== textured) { it.mesh.material.map = textured ? this.shock : null; it.mesh.material.needsUpdate = true; }
+    it.mesh.material.color.set(color).multiplyScalar(textured ? 1.6 : 1.2); // HDR-ish boost: additive and not tone-mapped
     it.mesh.visible = true;
     it.mesh.rotation.set(0, 0, 0);
     it.mesh.quaternion.identity();
@@ -104,7 +109,7 @@ class Vfx {
           m.material.opacity = 0.7 * (1 - u);
           break;
         case 'decal':
-          m.material.opacity = 0.75 * (1 - u) * Math.min(1, u * 20);
+          m.material.opacity = 0.9 * (1 - u * u) * Math.min(1, u * 20); // holds, then fades: reads as a telegraph
           break;
         case 'ghost':
           m.material.opacity = 0.55 * (1 - u);

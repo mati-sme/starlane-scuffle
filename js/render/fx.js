@@ -25,7 +25,7 @@ export class Ribbon {
     geo.setAttribute('color', new THREE.BufferAttribute(col, 4));
     geo.setIndex(idx);
     this.mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
-      vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+      vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false,
     }));
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 9;
@@ -111,7 +111,7 @@ export function makeBeam(color) {
   const geo = new THREE.CylinderGeometry(0.5, 0.5, 1, 10, 1, true).rotateX(Math.PI / 2).translate(0, 0, 0.5);
   const tex = stripeTexture();
   const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
-    map: tex, color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    map: tex, color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false,
   }));
   mesh.visible = false;
   mesh.renderOrder = 9;

@@ -1,4 +1,4 @@
-// Towers: stone plinth, ribbed steel shaft, team band, spinning crystal. Shoot minions first, then heroes.
+// Towers: stone-and-steel fortified plinth, ribbed armored shaft with glowing seams, turret prongs, spinning energy crystal. Shoot minions first, then heroes.
 import * as THREE from 'three';
 import { PAL, TEAM, TOWER, GROUND } from '../config.js';
 import { structSpot } from './arena.js';
@@ -36,42 +36,63 @@ export class Tower {
     if (this.tier === 'guard') this.group.scale.setScalar(1.18);
     this.group.add(makeShadow(4.4));
 
-    this.mat = toonMat({ vertexColors: true });
-    this.crystalMat = toonMat({ color: c.main, emissive: c.main, emissiveIntensity: 0.55 });
+    this.mat = toonMat({ vertexColors: true, finish: true, rim: 0.25 });
+    this.crystalMat = toonMat({ color: c.main, emissive: c.main, emissiveIntensity: 1.4, roughness: 0.15, metalness: 0.1 });
     this.mats = [this.mat, this.crystalMat];
 
+    // Fortified plinth: rough-cut stone base, four sloped steel buttresses, a glowing team ring.
+    const glowC = new THREE.Color(c.main).lerp(new THREE.Color(0xffffff), 0.15).getHex();
     const stumpGeo = mergeParts([
-      { g: new THREE.CylinderGeometry(1.45, 1.7, 0.5, 6), c: PAL.cliffDark, p: [0, 0.25, 0] },
-      { g: new THREE.CylinderGeometry(1.3, 1.45, 0.45, 6), c: PAL.cliffLight, p: [0, 0.72, 0] },
-      { g: new THREE.CylinderGeometry(1.1, 1.15, 0.3, 6), c: c.deep, p: [0, 1.08, 0] },
+      { g: new THREE.CylinderGeometry(1.75, 1.95, 0.55, 8), c: 0x6A655C, p: [0, 0.27, 0], f: 'stone' },
+      { g: new THREE.CylinderGeometry(1.45, 1.7, 0.5, 8), c: 0x746D62, p: [0, 0.78, 0], f: 'stone' },
+      ...Array.from({ length: 4 }, (_, i) => {
+        const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+        return { g: new THREE.BoxGeometry(0.42, 1.5, 0.9), c: 0x4C535E, p: [Math.sin(a) * 1.35, 1.0, Math.cos(a) * 1.35], r: [0, a, 0], f: 'steel' };
+      }),
+      { g: new THREE.TorusGeometry(1.32, 0.09, 6, 24), c: glowC, p: [0, 1.06, 0], r: [Math.PI / 2, 0, 0], f: 'glow' },
+      { g: new THREE.CylinderGeometry(1.2, 1.3, 0.3, 8), c: c.deep, p: [0, 1.18, 0], f: 'metal' },
     ]);
-    this.group.add(toonMesh(stumpGeo, this.mat));
+    const base = toonMesh(stumpGeo, this.mat, 0);
+    base.receiveShadow = true;
+    this.group.add(base);
 
+    // Armored shaft: paneled lower tower with steel ribs and glowing seams, a team-painted collar, turret head with emitter prongs.
     this.top = new THREE.Group();
-    const ribs = Array.from({ length: 6 }, (_, i) => { // steel ribs on the hex corners of the lower shaft
-      const a = (i / 6) * Math.PI * 2;
-      return { g: new THREE.BoxGeometry(0.16, 2.0, 0.16), c: 0x4A505A, p: [Math.sin(a) * 0.93, 2.1, Math.cos(a) * 0.93], r: [0, a, 0] };
-    });
+    const ribs = Array.from({ length: 8 }, (_, i) => {
+      const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
+      return [
+        { g: new THREE.BoxGeometry(0.18, 2.1, 0.2), c: 0x3E444E, p: [Math.sin(a) * 0.95, 2.15, Math.cos(a) * 0.95], r: [0, a, 0], f: 'steel' },
+        ...(i % 2 ? [] : [{ g: new THREE.BoxGeometry(0.05, 1.5, 0.06), c: glowC, p: [Math.sin(a + 0.39) * 0.97, 2.15, Math.cos(a + 0.39) * 0.97], r: [0, a, 0], f: 'glow' }]),
+      ];
+    }).flat();
+    const prongs = Array.from({ length: 4 }, (_, i) => {
+      const a = (i / 4) * Math.PI * 2;
+      return [
+        { g: new THREE.BoxGeometry(0.22, 1.2, 0.36), c: 0xB4BAC4, p: [Math.sin(a) * 0.82, 4.75, Math.cos(a) * 0.82], r: [Math.cos(a) * -0.3, 0, Math.sin(a) * 0.3], f: 'metal' },
+        { g: new THREE.BoxGeometry(0.08, 0.6, 0.1), c: glowC, p: [Math.sin(a) * 0.95, 5.0, Math.cos(a) * 0.95], r: [Math.cos(a) * -0.3, 0, Math.sin(a) * 0.3], f: 'glow' },
+      ];
+    }).flat();
     const shaftGeo = mergeParts([
-      { g: new THREE.CylinderGeometry(0.85, 1.05, 2.0, 6), c: 0xA9ADB5, p: [0, 2.1, 0] },
+      { g: new THREE.CylinderGeometry(0.88, 1.08, 2.1, 8), c: 0x8E9098, p: [0, 2.15, 0], f: 'steel' },
       ...ribs,
-      { g: new THREE.TorusGeometry(0.98, 0.14, 6, 12), c: c.main, p: [0, 1.7, 0], r: [Math.PI / 2, 0, 0] },
-      { g: new THREE.CylinderGeometry(0.92, 0.92, 0.18, 6), c: 0x5A606A, p: [0, 3.15, 0] },
-      { g: new THREE.CylinderGeometry(0.7, 0.85, 1.2, 6), c: 0xBCC0C7, p: [0, 3.7, 0] },
-      { g: new THREE.BoxGeometry(1.5, 0.1, 0.22), c: c.main, p: [0, 3.75, 0] }, // team light slot
-      { g: new THREE.ConeGeometry(1.05, 0.7, 6), c: c.deep, p: [0, 4.65, 0] },
+      { g: new THREE.CylinderGeometry(1.08, 1.0, 0.35, 8), c: c.main, p: [0, 3.3, 0], f: 'paint' },
+      { g: new THREE.TorusGeometry(1.04, 0.07, 6, 16), c: 0xD2D6DC, p: [0, 3.48, 0], r: [Math.PI / 2, 0, 0], f: 'metal' },
+      { g: new THREE.CylinderGeometry(0.72, 0.88, 0.9, 8), c: 0x5A606A, p: [0, 3.92, 0], f: 'steel' },
+      { g: new THREE.CylinderGeometry(1.0, 0.75, 0.32, 8), c: 0xC2C6CC, p: [0, 4.5, 0], f: 'metal' },
+      ...prongs,
     ]);
-    this.top.add(toonMesh(shaftGeo, this.mat));
+    this.top.add(toonMesh(shaftGeo, this.mat, 0));
 
-    this.crystal = toonMesh(new THREE.OctahedronGeometry(0.55).scale(1, 1.4, 1), this.crystalMat, 0.03);
+    this.crystal = toonMesh(new THREE.OctahedronGeometry(0.55).scale(1, 1.4, 1), this.crystalMat, 0);
     this.crystal.position.y = CRYSTAL_Y + 0.6;
-    this.halo = makeHalo(c.main, 2.6);
+    this.halo = makeHalo(c.main, 3.4);
     this.halo.position.copy(this.crystal.position);
     this.top.add(this.crystal, this.halo);
 
     this.banner = new THREE.Group();
-    this.banner.position.set(1.0, 3.9, 0);
-    const cloth = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 1.1), toonMat({ color: c.main, side: THREE.DoubleSide }));
+    this.banner.position.set(1.05, 3.9, 0);
+    const cloth = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 1.1), toonMat({ color: c.main, side: THREE.DoubleSide, roughness: 0.9 }));
+    cloth.castShadow = true;
     cloth.position.set(0.35, -0.55, 0);
     this.banner.add(cloth);
     this.top.add(this.banner);

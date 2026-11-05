@@ -22,7 +22,9 @@ const FRAG = /* glsl */ `
   varying vec3 vC; varying float vA; varying float vF;
   void main() {
     vec4 t = texture2D(uTex, vec2((vF + gl_PointCoord.x) / 4.0, 1.0 - gl_PointCoord.y));
-    gl_FragColor = vec4(vC * t.rgb, t.a * vA);
+    // White-hot core: the brightest part of each sprite pushes toward white so effects glow rather than tint.
+    vec3 c = mix(vC, vec3(1.0), t.a * t.a * 0.55);
+    gl_FragColor = vec4(c * t.rgb * 1.25, t.a * vA);
     #include <colorspace_fragment>
   }`;
 

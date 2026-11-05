@@ -1,4 +1,4 @@
-// The Core: floating crystal over a ring dais, orbiting shards, fresnel shield bubble.
+// The Core: floating energy crystal over a stepped reactor dais with conduit pylons, orbiting shards, fresnel shield bubble.
 import * as THREE from 'three';
 import { PAL, TEAM, CORE, GROUND } from '../config.js';
 import { structSpot } from './arena.js';
@@ -38,29 +38,40 @@ export class Core {
     this.group.position.set(this.x, GROUND, this.z);
     this.group.add(makeShadow(7));
 
-    this.mat = toonMat({ vertexColors: true });
-    this.crystalMat = toonMat({ color: c.main, emissive: c.main, emissiveIntensity: 0.5 });
+    this.mat = toonMat({ vertexColors: true, finish: true, rim: 0.25 });
+    this.crystalMat = toonMat({ color: c.main, emissive: c.main, emissiveIntensity: 1.3, roughness: 0.12, metalness: 0.1 });
     this.mats = [this.mat, this.crystalMat];
 
+    // Stepped stone dais, six armored conduit pylons with glowing tips, an energy ring and a team-painted reactor socket.
+    const glowC = new THREE.Color(c.main).lerp(new THREE.Color(0xffffff), 0.15).getHex();
     const daisGeo = mergeParts([
-      { g: new THREE.CylinderGeometry(3.1, 3.3, 0.25, 16), c: PAL.cliffDark, p: [0, 0.12, 0] },
-      { g: new THREE.CylinderGeometry(2.6, 2.9, 0.5, 16), c: PAL.cliffLight, p: [0, 0.3, 0] },
-      ...Array.from({ length: 6 }, (_, i) => { // steel pylons ringing the dais
-        const a = (i / 6) * Math.PI * 2 + Math.PI / 6;
-        return { g: new THREE.BoxGeometry(0.32, 1.3, 0.32), c: 0x5A606A, p: [Math.cos(a) * 2.75, 0.75, Math.sin(a) * 2.75], r: [0, -a, 0] };
-      }),
-      { g: new THREE.TorusGeometry(2.3, 0.16, 6, 24), c: c.main, p: [0, 0.55, 0], r: [Math.PI / 2, 0, 0] },
-      { g: new THREE.CylinderGeometry(1.0, 1.4, 0.4, 12), c: c.deep, p: [0, 0.6, 0] },
+      { g: new THREE.CylinderGeometry(3.5, 3.7, 0.3, 16), c: 0x5E5950, p: [0, 0.15, 0], f: 'stone' },
+      { g: new THREE.CylinderGeometry(3.0, 3.3, 0.35, 16), c: 0x746D62, p: [0, 0.45, 0], f: 'stone' },
+      { g: new THREE.CylinderGeometry(2.4, 2.7, 0.3, 16), c: 0x5A606A, p: [0, 0.75, 0], f: 'steel' },
+      ...Array.from({ length: 6 }, (_, i) => {
+        const a = (i / 6) * Math.PI * 2 + Math.PI / 6, x = Math.cos(a) * 2.85, z = Math.sin(a) * 2.85;
+        return [
+          { g: new THREE.BoxGeometry(0.45, 1.9, 0.5), c: 0x4C535E, p: [x, 1.25, z], r: [0, -a, 0], f: 'steel' },
+          { g: new THREE.BoxGeometry(0.55, 0.22, 0.6), c: c.main, p: [x, 2.0, z], r: [0, -a, 0], f: 'paint' },
+          { g: new THREE.OctahedronGeometry(0.22), c: glowC, p: [x, 2.42, z], f: 'glow' },
+          { g: new THREE.BoxGeometry(0.06, 1.1, 0.06), c: glowC, p: [Math.cos(a) * 2.6, 1.2, Math.sin(a) * 2.6], r: [0, -a, 0], f: 'glow' },
+        ];
+      }).flat(),
+      { g: new THREE.TorusGeometry(2.25, 0.12, 6, 32), c: glowC, p: [0, 0.92, 0], r: [Math.PI / 2, 0, 0], f: 'glow' },
+      { g: new THREE.CylinderGeometry(1.1, 1.5, 0.55, 12), c: c.deep, p: [0, 1.15, 0], f: 'metal' },
+      { g: new THREE.TorusGeometry(1.15, 0.08, 6, 24), c: 0xD2D6DC, p: [0, 1.42, 0], r: [Math.PI / 2, 0, 0], f: 'metal' },
     ]);
-    this.group.add(toonMesh(daisGeo, this.mat));
+    const dais = toonMesh(daisGeo, this.mat, 0);
+    dais.receiveShadow = true;
+    this.group.add(dais);
 
     this.body = new THREE.Group();
-    this.crystal = toonMesh(new THREE.IcosahedronGeometry(1.3, 0), this.crystalMat);
+    this.crystal = toonMesh(new THREE.IcosahedronGeometry(1.3, 0), this.crystalMat, 0);
     this.halo = makeHalo(c.main, 5);
     this.orbit = new THREE.Group();
     const shardGeo = new THREE.OctahedronGeometry(0.28);
     for (let i = 0; i < 6; i++) {
-      const s = toonMesh(shardGeo, this.crystalMat, 0.02);
+      const s = toonMesh(shardGeo, this.crystalMat, 0);
       const a = (i / 6) * Math.PI * 2;
       s.position.set(Math.cos(a) * 2.3, Math.sin(i * 1.7) * 0.4, Math.sin(a) * 2.3);
       this.orbit.add(s);

@@ -1,46 +1,104 @@
-// Toon look: soft 4-step gradient, fresnel rim + hit flash, thin inverted-hull outlines, blob shadows.
+// Stylized PBR look: metalness-roughness materials with per-part finish (paint / metal / cloth / glow) baked into a vertex
+// attribute, a soft fresnel rim + hit flash, thin selective outlines on characters, world-space terrain detail, blob shadows.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { PAL } from '../config.js';
 import { radialTexture } from './atlas.js';
+import { HI } from './quality.js';
 
-export const gradientMap = (() => {
-  // Linear filtering blurs the bands into a soft ramp: still stylized, less flat than hard cel steps.
-  const t = new THREE.DataTexture(new Uint8Array([78, 140, 205, 255]), 4, 1, THREE.RedFormat);
-  t.minFilter = t.magFilter = THREE.LinearFilter;
-  t.needsUpdate = true;
-  return t;
-})();
+// Part finishes: [roughness multiplier, metalness, emissive strength].
+export const FIN = {
+  paint: [0.55, 0.25, 0], metal: [0.35, 0.8, 0], steel: [0.5, 0.5, 0], cloth: [0.95, 0, 0],
+  rubber: [0.8, 0.05, 0], stone: [1, 0, 0], glow: [0.4, 0, 3.2], glass: [0.15, 0.3, 0.6],
+};
 
+const COMMON_V = /* glsl */ `
+  #ifdef USE_FINISH
+    attribute vec3 finish; varying vec3 vFin;
+  #endif
+  #ifdef USE_DETAIL
+    varying vec3 vWPos; varying vec3 vWN;
+  #endif`;
+const BEGIN_V = /* glsl */ `
+  #ifdef USE_FINISH
+    vFin = finish;
+  #endif
+  #ifdef USE_DETAIL
+    vec4 wp4 = modelMatrix * vec4(transformed, 1.0);
+    #ifdef USE_INSTANCING
+      wp4 = modelMatrix * instanceMatrix * vec4(transformed, 1.0);
+    #endif
+    vWPos = wp4.xyz; vWN = normalize(mat3(modelMatrix) * objectNormal);
+  #endif`;
+const COMMON_F = /* glsl */ `
+  uniform float uFlash;
+  #ifdef USE_FINISH
+    varying vec3 vFin;
+  #endif
+  #ifdef USE_DETAIL
+    uniform sampler2D uDetail; uniform float uScale; varying vec3 vWPos; varying vec3 vWN;
+  #endif`;
+// Detail texture is neutral grey around 0.5, so x2 keeps the vertex colors' average while adding grain; a slow
+// second sample at 1/7 scale breaks up tiling. Triplanar for cliffs, top-down for ground.
+const DETAIL_F = /* glsl */ `
+  #ifdef USE_DETAIL
+    #ifdef USE_TRIPLANAR
+      vec3 bw = pow(abs(normalize(vWN)), vec3(4.0)); bw /= dot(bw, vec3(1.0));
+      vec3 dt = texture2D(uDetail, vWPos.zy * uScale).rgb * bw.x + texture2D(uDetail, vWPos.xz * uScale).rgb * bw.y + texture2D(uDetail, vWPos.xy * uScale).rgb * bw.z;
+    #else
+      vec3 dt = texture2D(uDetail, vWPos.xz * uScale).rgb;
+    #endif
+    float macro = texture2D(uDetail, vWPos.xz * uScale * 0.14 + 0.37).g;
+    diffuseColor.rgb *= dt * 2.0 * mix(0.86, 1.14, macro);
+  #endif`;
+const FINISH_R = '#include <roughnessmap_fragment>\n#ifdef USE_FINISH\n roughnessFactor = clamp(roughnessFactor * vFin.x, 0.04, 1.0);\n#endif';
+const FINISH_M = '#include <metalnessmap_fragment>\n#ifdef USE_FINISH\n metalnessFactor = max(metalnessFactor, vFin.y);\n#endif\n metalnessFactor *= METAL_K;'; // no reflections on the low tier: keep metal from going black
+const FINISH_E = '#include <emissivemap_fragment>\n#ifdef USE_FINISH\n totalEmissiveRadiance += diffuseColor.rgb * vFin.z;\n#endif';
+// Soft cool rim from the view fresnel (reads as a sky bounce on silhouettes), then the white hit flash.
 const RIM = /* glsl */ `
-  float rimF = pow(1.0 - saturate(dot(normalize(vNormal), normalize(vViewPosition))), 3.0);
-  outgoingLight += vec3(0.78, 0.86, 1.0) * rimF * 0.2;
-  outgoingLight *= mix(0.82, 1.0, saturate(normalize(vNormal).y * 0.5 + 0.6)); // underside falloff, fake AO
+  float rimF = pow(1.0 - saturate(dot(normal, normalize(vViewPosition))), 3.0);
+  outgoingLight += vec3(0.62, 0.74, 1.0) * rimF * RIM_K;
   outgoingLight = mix(outgoingLight, vec3(1.0), uFlash);
 `;
 
-// Toon material with rim light and a uFlash uniform exposed as material.userData.flash.
+// Standard material with the stylized patches; uFlash is exposed as material.userData.flash.
+// Extra opts: finish (use the per-vertex finish attribute from mergeParts), detail {tex, scale, tri}, rim (0..1).
 export function toonMat(opts = {}) {
-  const m = new THREE.MeshToonMaterial({ gradientMap, ...opts });
+  const { finish = false, detail = null, rim = 0.22, ...rest } = opts;
+  const m = new THREE.MeshStandardMaterial({ roughness: 0.7, metalness: 0.05, ...rest });
   const flash = { value: 0 };
   m.userData.flash = flash;
+  m.defines = { RIM_K: rim.toFixed(3), METAL_K: HI ? '1.0' : '0.35' };
+  if (finish) m.defines.USE_FINISH = '';
+  if (detail) { m.defines.USE_DETAIL = ''; if (detail.tri) m.defines.USE_TRIPLANAR = ''; }
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uFlash = flash;
+    if (detail) { sh.uniforms.uDetail = { value: detail.tex }; sh.uniforms.uScale = { value: detail.scale }; }
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>' + COMMON_V)
+      .replace('#include <begin_vertex>', '#include <begin_vertex>' + BEGIN_V);
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform float uFlash;')
+      .replace('#include <common>', '#include <common>' + COMMON_F)
+      .replace('#include <color_fragment>', '#include <color_fragment>' + DETAIL_F)
+      .replace('#include <roughnessmap_fragment>', FINISH_R)
+      .replace('#include <metalnessmap_fragment>', FINISH_M)
+      .replace('#include <emissivemap_fragment>', FINISH_E)
       .replace('#include <opaque_fragment>', RIM + '#include <opaque_fragment>');
   };
-  m.customProgramCacheKey = () => 'toon-rim-flash';
+  m.customProgramCacheKey = () => `sty-${finish ? 1 : 0}-${detail ? (detail.tri ? 2 : 1) : 0}-${m.defines.RIM_K}`;
   return m;
 }
 
+// Ground / cliff material: vertex colors times a tiling world-space detail texture. Receives shadows.
+export const terrainMat = (tex, scale, tri = false, opts = {}) => toonMat({ vertexColors: true, roughness: 0.92, rim: 0.05, detail: { tex, scale, tri }, ...opts });
+
+// Outlines are a soft deep-navy hull, kept only on characters and key props so the world reads painted, not inked.
 const outlines = new Map();
 export function outlineMat(thickness) {
   if (!outlines.has(thickness)) {
     outlines.set(thickness, new THREE.ShaderMaterial({
       side: THREE.BackSide,
       fog: false,
-      uniforms: { uT: { value: thickness * 0.7 }, uCol: { value: new THREE.Color(PAL.ink) } },
+      uniforms: { uT: { value: thickness * 0.55 }, uCol: { value: new THREE.Color(0x0B1220) } },
       vertexShader: /* glsl */ `
         uniform float uT;
         void main() {
@@ -62,33 +120,38 @@ export function outlineMat(thickness) {
   return outlines.get(thickness);
 }
 
-// A toon mesh with an inverted-hull outline child.
+// A shadow-casting mesh with an optional inverted-hull outline child.
 export function toonMesh(geo, mat, thickness = 0.035) {
   const mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow = true;
   if (thickness) mesh.add(new THREE.Mesh(geo, outlineMat(thickness)));
   return mesh;
 }
 
 const _m = new THREE.Matrix4(), _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _s = new THREE.Vector3();
 
-// parts: [{ g: geometry, c: hex color, p: [x,y,z], s: [x,y,z] | n, r: [x,y,z] }] -> one vertex-colored geometry.
+// parts: [{ g: geometry, c: hex color, p: [x,y,z], s: [x,y,z] | n, r: [x,y,z], f: FIN key }] -> one geometry with
+// vertex colors and a per-vertex finish (roughness, metalness, emissive) read by toonMat({ finish: true }).
 export function mergeParts(parts) {
-  const geos = parts.map(({ g, c, p = [0, 0, 0], s = 1, r = [0, 0, 0] }) => {
+  const geos = parts.map(({ g, c, p = [0, 0, 0], s = 1, r = [0, 0, 0], f = 'paint' }) => {
     const sv = typeof s === 'number' ? [s, s, s] : s;
     const geo = g.index ? g.toNonIndexed() : g.clone();
     geo.deleteAttribute('uv');
     geo.applyMatrix4(_m.compose(_p.set(...p), _q.setFromEuler(_e.set(...r)), _s.set(...sv)));
-    const col = new THREE.Color(c), n = geo.attributes.position.count, arr = new Float32Array(n * 3);
-    for (let i = 0; i < n; i++) { arr[i * 3] = col.r; arr[i * 3 + 1] = col.g; arr[i * 3 + 2] = col.b; }
+    const col = new THREE.Color(c), fin = FIN[f] ?? FIN.paint, n = geo.attributes.position.count;
+    const arr = new Float32Array(n * 3), fa = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { arr.set([col.r, col.g, col.b], i * 3); fa.set(fin, i * 3); }
     geo.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+    geo.setAttribute('finish', new THREE.BufferAttribute(fa, 3));
     return geo;
   });
   return mergeGeometries(geos);
 }
 
+// Blob shadows stay as soft contact shadows under the real shadow map (and are the only shadow when it is off).
 const shadowGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
 export const shadowMat = new THREE.MeshBasicMaterial({
-  map: radialTexture(), color: 0x000000, transparent: true, opacity: 0.45, depthWrite: false,
+  map: radialTexture(), color: 0x000000, transparent: true, opacity: 0.32, depthWrite: false,
 });
 export const SHADOW_Y = 0.14;
 export { shadowGeo };
@@ -101,12 +164,12 @@ export function makeShadow(size) {
   return m;
 }
 
-// Additive halo sprite used to fake crystal glow.
+// Additive halo sprite used to fake crystal glow (not tone-mapped so team colors stay saturated).
 let haloTex;
 export function makeHalo(color, size) {
   haloTex ??= radialTexture();
   const s = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: haloTex, color, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0.8,
+    map: haloTex, color, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0.8, toneMapped: false,
   }));
   s.scale.set(size, size, 1);
   return s;
