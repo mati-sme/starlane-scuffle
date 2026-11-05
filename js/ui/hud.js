@@ -30,6 +30,15 @@ export class Hud {
       <div class="objective" data-testid="objective-hint">Destroy enemy towers, then the core!</div>
       <div class="takedown"><i class="k"></i><s>${icons.star('#FFC83D')}</s><i class="v"></i></div>
       <div class="banner">${icons.star('#FFC83D')}${icons.star('#3DA5FF')}${icons.star('#FFC83D')}</div>`;
+    this.nums = []; this.numAt = 0;
+    for (let i = 0; i < 14; i++) {
+      const el = document.createElement('div');
+      el.className = 'dnum';
+      el.addEventListener('animationend', () => el.classList.remove('go'));
+      barsRoot.appendChild(el);
+      this.nums.push(el);
+    }
+    bus.on('dmg', (e) => this._num(e));
     this.ring = root.querySelector('.ring');
     this.xp = root.querySelector('.xp');
     this.face = root.querySelector('.portrait .face');
@@ -114,7 +123,21 @@ export class Hud {
     this.objective.classList.add('pop'); // once per match start
   }
 
-  hide() { this.root.hidden = true; this.shown = false; this.barsRoot.replaceChildren(); this.bars.length = 0; this.levelup.hide(); }
+  // Floating damage: the player's hits (bigger; gold for skills) and big hits the player takes (red).
+  _num({ t, amount, src, skill }) {
+    const hero = this.match.hero;
+    const mine = src === hero, taken = t === hero && amount >= 5;
+    if (!this.shown || !(mine || taken) || amount < 1) return;
+    const v = this._v.set(t.rx ?? t.x, GROUND + (t.barY ?? 1.5) + 0.3, t.rz ?? t.z).project(this.camera);
+    if (v.z > 1 || Math.abs(v.x) > 1.1 || Math.abs(v.y) > 1.1) return;
+    const el = this.nums[this.numAt++ % this.nums.length];
+    el.textContent = Math.round(amount);
+    el.className = `dnum go ${mine ? (skill ? 'skill' : 'mine') : 'taken'}`;
+    el.style.left = `${((v.x * 0.5 + 0.5) * this.w + (Math.random() - 0.5) * 24).toFixed(0)}px`;
+    el.style.top = `${((-v.y * 0.5 + 0.5) * this.h).toFixed(0)}px`;
+  }
+
+  hide() { this.root.hidden = true; this.shown = false; this.barsRoot.replaceChildren(...this.nums); this.bars.length = 0; this.levelup.hide(); }
 
   update(dt = 0.016) {
     if (!this.shown) return;

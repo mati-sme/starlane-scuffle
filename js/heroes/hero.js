@@ -18,6 +18,7 @@ const FWD = new THREE.Vector2(-CAM.offset[0], -CAM.offset[2]).normalize();
 const RIGHT = new THREE.Vector2(-FWD.y, FWD.x);
 export const screenToWorld = (sx, sy, out) => out.set(RIGHT.x * sx + FWD.x * sy, RIGHT.y * sx + FWD.y * sy);
 
+const HERO_SCALE = 1.3; // visual only; hitboxes and ranges are unscaled
 const ASSIST_RANGE = 7; // holding Attack with no stick steps toward a nearby enemy
 const WINDUP = 0.15;    // anticipation crouch before a skill fires
 const BOOST = { t: 4, mul: 1.6 }; // launch boost after leaving the fountain
@@ -32,6 +33,7 @@ export class Hero {
     this.team = team;
     this.slot = slot;
     Object.assign(this, { hitY: 1.2, barY: 3.4, regen: 40 }, def.stats);
+    this.barY *= HERO_SCALE;
     this.baseHp = def.stats.hp;
     this.basic = def.abilities.basic;
     this.ab = [def.abilities.s1, def.abilities.s2, def.abilities.ult];
@@ -394,7 +396,7 @@ export class Hero {
 
   render(alpha, t, dt) {
     const show = (this.alive || this.dying > 0) && !(this.hidden && this.team !== 0); // stealth: only the player's team sees it
-    this.holder.scale.setScalar(this.hidden ? 0.92 : 1);
+    this.holder.scale.setScalar((this.hidden ? 0.92 : 1) * HERO_SCALE);
     this.holder.visible = show;
     this.dome.visible = false;
     if (this.beamMesh) this.beamMesh.visible = false;

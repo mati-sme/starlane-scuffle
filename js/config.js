@@ -77,5 +77,5 @@ export const BOT = { aggro: 10, retreatHp: 0.35, returnHp: 0.9, powerRatio: 0.8,
 export const TOWER = { range: 9, cd: 1.1, radius: 1.5, hp: { outer: 2200, guard: 2200 }, heroDmg: 70, heroPct: 0.06, minionDmg: 100, shield: 0.35, shieldR: 10 };
 export const CORE = { hp: 2800, radius: 2.4 };
 
-export const CAM = { fov: 38, offset: [-7, 20, 15], follow: 6, lead: 2, wideAspect: 2.0, zoom: 1.35 };
+export const CAM = { fov: 38, offset: [-7, 20, 15], follow: 6, lead: 2, wideAspect: 2.0, zoom: 1.22 };
 export const BUDGET = { dprMax: 2, scaleMin: 0.6, maxParticles: 1500 };

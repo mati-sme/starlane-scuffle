@@ -8,9 +8,11 @@ export const DYING = 0.25;
 export const AIR = 0.7; // knock-up hang time
 const SPARK = { color: PAL.gold, speed: 2.5, up: 1.5, size: 0.35, life: 0.35, frame: FRAME.sparkle, grav: 3 };
 
+const dmgEv = { t: null, amount: 0, src: null, skill: false }; // reused: listeners must not keep it
+
 // Any entity: { type, team, x, z, hp, maxHp, alive, hitY, flash, squash, dying }
 // src.outMul scales outgoing damage (hero level / upgrades / bot difficulty); heroes may carry shieldHp.
-export function dealDamage(t, amount, src) {
+export function dealDamage(t, amount, src, skill = false) {
   if (!t.alive || t.untarget) return;
   if (src?.outMul) amount *= src.outMul;
   if (t.buf?.dr) amount *= 1 - t.buf.dr.v;
@@ -42,6 +44,8 @@ export function dealDamage(t, amount, src) {
   }
   if (t.type === 'camp' && src) t.provoked = src;
   bus.emit('hit', t);
+  dmgEv.t = t; dmgEv.amount = amount; dmgEv.src = src; dmgEv.skill = skill;
+  bus.emit('dmg', dmgEv);
   if (t.hp <= 0) {
     t.hp = 0;
     t.alive = false;

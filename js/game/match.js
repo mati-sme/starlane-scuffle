@@ -46,7 +46,9 @@ export class Match {
     this._hit = new THREE.Vector3();
 
     bus.on('hit', (t) => { if (t === this.hero) rig.shake(0.15); });
+    bus.on('dmg', (e) => { if (e.t === this.hero && e.amount >= e.t.maxHp * 0.12) rig.shake(0.3); });
     bus.on('down', (t) => {
+      if (t.type === 'hero' && t.killer === this.hero) rig.shake(0.3);
       if (t.type === 'tower' || t.type === 'core') rig.shake(0.4);
       if (t.type === 'tower' && t.team === 0) this.towersLost++;
       if (t.type === 'tower' || t.type === 'core') this.destroyed[1 - t.team]++;

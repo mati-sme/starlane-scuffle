@@ -1,7 +1,7 @@
 // Shared skill behaviors. A champion skill is pure data (roster.js); its `kind` picks one of these.
 // BEHAVIORS[kind](hero, ab, ctx, aim): ab is the rank-resolved skill; return false for "nothing to hit" (short retry).
 // BASICS[kind](hero, ctx, target, basic, dmg): the auto-attack kinds.
-import { GROUND } from '../config.js';
+import { GROUND, PAL, TEAM } from '../config.js';
 import { rand, lerp, clamp, angleLerp } from '../core/math.js';
 import {
   dealDamage, forEachEnemy, forEachAlly, applyStatus, shove, heal, addBuff, giveShield, AIR,
@@ -11,10 +11,11 @@ import { particles, FRAME } from '../render/particles.js';
 import { vfx } from '../render/vfx.js';
 
 const DEG = Math.PI / 180;
+const telegraph = (h) => (h.team === 0 ? TEAM[0].main : PAL.gloom); // red warns the player; allies show their team tint
 
 // Damage + the optional status / forced movement flags of a skill (stun, slow, air, knock, pull).
 function affect(h, e, ab, o = {}) {
-  if (ab.dmg) dealDamage(e, ab.dmg * (o.mul ?? 1), h);
+  if (ab.dmg) dealDamage(e, ab.dmg * (o.mul ?? 1), h, true);
   if (!e.alive) return;
   const ox = o.x ?? h.x, oz = o.z ?? h.z;
   if (ab.stun) applyStatus(e, 'stun', ab.stun);
@@ -188,7 +189,7 @@ const BEHAVIORS = {
 
   // Telegraphed strike(s) at the best enemy cluster, or at the lowest-HP enemy hero (`target: 'lowhero'`).
   blast(h, ab, ctx, aim) {
-    const col = h.def.color, acc = h.def.accent, delay = ab.delay ?? 0.5, R = ab.radius;
+    const col = h.def.color, acc = h.def.accent, tg = telegraph(h), delay = ab.delay ?? 0.5, R = ab.radius;
     let pts;
     if (ab.target === 'lowhero') {
       pts = ctx.heroes
@@ -199,8 +200,8 @@ const BEHAVIORS = {
 
     const x0 = h.x, z0 = h.z;
     for (const { x, z } of pts) {
-      vfx.decal(x, z, col, R, delay + 0.15);
-      vfx.ring(x, 0.2, z, acc, R * 1.1, delay);
+      vfx.decal(x, z, tg, R, delay + 0.15);
+      vfx.ring(x, 0.2, z, tg, R * 1.1, delay);
       if (ab.sky) vfx.streak(x + 4, 12, z, x, 0.3, z, acc, Math.min(delay, 0.5), 3.5);
       else {
         ctx.anim(delay, (u) => particles.emit(lerp(x0, x, u), GROUND + 1.4 + Math.sin(Math.PI * u) * 2.4, lerp(z0, z, u), 0, 0, 0, acc, 0.9, 0.3, FRAME.dot));
@@ -220,9 +221,9 @@ const BEHAVIORS = {
 
   // Many small blasts scattered over an area.
   rain(h, ab, ctx, aim) {
-    const col = h.def.color, acc = h.def.accent, A = ab.radius, n = ab.count, step = ab.dur / n;
-    vfx.decal(aim.x, aim.z, col, A, ab.dur + 0.4);
-    vfx.ring(aim.x, 0.2, aim.z, acc, A * 1.2, 0.5);
+    const col = h.def.color, acc = h.def.accent, tg = telegraph(h), A = ab.radius, n = ab.count, step = ab.dur / n;
+    vfx.decal(aim.x, aim.z, tg, A, ab.dur + 0.4);
+    vfx.ring(aim.x, 0.2, aim.z, tg, A * 1.2, 0.5);
     for (let i = 0; i < n; i++) {
       const a = rand(0, Math.PI * 2), r = Math.sqrt(Math.random()) * A, px = aim.x + Math.cos(a) * r, pz = aim.z + Math.sin(a) * r;
       ctx.later(0.1 + i * step, () => {

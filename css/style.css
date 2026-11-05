@@ -14,6 +14,12 @@ svg { display: block; width: 100%; height: 100%; }
 #bars { position: fixed; inset: 0; pointer-events: none; z-index: 1; }
 .bar { position: absolute; left: 0; top: 0; width: 34px; height: 8px; border-radius: 6px; background: rgba(11,16,32,.8); border: 2px solid var(--ink); overflow: hidden; will-change: transform; }
 .bar i { display: block; height: 100%; border-radius: 4px; transition: width .12s; }
+.dnum { position: absolute; left: 0; top: 0; opacity: 0; font-weight: 800; font-size: 18px; color: #fff; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; translate: -50% -100%; will-change: transform, opacity; }
+.dnum.mine { font-size: 22px; }
+.dnum.skill { font-size: 26px; color: var(--gold); }
+.dnum.taken { font-size: 20px; color: var(--gloom); }
+.dnum.go { animation: dnum .7s ease-out; }
+@keyframes dnum { 0% { transform: translateY(0) scale(1.5); opacity: 1; } 20% { transform: translateY(-8px) scale(1); } 70% { opacity: 1; } 100% { transform: translateY(-34px) scale(.9); opacity: 0; } }
 .bar.t0 i { background: var(--sunny); }
 .bar.t1 i { background: var(--gloom); }
 .bar.t2 i { background: #FFB020; }
@@ -39,8 +45,7 @@ svg { display: block; width: 100%; height: 100%; }
 .pips .t0 i { background: var(--sunny); } .pips .t1 i { background: var(--gloom); }
 .pips i.core { width: 11px; height: 11px; transform: rotate(45deg); }
 .pips i.dead { background: #39415A; opacity: .6; }
-#mini { position: absolute; left: calc(104px + var(--sl)); top: calc(12px + var(--st)); width: 168px; height: 104px; border: 3px solid var(--ink); background: #101A33; box-shadow: 0 3px 0 rgba(0,0,0,.3); }
-@media (min-width: 1100px) { #mini { width: 216px; height: 134px; } }
+#mini { position: absolute; left: calc(104px + var(--sl)); top: calc(12px + var(--st)); width: min(20vw, 210px); height: auto; aspect-ratio: 168 / 104; border: 3px solid var(--ink); background: #101A33; box-shadow: 0 3px 0 rgba(0,0,0,.3); }
 #notarget { position: fixed; right: calc(140px + var(--sr)); bottom: calc(150px + var(--sb)); z-index: 5; pointer-events: none; opacity: 0; font-weight: 700; font-size: 16px; color: #fff; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; white-space: nowrap; }
 #notarget.pop { animation: toast 1.4s ease-out; }
 .sk.nope { animation: nope .3s; }
@@ -53,7 +58,7 @@ svg { display: block; width: 100%; height: 100%; }
 .ko, .objective { position: absolute; left: 50%; top: calc(116px + var(--st)); translate: -50% 0; opacity: 0; white-space: nowrap; font-weight: 800; font-size: 20px; -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; text-shadow: 0 3px 0 var(--ink); }
 .ko.won { color: var(--gold); } .ko.lost { color: var(--gloom); }
 .ko.pop { animation: kopop 2.2s ease-out; }
-.objective { top: calc(76px + var(--st)); font-size: 17px; color: #fff; }
+.objective { top: calc(62px + var(--st)); width: min(28vw, 300px); white-space: normal; text-align: center; font-size: clamp(11px, 1.8vw, 15px); line-height: 1.15; -webkit-text-stroke-width: 3px; color: #fff; }
 .objective.pop { animation: kopop 5s ease-out; }
 @keyframes kopop { 0% { scale: .6; opacity: 0; } 8% { scale: 1.12; opacity: 1; } 14% { scale: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
 .banner { position: absolute; left: 50%; top: 32%; width: 240px; height: 80px; margin-left: -120px; display: flex; gap: 8px; opacity: 0; }
