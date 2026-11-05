@@ -244,6 +244,7 @@ export class Match {
         const kinds = ['blobling', 'blobling', 'blobling', 'zapper'];
         if (this.storm) kinds.push('blobling');
         if (this.time >= MATCH.siegeFrom && this.waveNo % MATCH.siegeEvery === 0) kinds.push('bigblob');
+        if (this.storm) for (let i = 0; i < MATCH.stormSiege; i++) kinds.push('bigblob');
         for (const team of [0, 1]) for (let lane = 0; lane < 3; lane++) this.minions.spawnWave(team, lane, kinds);
       }
       if (!this.storm && this.time >= MATCH.storm) {

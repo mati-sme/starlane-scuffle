@@ -218,9 +218,11 @@ export class Bot {
         g.keep = h.basicRange * 0.75;
       } else { // LANE / ROAM
         this.state = 'lane';
-        if (this.lane === ROAM) skillFoe = this._roam(ctx, g) ?? foe;
+        const grp = this._group(ctx);
+        if (grp !== null) this._laneGoal(ctx, grp, g);
+        else if (this.lane === ROAM) skillFoe = this._roam(ctx, g) ?? foe;
         else this._laneGoal(ctx, this.lane, g);
-        if (!g.follow && !foe && this.lane !== ROAM) {
+        if (!g.follow && !foe && (this.lane !== ROAM || grp !== null)) {
           const m = pickTarget(ctx, h.team, h.x, h.z, h.basicRange + 2, ['minions']);
           if (m) { g.follow = m; g.keep = h.basicRange * 0.8; }
         }
@@ -228,6 +230,27 @@ export class Bot {
     }
 
     for (let i = 0; i < 3; i++) if (h.ranks[i] > 0 && h.cds[i] <= 0 && !it.cast[i] && this._want(ctx, i, skillFoe)) it.cast[i] = true;
+  }
+
+  // Group push: with the numbers advantage (enemy heroes dead) or in Overdrive, every bot walks the lane where our wave is furthest along.
+  _group(ctx) {
+    const h = this.h, c = (ctx._grp ??= [{ t: -9, lane: null }, { t: -9, lane: null }])[h.team];
+    if (ctx.time >= c.t && ctx.time - c.t < 2) return c.lane; // time < c.t: stale cache from the previous match
+    c.t = ctx.time;
+    let ally = 0, foe = 0;
+    for (const o of ctx.heroes) if (o.alive || o.respawn < 4) { if (o.team === h.team) ally++; else foe++; }
+    c.lane = null;
+    if (!ctx.storm && ally - foe < BOT.groupDeficit) return null;
+    const best = [0, 0, 0];
+    for (const m of ctx.minions.list) {
+      if (m.team !== h.team || !m.alive) continue;
+      const path = PATHS[h.team][m.lane], p = m.prog / path.cum[path.cum.length - 1];
+      if (p > best[m.lane]) best[m.lane] = p;
+    }
+    let bl = -1, bp = 0.15;
+    for (let i = 0; i < 3; i++) if (best[i] > bp) { bp = best[i]; bl = i; }
+    if (bl >= 0) c.lane = bl;
+    return c.lane;
   }
 
   // A vulnerable enemy structure with 2+ of our minions beside it and no enemy hero close by.

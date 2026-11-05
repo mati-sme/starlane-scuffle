@@ -162,7 +162,7 @@ export class MinionSystem {
           m.cd = st.cd;
           m.lunge = 1;
           const structure = tgt.type === 'tower' || tgt.type === 'core';
-          const dmg = st.dmg * (structure ? st.structMul * (ctx.storm ? MATCH.stormStructMul : 1) : 1);
+          const dmg = st.dmg * (structure ? st.structMul * (ctx.storm ? MATCH.stormStructMul : 1) * Math.min(1, 0.3 + ctx.time / 240) : 1);
           if (st.ranged) ctx.projectiles.fire(m, tgt, dmg, 10, 0.5, GROUND + st.hitY + 0.3);
           else dealDamage(tgt, dmg, m);
         }

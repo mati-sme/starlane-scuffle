@@ -49,6 +49,13 @@ svg { display: block; width: 100%; height: 100%; }
 .respawn.on { display: block; }
 .rring { position: absolute; inset: 0; border-radius: 50%; border: 5px solid var(--ink); background: conic-gradient(var(--gold) calc(var(--p, 0) * 1%), rgba(11,16,32,.75) 0); }
 .respawn i { position: absolute; inset: 26px; animation: pulse 1s ease-in-out infinite; }
+.respawn .rsec { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 40px; font-style: normal; color: #fff; -webkit-text-stroke: 5px var(--ink); paint-order: stroke fill; }
+.ko, .objective { position: absolute; left: 50%; top: calc(116px + var(--st)); translate: -50% 0; opacity: 0; white-space: nowrap; font-weight: 800; font-size: 20px; -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; text-shadow: 0 3px 0 var(--ink); }
+.ko.won { color: var(--gold); } .ko.lost { color: var(--gloom); }
+.ko.pop { animation: kopop 2.2s ease-out; }
+.objective { top: calc(76px + var(--st)); font-size: 17px; color: #fff; }
+.objective.pop { animation: kopop 5s ease-out; }
+@keyframes kopop { 0% { scale: .6; opacity: 0; } 8% { scale: 1.12; opacity: 1; } 14% { scale: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
 .banner { position: absolute; left: 50%; top: 32%; width: 240px; height: 80px; margin-left: -120px; display: flex; gap: 8px; opacity: 0; }
 .banner.pop { animation: banner 2s ease-out; }
 @keyframes banner { 0% { transform: scale(.3); opacity: 0; } 15% { transform: scale(1.1); opacity: 1; } 25% { transform: scale(1); } 80% { opacity: 1; } 100% { transform: scale(1); opacity: 0; } }
@@ -111,7 +118,7 @@ body.playing #upgrades { display: flex; align-items: flex-start; gap: 6px; }
 #upgrades.open .upanel { display: flex; animation: upfade .16s ease-out; }
 @keyframes upfade { from { opacity: 0; } to { opacity: 1; } }
 .upbtn { position: relative; width: 64px; height: 72px; padding: 6px 4px 4px; display: flex; flex-direction: column; align-items: center; gap: 1px; border: 2px solid var(--c, #fff); background: linear-gradient(180deg, rgba(28,38,64,.95), rgba(11,16,32,.95)); color: #fff; font-family: inherit; cursor: pointer;
-  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%); pointer-events: none; touch-action: none; --c: var(--hero, #fff); }
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%); pointer-events: none; touch-action: manipulation; --c: var(--hero, #fff); }
 #upgrades.open .upbtn { pointer-events: auto; }
 .upbtn .ico { width: 30px; height: 30px; padding: 3px; background: var(--hero, #666); display: block; }
 .upbtn b { position: absolute; left: 4px; top: 2px; font-size: 13px; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; }
@@ -124,7 +131,7 @@ body.playing #upgrades { display: flex; align-items: flex-start; gap: 6px; }
 .upbtn.can { --c: var(--gold); animation: upglow 1.2s ease-in-out infinite; }
 .upbtn:active { scale: .94; }
 .upbtn.shine::after, .utab.bump::after { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 30%, rgba(255,230,140,.9) 50%, transparent 70%); animation: shine .3s ease-out forwards; }
-.utab { position: relative; pointer-events: auto; cursor: pointer; width: 64px; height: 64px; padding: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px solid var(--gold); background: linear-gradient(180deg, rgba(28,38,64,.95), rgba(11,16,32,.95)); color: #fff; font-family: inherit; cursor: pointer; pointer-events: auto; touch-action: none;
+.utab { position: relative; pointer-events: auto; cursor: pointer; width: 64px; height: 64px; padding: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px solid var(--gold); background: linear-gradient(180deg, rgba(28,38,64,.95), rgba(11,16,32,.95)); color: #fff; font-family: inherit; cursor: pointer; pointer-events: auto; touch-action: manipulation;
   clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%, 0 10px); }
 .utab .chev { width: 20px; height: 20px; display: block; }
 .utab .chev svg { stroke: none; }
@@ -145,6 +152,14 @@ body.playing #upgrades { display: flex; align-items: flex-start; gap: 6px; }
 @keyframes upglow { 50% { filter: drop-shadow(0 0 7px rgba(255,200,61,.9)); } }
 @keyframes shine { from { transform: translateX(-100%); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
 .utab.bump { animation: ding .5s cubic-bezier(.3, 1.6, .5, 1); }
+/* short landscape phones: smaller drawer, panel stays left of the tab and above the skill arc */
+@media (max-height: 420px) {
+  #upgrades { top: calc(66px + var(--st)); }
+  .upbtn { width: 56px; height: 62px; }
+  .upbtn .ico { width: 26px; height: 26px; }
+  .utab { width: 56px; height: 56px; }
+  .lvtoast { top: 62px; } .xpgain { top: 84px; }
+}
 
 /* ---------- screens ---------- */
 #screens { position: fixed; inset: 0; z-index: 5; pointer-events: none; }

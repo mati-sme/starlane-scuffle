@@ -25,7 +25,9 @@ export class Hud {
         <div class="score"><b class="k0" data-testid="kills-blue">0</b><span class="clock" data-testid="clock">0:00</span><b class="k1" data-testid="kills-red">0</b></div>
         <div class="pips"><div class="t0" data-testid="pips-blue"></div><div class="t1" data-testid="pips-red"></div></div>
       </div>
-      <div class="respawn"><div class="rring"></div><i>${icons.star('#FFC83D')}</i></div>
+      <div class="respawn"><div class="rring"></div><i>${icons.star('#FFC83D')}</i><b class="rsec" data-testid="respawn-secs"></b></div>
+      <div class="ko" data-testid="ko-banner"></div>
+      <div class="objective" data-testid="objective-hint">Destroy enemy towers, then the core!</div>
       <div class="takedown"><i class="k"></i><s>${icons.star('#FFC83D')}</s><i class="v"></i></div>
       <div class="banner">${icons.star('#FFC83D')}${icons.star('#3DA5FF')}${icons.star('#FFC83D')}</div>`;
     this.ring = root.querySelector('.ring');
@@ -34,6 +36,10 @@ export class Hud {
     this.lvlEl = root.querySelector('.lvl');
     this.respawn = root.querySelector('.respawn');
     this.rring = root.querySelector('.rring');
+    this.rsec = root.querySelector('.rsec');
+    this.ko = root.querySelector('.ko');
+    this.objective = root.querySelector('.objective');
+    this.rs = -1;
     this.clock = root.querySelector('.clock');
     this.kills = [root.querySelector('.k0'), root.querySelector('.k1')];
     this.pipEls = [0, 1].map((t) => root.querySelector(`.pips .t${t}`));
@@ -64,8 +70,21 @@ export class Hud {
       void this.take.offsetWidth;
       this.take.classList.add('pop');
     });
+    bus.on('down', (t) => { // kill feedback for the player only; ally takedowns keep the icon pop
+      if (!this.shown || t.type !== 'hero') return;
+      const k = t.killer, hero = this.match.hero;
+      if (t === hero) this._ko(k?.type === 'hero' ? `${k.def.name} defeated you` : 'You were defeated', 'lost');
+      else if (k === hero) this._ko(`KO! You defeated ${t.def.name}`, 'won');
+    });
     this.onResize();
     addEventListener('resize', () => { this.onResize(); this.mini.resize(); });
+  }
+
+  _ko(text, cls) {
+    this.ko.textContent = text;
+    this.ko.className = `ko ${cls}`;
+    void this.ko.offsetWidth;
+    this.ko.classList.add('pop');
   }
 
   onResize() { this.w = innerWidth; this.h = innerHeight; }
@@ -89,6 +108,10 @@ export class Hud {
     this.shown = true;
     this.clock.classList.remove('storming');
     this.take.classList.remove('pop');
+    this.ko.classList.remove('pop');
+    this.objective.classList.remove('pop');
+    void this.objective.offsetWidth;
+    this.objective.classList.add('pop'); // once per match start
   }
 
   hide() { this.root.hidden = true; this.shown = false; this.barsRoot.replaceChildren(); this.bars.length = 0; this.levelup.hide(); }
@@ -116,7 +139,11 @@ export class Hud {
 
     const respawning = !hero.alive && hero.dying <= 0 && !m.over;
     this.respawn.classList.toggle('on', respawning);
-    if (respawning) this.rring.style.setProperty('--p', (1 - hero.respawn / hero.respawnTotal) * 100);
+    if (respawning) {
+      this.rring.style.setProperty('--p', (1 - hero.respawn / hero.respawnTotal) * 100);
+      const rs = Math.ceil(hero.respawn);
+      if (rs !== this.rs) { this.rs = rs; this.rsec.textContent = rs; }
+    }
 
     this.mini.update(this.dt, m.rig, this.w / this.h);
 

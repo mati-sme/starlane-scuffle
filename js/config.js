@@ -45,16 +45,16 @@ export const ARENA = {
 };
 
 export const MATCH = {
-  waveEvery: 20, stormWaveEvery: 15, firstWave: 15, siegeFrom: 120, siegeEvery: 3,
-  storm: 360, tieBreak: 540, stormStructMul: 2, stormXpMul: 1.5,
-  respawnBase: 4, respawnPerLevel: 1.5, starTime: 360,
+  waveEvery: 20, stormWaveEvery: 15, firstWave: 15, siegeFrom: 90, siegeEvery: 2,
+  storm: 300, tieBreak: 480, stormStructMul: 2, stormXpMul: 1.5, stormSiege: 1, // Overdrive at 5:00: extra siege blob per wave, 2x structure damage, 1.5x XP, half respawn
+  respawnBase: 4, respawnPerLevel: 1.5, starTime: 330,
   campFirst: 60, campRespawn: 75,
 };
 
 // blobling = trooper, zapper = gunner, bigblob = siege.
 export const UNITS = {
-  blobling: { hp: 150, speed: 3.2, range: 1.2, dmg: 14, cd: 1.0, radius: 0.55, aggro: 6, structMul: 1, hitY: 0.6, barY: 1.6, max: 36 },
-  zapper: { hp: 100, speed: 3.0, range: 5.5, dmg: 16, cd: 1.3, radius: 0.45, aggro: 7, structMul: 1, hitY: 1.3, barY: 2.5, max: 12, ranged: true },
+  blobling: { hp: 150, speed: 3.2, range: 1.2, dmg: 14, cd: 1.0, radius: 0.55, aggro: 6, structMul: 1.3, hitY: 0.6, barY: 1.6, max: 36 },
+  zapper: { hp: 100, speed: 3.0, range: 5.5, dmg: 16, cd: 1.3, radius: 0.45, aggro: 7, structMul: 1.3, hitY: 1.3, barY: 2.5, max: 12, ranged: true },
   bigblob: { hp: 520, speed: 2.6, range: 6, dmg: 30, cd: 1.6, radius: 1.0, aggro: 7, structMul: 2.5, hitY: 1.1, barY: 3.0, max: 6, ranged: true },
 };
 
@@ -70,12 +70,12 @@ export const HERO = {
 };
 
 // Bots: reaction time (s) and damage multiplier per difficulty star (1-3). Only Gloom's bots scale; Sunny allies stay at 0.4 s / 1.0x.
-export const DIFFICULTY = { react: [0.55, 0.4, 0.3], dmg: [0.85, 1, 1.1], allyReact: 0.4 };
+export const DIFFICULTY = { react: [0.5, 0.4, 0.3], dmg: [0.92, 1, 1.1], allyReact: 0.4 };
 export const settings = { stars: 1 };
-export const BOT = { aggro: 10, retreatHp: 0.35, returnHp: 0.9, powerRatio: 0.8 };
+export const BOT = { aggro: 10, retreatHp: 0.35, returnHp: 0.9, powerRatio: 0.8, groupDeficit: 2 };
 
-export const TOWER = { range: 9, cd: 1.1, radius: 1.5, hp: { outer: 1600, guard: 2000 }, heroDmg: 70, heroPct: 0.06, minionDmg: 120, shield: 0.35, shieldR: 10 };
-export const CORE = { hp: 3600, radius: 2.4 };
+export const TOWER = { range: 9, cd: 1.1, radius: 1.5, hp: { outer: 2200, guard: 2200 }, heroDmg: 70, heroPct: 0.06, minionDmg: 100, shield: 0.35, shieldR: 10 };
+export const CORE = { hp: 2800, radius: 2.4 };
 
 export const CAM = { fov: 38, offset: [-7, 20, 15], follow: 6, lead: 2, wideAspect: 2.0, zoom: 1.35 };
 export const BUDGET = { dprMax: 2, scaleMin: 0.6, maxParticles: 1500 };

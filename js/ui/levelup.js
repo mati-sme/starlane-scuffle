@@ -3,15 +3,16 @@
 import { bus } from '../core/bus.js';
 import { HERO } from '../config.js';
 import { icons } from './icons.js';
-import { save } from '../save.js';
 
 const KEYS = ['Q', 'E', 'R'];
 const COLLAPSE_AFTER = 1500;
+const USER_HOLD = 3000; // auto-collapse never fires this soon after a user toggle
 
 export class LevelUp {
   constructor(match) {
     this.match = match;
     this.collapseAt = 0;
+    this.userAt = -1e9;
     this.last = { pts: -1, lv: -1, xp: -1, slots: ['', '', ''] };
     this.root = document.createElement('div');
     this.root.id = 'upgrades';
@@ -40,12 +41,12 @@ export class LevelUp {
       el, pips: [...el.querySelectorAll('.pips i')], mark: el.querySelector('.mark'), ico: el.querySelector('.ico'),
     }));
 
-    this.tab.addEventListener('click', () => this.toggle()); // click (not pointerdown) so taps, mouse and synthetic clicks all open it
+    this.tab.addEventListener('click', (e) => { e.stopPropagation(); this.toggle(true); }); // click (not pointerdown) so taps, mouse and synthetic clicks all open it
     for (const [i, b] of this.btns.entries()) {
       b.el.addEventListener('click', () => this.match.hero.spendPoint(i));
     }
     addEventListener('keydown', (e) => {
-      if (e.code === 'KeyU' && !e.repeat && document.body.classList.contains('playing')) this.toggle();
+      if (e.code === 'KeyU' && !e.repeat && document.body.classList.contains('playing')) this.toggle(true);
     });
 
     const mine = (h) => h === match.hero;
@@ -59,7 +60,6 @@ export class LevelUp {
       this.toast.textContent = h.level === HERO.ultLevel ? `LEVEL ${h.level} · R UNLOCKED · +1 POINT` : `LEVEL ${h.level} · +1 POINT`;
       this._pop(this.toast, 'pop');
       this._pop(this.tab, 'bump');
-      if (!save.get('upSeen', false)) { save.set('upSeen', true); this.open(true); } // once, to show where upgrades live
     });
     bus.on('xp', ({ hero, amount }) => {
       if (!mine(hero)) return;
@@ -74,13 +74,16 @@ export class LevelUp {
     el.classList.add(cls);
   }
 
-  open(v) {
+  // The 'open' class is the single source of truth; aria-expanded always mirrors it. `user` marks a deliberate toggle.
+  open(v, user = false) {
+    v = !!v;
     this.root.classList.toggle('open', v);
     this.tab.setAttribute('aria-expanded', String(v));
     this.collapseAt = 0;
+    if (user) this.userAt = performance.now();
   }
 
-  toggle() { this.open(!this.root.classList.contains('open')); }
+  toggle(user = false) { this.open(!this.root.classList.contains('open'), user); }
 
   // Fresh match: close the drawer and re-read everything.
   reset() {
@@ -121,6 +124,7 @@ export class LevelUp {
       b.el.dataset.rank = r;
     });
 
-    if (this.collapseAt && performance.now() > this.collapseAt) this.open(false);
+    const now = performance.now();
+    if (this.collapseAt && now > this.collapseAt && now - this.userAt > USER_HOLD) this.open(false);
   }
 }
