@@ -43,7 +43,12 @@ export class Core {
     this.mats = [this.mat, this.crystalMat];
 
     const daisGeo = mergeParts([
-      { g: new THREE.CylinderGeometry(2.6, 2.9, 0.5, 16), c: PAL.cliffLight, p: [0, 0.25, 0] },
+      { g: new THREE.CylinderGeometry(3.1, 3.3, 0.25, 16), c: PAL.cliffDark, p: [0, 0.12, 0] },
+      { g: new THREE.CylinderGeometry(2.6, 2.9, 0.5, 16), c: PAL.cliffLight, p: [0, 0.3, 0] },
+      ...Array.from({ length: 6 }, (_, i) => { // steel pylons ringing the dais
+        const a = (i / 6) * Math.PI * 2 + Math.PI / 6;
+        return { g: new THREE.BoxGeometry(0.32, 1.3, 0.32), c: 0x5A606A, p: [Math.cos(a) * 2.75, 0.75, Math.sin(a) * 2.75], r: [0, -a, 0] };
+      }),
       { g: new THREE.TorusGeometry(2.3, 0.16, 6, 24), c: c.main, p: [0, 0.55, 0], r: [Math.PI / 2, 0, 0] },
       { g: new THREE.CylinderGeometry(1.0, 1.4, 0.4, 12), c: c.deep, p: [0, 0.6, 0] },
     ]);

@@ -1,16 +1,16 @@
 // Single source of truth: palette, tuning numbers, budgets.
 
-export const PAL = {
-  voidTop: 0x060A16, voidBottom: 0x1A2748,
-  nebulaA: 0x2E5BD6, nebulaB: 0x16C7B8,
-  star: 0xE6F4FF, gold: 0xFFC83D,
-  grassLight: 0x3F5A68, grassDark: 0x2A3F4D,
-  lane: 0x6D7C8E, laneGlow: 0x7FE0FF,
-  cliffLight: 0x56658A, cliffDark: 0x2B3550,
-  sunny: 0x3DA5FF, sunnyDeep: 0x1B5FB8,
-  gloom: 0xFF4D5E, gloomDeep: 0xB02338,
-  heal: 0x3EE89A, shield: 0x8FE3FF,
-  ink: 0x0B1020, fog: 0x101A33,
+export const PAL = { // grounded sci-fi: slightly desaturated neon, deeper shadows; team blue/red stay saturated enough to read
+  voidTop: 0x05080F, voidBottom: 0x172238,
+  nebulaA: 0x2A4FA8, nebulaB: 0x1A9E94,
+  star: 0xE2EEF8, gold: 0xF0BE48,
+  grassLight: 0x4E6352, grassDark: 0x2E3E34,
+  lane: 0x666D76, laneGlow: 0x6FCBE4,
+  cliffLight: 0x6A6A70, cliffDark: 0x24252D,
+  sunny: 0x3A9BF0, sunnyDeep: 0x1D57A3,
+  gloom: 0xF04C5A, gloomDeep: 0xA02436,
+  heal: 0x42D592, shield: 0x8AD6F2,
+  ink: 0x0D1017, fog: 0x141B28,
 };
 
 // Team 0 = Sunny (player side, marches +x), team 1 = Gloom (marches -x).

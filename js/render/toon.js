@@ -1,19 +1,21 @@
-// Toon look: shared 3-step gradient, fresnel rim + hit flash, inverted-hull outlines, blob shadows.
+// Toon look: soft 4-step gradient, fresnel rim + hit flash, thin inverted-hull outlines, blob shadows.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { PAL } from '../config.js';
 import { radialTexture } from './atlas.js';
 
 export const gradientMap = (() => {
-  const t = new THREE.DataTexture(new Uint8Array([115, 191, 255]), 3, 1, THREE.RedFormat);
-  t.minFilter = t.magFilter = THREE.NearestFilter;
+  // Linear filtering blurs the bands into a soft ramp: still stylized, less flat than hard cel steps.
+  const t = new THREE.DataTexture(new Uint8Array([78, 140, 205, 255]), 4, 1, THREE.RedFormat);
+  t.minFilter = t.magFilter = THREE.LinearFilter;
   t.needsUpdate = true;
   return t;
 })();
 
 const RIM = /* glsl */ `
-  float rimF = pow(1.0 - saturate(dot(normalize(vNormal), normalize(vViewPosition))), 2.5);
-  outgoingLight += vec3(1.0, 0.957, 0.76) * rimF * 0.35;
+  float rimF = pow(1.0 - saturate(dot(normalize(vNormal), normalize(vViewPosition))), 3.0);
+  outgoingLight += vec3(0.78, 0.86, 1.0) * rimF * 0.2;
+  outgoingLight *= mix(0.82, 1.0, saturate(normalize(vNormal).y * 0.5 + 0.6)); // underside falloff, fake AO
   outgoingLight = mix(outgoingLight, vec3(1.0), uFlash);
 `;
 
@@ -38,7 +40,7 @@ export function outlineMat(thickness) {
     outlines.set(thickness, new THREE.ShaderMaterial({
       side: THREE.BackSide,
       fog: false,
-      uniforms: { uT: { value: thickness }, uCol: { value: new THREE.Color(PAL.ink) } },
+      uniforms: { uT: { value: thickness * 0.7 }, uCol: { value: new THREE.Color(PAL.ink) } },
       vertexShader: /* glsl */ `
         uniform float uT;
         void main() {
@@ -86,7 +88,7 @@ export function mergeParts(parts) {
 
 const shadowGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
 export const shadowMat = new THREE.MeshBasicMaterial({
-  map: radialTexture(), color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false,
+  map: radialTexture(), color: 0x000000, transparent: true, opacity: 0.45, depthWrite: false,
 });
 export const SHADOW_Y = 0.14;
 export { shadowGeo };

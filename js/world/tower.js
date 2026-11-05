@@ -1,4 +1,4 @@
-// Towers: stone shaft, team band, spinning crystal. Shoot minions first, then heroes.
+// Towers: stone plinth, ribbed steel shaft, team band, spinning crystal. Shoot minions first, then heroes.
 import * as THREE from 'three';
 import { PAL, TEAM, TOWER, GROUND } from '../config.js';
 import { structSpot } from './arena.js';
@@ -41,16 +41,24 @@ export class Tower {
     this.mats = [this.mat, this.crystalMat];
 
     const stumpGeo = mergeParts([
-      { g: new THREE.CylinderGeometry(1.35, 1.6, 0.8, 6), c: PAL.cliffLight, p: [0, 0.4, 0] },
-      { g: new THREE.CylinderGeometry(1.1, 1.15, 0.3, 6), c: c.deep, p: [0, 0.95, 0] },
+      { g: new THREE.CylinderGeometry(1.45, 1.7, 0.5, 6), c: PAL.cliffDark, p: [0, 0.25, 0] },
+      { g: new THREE.CylinderGeometry(1.3, 1.45, 0.45, 6), c: PAL.cliffLight, p: [0, 0.72, 0] },
+      { g: new THREE.CylinderGeometry(1.1, 1.15, 0.3, 6), c: c.deep, p: [0, 1.08, 0] },
     ]);
     this.group.add(toonMesh(stumpGeo, this.mat));
 
     this.top = new THREE.Group();
+    const ribs = Array.from({ length: 6 }, (_, i) => { // steel ribs on the hex corners of the lower shaft
+      const a = (i / 6) * Math.PI * 2;
+      return { g: new THREE.BoxGeometry(0.16, 2.0, 0.16), c: 0x4A505A, p: [Math.sin(a) * 0.93, 2.1, Math.cos(a) * 0.93], r: [0, a, 0] };
+    });
     const shaftGeo = mergeParts([
-      { g: new THREE.CylinderGeometry(0.85, 1.05, 2.0, 6), c: 0xE9E0F5, p: [0, 2.1, 0] },
+      { g: new THREE.CylinderGeometry(0.85, 1.05, 2.0, 6), c: 0xA9ADB5, p: [0, 2.1, 0] },
+      ...ribs,
       { g: new THREE.TorusGeometry(0.98, 0.14, 6, 12), c: c.main, p: [0, 1.7, 0], r: [Math.PI / 2, 0, 0] },
-      { g: new THREE.CylinderGeometry(0.7, 0.85, 1.2, 6), c: 0xF4EEFA, p: [0, 3.7, 0] },
+      { g: new THREE.CylinderGeometry(0.92, 0.92, 0.18, 6), c: 0x5A606A, p: [0, 3.15, 0] },
+      { g: new THREE.CylinderGeometry(0.7, 0.85, 1.2, 6), c: 0xBCC0C7, p: [0, 3.7, 0] },
+      { g: new THREE.BoxGeometry(1.5, 0.1, 0.22), c: c.main, p: [0, 3.75, 0] }, // team light slot
       { g: new THREE.ConeGeometry(1.05, 0.7, 6), c: c.deep, p: [0, 4.65, 0] },
     ]);
     this.top.add(toonMesh(shaftGeo, this.mat));
@@ -63,7 +71,7 @@ export class Tower {
 
     this.banner = new THREE.Group();
     this.banner.position.set(1.0, 3.9, 0);
-    const cloth = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 1.1), new THREE.MeshBasicMaterial({ color: c.main, side: THREE.DoubleSide }));
+    const cloth = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 1.1), toonMat({ color: c.main, side: THREE.DoubleSide }));
     cloth.position.set(0.35, -0.55, 0);
     this.banner.add(cloth);
     this.top.add(this.banner);

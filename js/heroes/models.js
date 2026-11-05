@@ -13,11 +13,18 @@ const OCT = new THREE.OctahedronGeometry(0.5);
 const DOME = new THREE.SphereGeometry(1, 8, 6);
 const RING = new THREE.TorusGeometry(0.5, 0.07, 5, 14);
 
-const DARK = 0x1B2230, STEEL = 0x2E3748, HIP = 0.95;
-const TORSO = { heavy: { w: 1.05, h: 0.95, d: 0.72 }, medium: { w: 0.86, h: 0.9, d: 0.6 }, slim: { w: 0.68, h: 0.9, d: 0.5 } };
+// DARK = joints / soles, STEEL = bare metal frame, CLOTH = undersuit, TRIM = bright machined edges.
+const DARK = 0x171B24, STEEL = 0x3A414D, CLOTH = 0x2A2C33, TRIM = 0x8A919C, HIP = 1.08;
+const TORSO = { heavy: { w: 1.02, h: 1.04, d: 0.7 }, medium: { w: 0.84, h: 1.0, d: 0.58 }, slim: { w: 0.68, h: 1.0, d: 0.5 } };
+const HEAD = 0.86; // helmet + visor scale; smaller head reads less chibi
 const shade = (c, k) => new THREE.Color(c).multiplyScalar(k).getHex();
+// Pull a color slightly toward its own grey: armor reads as painted metal rather than toy plastic.
+const ground = (c, k) => { const col = new THREE.Color(c), l = col.r * 0.3 + col.g * 0.59 + col.b * 0.11; return col.lerp(new THREE.Color(l, l, l), k).getHex(); };
 
 const part = (g, c, p, s = 1, r) => ({ g, c, p, s, r });
+// Scale parts about a pivot / shift them vertically (parts are authored in absolute rig space).
+const scaleAbout = (P, [cx, cy, cz], k) => P.map((q) => ({ ...q, p: [cx + (q.p[0] - cx) * k, cy + (q.p[1] - cy) * k, cz + (q.p[2] - cz) * k], s: (typeof q.s === 'number' ? [q.s, q.s, q.s] : q.s).map((v) => v * k) }));
+const lift = (P, dy) => P.map((q) => ({ ...q, p: [q.p[0], q.p[1] + dy, q.p[2]] }));
 
 function helmet(kind, hy, hz, main, acc) {
   const head = (w, h, d, c = main) => part(BOX, c, [0, hy, hz], [w, h, d]);
@@ -40,9 +47,13 @@ function visor(kind, hy, hz, col) {
 
 function arms(kind, ax, main, acc) {
   const P = [];
-  const arm = (sx) => P.push(part(BOX, STEEL, [sx * ax, HIP + 0.55, 0], [0.22, 0.5, 0.24]), part(BOX, shade(main, 0.85), [sx * ax, HIP + 0.1, 0.08], [0.2, 0.5, 0.22]));
+  const arm = (sx) => P.push(
+    part(BOX, CLOTH, [sx * ax, HIP + 0.55, 0], [0.19, 0.52, 0.2]),
+    part(BOX, shade(main, 0.85), [sx * ax, HIP + 0.12, 0.08], [0.21, 0.46, 0.22]),
+    part(BOX, TRIM, [sx * ax, HIP + 0.33, 0.06], [0.2, 0.05, 0.21]),
+  );
   arm(1); arm(-1);
-  const fist = (sx, s) => P.push(part(BOX, shade(main, 0.9), [sx * ax, HIP - 0.05, 0.14], [0.3 * s, 0.34 * s, 0.36 * s]), part(BOX, acc, [sx * ax, HIP + 0.08 + 0.1 * s, 0.14], [0.32 * s, 0.06, 0.38 * s]));
+  const fist = (sx, s) => P.push(part(BOX, DARK, [sx * ax, HIP - 0.06, 0.14], [0.24 * s, 0.26 * s, 0.28 * s]), part(BOX, acc, [sx * ax, HIP + 0.05 + 0.08 * s, 0.14], [0.27 * s, 0.05, 0.31 * s]));
   fist(1, 1); fist(-1, 1);
   const R = -ax; // weapon side
   if (kind === 'shield') P.push(part(BOX, main, [ax + 0.4, HIP + 0.55, 0.25], [0.12, 1.6, 0.9]), part(BOX, acc, [ax + 0.47, HIP + 0.55, 0.25], [0.06, 1.35, 0.62]), part(HEX, STEEL, [ax + 0.5, HIP + 0.6, 0.25], [0.3, 0.06, 0.3], [0, 0, Math.PI / 2]));
@@ -93,27 +104,35 @@ function back(kind, main, acc) {
 
 function legGeo(T, main, acc) {
   return mergeParts([
-    part(BOX, STEEL, [0, -0.25, 0], [0.28, 0.5, 0.3]),
-    part(BOX, acc, [0, -0.5, 0.15], [0.2, 0.12, 0.08]),
-    part(BOX, shade(main, 0.85), [0, -0.72, 0.02], [0.26, 0.46, 0.3]),
-    part(BOX, DARK, [0, -0.88, 0.1], [0.32, 0.2, 0.52]),
+    part(BOX, CLOTH, [0, -0.27, 0], [0.24, 0.54, 0.27]),
+    part(BOX, shade(main, 0.8), [0, -0.24, 0.1], [0.25, 0.36, 0.1]),
+    part(BOX, TRIM, [0, -0.56, 0.13], [0.2, 0.12, 0.08]),
+    part(BOX, acc, [0, -0.56, 0.17], [0.08, 0.06, 0.02]),
+    part(BOX, shade(main, 0.88), [0, -0.8, 0.03], [0.24, 0.42, 0.28]),
+    part(BOX, DARK, [0, -0.99, 0.08], [0.28, 0.18, 0.46]),
+    part(BOX, STEEL, [0, -0.95, 0.29], [0.26, 0.1, 0.06]),
   ]);
 }
 
 // -> { root, lean, eyes, tail, legs, mats } — hero.js animates lean / eyes / tail / legs and flashes mats.
 export function buildChampion(spec, def, team = 0) {
-  const T = TORSO[spec.torso], main = def.color, acc = def.accent;
-  const hunch = spec.hunch ? 0.18 : 0, hy = HIP + T.h + 0.34, ax = T.w / 2 + 0.2;
-  const mid = HIP + T.h * 0.5;
+  const T = TORSO[spec.torso], main = ground(def.color, 0.18), acc = ground(def.accent, 0.08);
+  const hunch = spec.hunch ? 0.18 : 0, hy = HIP + T.h + 0.3, ax = T.w / 2 + 0.18;
+  const mid = HIP + T.h * 0.5, chestZ = T.d / 2 + 0.02 + hunch * 0.4;
   const body = [
     part(BOX, DARK, [0, HIP, 0], [T.w * 0.75, 0.26, T.d * 0.85]),
-    part(BOX, STEEL, [0, HIP + 0.2, 0], [T.w * 0.6, 0.3, T.d * 0.7]),
-    part(TAPER, main, [0, mid + 0.12, hunch * 0.4], [T.w, T.h * 0.8, T.d], [hunch * 1.2, 0, 0]),
-    part(BOX, acc, [0, mid + 0.12, T.d / 2 + 0.02 + hunch * 0.4], [T.w * 0.42, T.h * 0.38, 0.06]),
-    part(BOX, shade(main, 0.8), [0, HIP + T.h + 0.1, hunch * 0.5], [0.26, 0.14, 0.3]),
-    ...helmet(spec.helmet, hy, hunch, main, acc),
+    part(BOX, CLOTH, [0, HIP + 0.22, 0], [T.w * 0.6, 0.34, T.d * 0.7]),
+    part(BOX, STEEL, [0, HIP + 0.16, T.d * 0.33], [T.w * 0.46, 0.08, 0.06]), // abdomen plates
+    part(BOX, STEEL, [0, HIP + 0.3, T.d * 0.33], [T.w * 0.5, 0.08, 0.06]),
+    part(BOX, TRIM, [0, HIP + 0.04, T.d * 0.43], [0.16, 0.1, 0.04]), // belt buckle
+    part(TAPER, main, [0, mid + 0.14, hunch * 0.4], [T.w, T.h * 0.78, T.d], [hunch * 1.2, 0, 0]),
+    part(BOX, acc, [0, mid + 0.14, chestZ], [T.w * 0.42, T.h * 0.36, 0.06]),
+    part(BOX, DARK, [0, mid + 0.14, chestZ + 0.025], [0.03, T.h * 0.36, 0.03]), // chest plate seam
+    part(BOX, TRIM, [0, HIP + T.h - 0.02, hunch * 0.45], [T.w * 0.55, 0.06, T.d * 0.62]), // collar
+    part(BOX, CLOTH, [0, HIP + T.h + 0.08, hunch * 0.5], [0.22, 0.16, 0.24]), // neck
+    ...scaleAbout([...helmet(spec.helmet, hy, hunch, main, acc)], [0, hy - 0.2, hunch], HEAD),
     ...pauldrons(spec.paul, T.w, HIP + T.h - 0.05, main, acc),
-    ...arms(spec.arm, ax, main, acc),
+    ...lift(arms(spec.arm, ax, main, acc), T.h - 0.95),
   ];
   if (spec.emblem) body.push(part(OCT, acc, [0, mid + 0.15, T.d / 2 + 0.05], [0.26, 0.34, 0.08]));
   if (spec.cracks) for (const [x, r] of [[-0.18, 0.5], [0.12, -0.4], [0.28, 0.2]]) body.push(part(BOX, acc, [x, mid + 0.1, T.d / 2 + 0.02], [0.04, 0.55, 0.04], [0, 0, r]));
@@ -123,19 +142,19 @@ export function buildChampion(spec, def, team = 0) {
   lean.add(toonMesh(mergeParts(body), mat, 0.03));
 
   const vc = new THREE.Color(TEAM[team].main).lerp(new THREE.Color(0xffffff), 0.35).getHex();
-  const eyes = new THREE.Mesh(mergeParts(visor(spec.visor, 0, hunch, vc)), new THREE.MeshBasicMaterial({ vertexColors: true }));
+  const eyes = new THREE.Mesh(mergeParts(scaleAbout(visor(spec.visor, 0, hunch, vc), [0, -0.2, hunch], HEAD)), new THREE.MeshBasicMaterial({ vertexColors: true }));
   eyes.position.y = hy;
   lean.add(eyes);
 
   const tail = new THREE.Group();
-  tail.position.set(0, HIP + 0.3, -T.d / 2 - 0.05);
+  tail.position.set(0, HIP + T.h - 0.62, -T.d / 2 - 0.05);
   tail.add(toonMesh(mergeParts(back(spec.back, main, acc)), mat, 0.03));
   lean.add(tail);
 
   const geo = legGeo(T, main, acc);
   const legs = [-1, 1].map((sx) => {
     const g = new THREE.Group();
-    g.position.set(sx * T.w * 0.27, HIP, 0);
+    g.position.set(sx * T.w * 0.25, HIP, 0);
     g.add(toonMesh(geo, mat, 0.03));
     return g;
   });

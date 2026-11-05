@@ -11,10 +11,13 @@ export function createRenderer(canvas) {
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(PAL.fog, 70, 150);
 
-  scene.add(new THREE.HemisphereLight(0xBFD9FF, PAL.cliffDark, 1.1));
-  const sun = new THREE.DirectionalLight(0xFFE8C2, 1.6);
+  // Warm key, cool sky fill with an earthy bounce, and a soft cool rim from behind for silhouette separation.
+  scene.add(new THREE.HemisphereLight(0xA9C2E6, 0x3A3328, 1.0));
+  const sun = new THREE.DirectionalLight(0xFFDDB0, 2.0);
   sun.position.set(-0.5, 1, 0.3).multiplyScalar(50);
-  scene.add(sun);
+  const rim = new THREE.DirectionalLight(0x86A8E0, 0.5);
+  rim.position.set(0.6, 0.5, -1).multiplyScalar(50);
+  scene.add(sun, rim);
 
   const camera = new THREE.PerspectiveCamera(CAM.fov, 1, 0.5, 700);
 

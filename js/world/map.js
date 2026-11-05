@@ -22,6 +22,13 @@ function instanced(geo, mat, n) {
 }
 
 const hash = (x, y, z) => { const v = Math.sin(x * 12.9898 + y * 37.7 + z * 78.233) * 43758.5453; return v - Math.floor(v); };
+// Smooth 2D value noise in [0, 1] and a 3-octave sum of it.
+function vnoise(x, z) {
+  const ix = Math.floor(x), iz = Math.floor(z), fx = x - ix, fz = z - iz, ux = fx * fx * (3 - 2 * fx), uz = fz * fz * (3 - 2 * fz);
+  const a = hash(ix, 0, iz), b = hash(ix + 1, 0, iz), c = hash(ix, 0, iz + 1), d = hash(ix + 1, 0, iz + 1);
+  return a + (b - a) * ux + (c - a) * uz + (a - b - c + d) * ux * uz;
+}
+const fbm = (x, z) => vnoise(x, z) * 0.55 + vnoise(x * 2.1 + 7, z * 2.1 + 3) * 0.3 + vnoise(x * 4.3 + 1, z * 4.3 + 9) * 0.15;
 
 function buildSky(group) {
   const sky = new THREE.Mesh(
@@ -56,7 +63,7 @@ function buildSky(group) {
   [[-90, -85, -70, PAL.nebulaA, 190], [10, -95, -95, PAL.nebulaB, 220], [110, -80, -60, PAL.nebulaA, 180], [-20, -70, 70, PAL.nebulaB, 160]]
     .forEach(([x, y, z, color, size]) => {
       const q = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshBasicMaterial({
-        map: tex, color, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
+        map: tex, color, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
       }));
       q.position.set(x, y, z);
       group.add(q);
@@ -84,25 +91,67 @@ function roundRect(w, d, r) {
   return sh;
 }
 
-// Rounded-slab floating island: flat grass top, two stacked cliff tiers underneath.
+// Rounded-slab floating island: two cliff tiers, each stacked from rock strata with alternating insets and tones.
+const ISLAND = { w: 196, d: 124, r: 22 };
 function buildIsland(group) {
-  const tier = (w, d, r, h, y) => new THREE.ExtrudeGeometry(roundRect(w, d, r), { depth: h, bevelEnabled: false, curveSegments: 5 })
+  const layer = (w, d, r, h, y) => new THREE.ExtrudeGeometry(roundRect(w, d, r), { depth: h, bevelEnabled: false, curveSegments: 6 })
     .rotateX(-Math.PI / 2).translate(0, y, 0).toNonIndexed();
-  const parts = [tier(196, 124, 22, 10, -10), tier(150, 86, 20, 9, -19)];
-  const geos = parts.map((geo) => {
+  const strata = [];
+  const tier = (w, d, r, top, bottom, insets) => {
+    const h = (top - bottom) / insets.length;
+    insets.forEach((k, i) => strata.push({ geo: layer(w - k * 2, d - k * 2, r - k, h, top - h * (i + 1)), top: top - h * i, h, i }));
+  };
+  tier(ISLAND.w, ISLAND.d, ISLAND.r, 0, -10, [0, 0.7, 0.3, 1.2]);
+  tier(150, 86, 20, -10, -19, [0, 0.9, 0.4, 1.4]);
+  const cap = new THREE.Color(PAL.grassDark), cl = new THREE.Color(PAL.cliffLight), cd = new THREE.Color(PAL.cliffDark), warm = new THREE.Color(0x6E6252);
+  const geos = strata.map(({ geo, top, h, i }) => {
     geo.deleteAttribute('uv');
     geo.computeVertexNormals();
     const pos = geo.attributes.position, nrm = geo.attributes.normal, col = new Float32Array(pos.count * 3);
-    const light = new THREE.Color(PAL.grassLight), cl = new THREE.Color(PAL.cliffLight), cd = new THREE.Color(PAL.cliffDark);
-    for (let i = 0; i < pos.count; i++) {
-      if (nrm.getY(i) > 0.9) _c.copy(nrm.getY(i) > 0.9 && pos.getY(i) > -0.5 ? light : cd);
-      else _c.copy(cl).lerp(cd, clamp(-pos.getY(i) / 19, 0, 1) * 0.9 + hash(pos.getX(i) * 0.1, 0, pos.getZ(i) * 0.1) * 0.1);
-      col.set([_c.r, _c.g, _c.b], i * 3);
+    for (let v = 0; v < pos.count; v++) {
+      const y = pos.getY(v), x = pos.getX(v), z = pos.getZ(v);
+      if (nrm.getY(v) > 0.9) _c.copy(y > -0.5 ? cap : cd).lerp(cl, y > -0.5 ? 0 : 0.25); // grass cap / rock ledges
+      else {
+        const depth = clamp(-y / 19, 0, 1), band = (top - y) / h; // band: 0 at a stratum's top edge, 1 at its bottom
+        _c.copy(cl).lerp(warm, i % 2 ? 0.35 : 0).lerp(cd, depth * 0.75 + band * 0.18 + hash(x * 0.2, i, z * 0.2) * 0.1);
+      }
+      col.set([_c.r, _c.g, _c.b], v * 3);
     }
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     return geo;
   });
-  group.add(toonMesh(mergeGeometries(geos), toonMat({ vertexColors: true }), 0.12));
+  group.add(toonMesh(mergeGeometries(geos), toonMat({ vertexColors: true }), 0.1));
+}
+
+// Grass field over the island top: indexed grid with fbm tint, worn dirt patches, darker jungle pockets and team base tints.
+function buildGrass(group) {
+  const { w, d, r } = ISLAND, step = 2, nx = w / step, nz = d / step;
+  const geo = new THREE.PlaneGeometry(w, d, nx, nz).rotateX(-Math.PI / 2).translate(0, 0.006, 0);
+  geo.deleteAttribute('uv');
+  const pos = geo.attributes.position, col = new Float32Array(pos.count * 3);
+  const gl = new THREE.Color(PAL.grassLight), gd = new THREE.Color(PAL.grassDark), dirt = new THREE.Color(0x5A5446), jungle = new THREE.Color(0x24382C), tint = new THREE.Color();
+  const bases = [0, 1].map((team) => { const f = fountain(team); return { x: f.x + (team ? -6 : 6), col: new THREE.Color(TEAM[team].deep) }; });
+  const inside = (x, z) => Math.hypot(Math.max(Math.abs(x) - (w / 2 - r), 0), Math.max(Math.abs(z) - (d / 2 - r), 0)) <= r;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i), n = fbm(x * 0.06, z * 0.06);
+    _c.copy(gd).lerp(gl, clamp(n * 1.5 - 0.2, 0, 1));
+    _c.lerp(dirt, clamp((fbm(x * 0.11 + 40, z * 0.11) - 0.62) * 3, 0, 0.45));
+    for (const b of POCKETS) {
+      const e = Math.max(Math.abs(x - b.cx) - b.w / 2, Math.abs(z - b.cz) - b.d / 2);
+      _c.lerp(jungle, clamp(1 - e / 3, 0, 1) * 0.55);
+    }
+    for (const b of bases) _c.lerp(tint.copy(b.col), clamp(1 - (Math.hypot(x - b.x, z) - 12) / 6, 0, 1) * 0.35);
+    col.set([_c.r, _c.g, _c.b], i * 3);
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const idx = geo.index.array, keep = []; // drop cells outside the rounded corners
+  for (let t = 0; t < idx.length; t += 3) {
+    const a = idx[t], b = idx[t + 1], c = idx[t + 2];
+    if (inside(pos.getX(a), pos.getZ(a)) && inside(pos.getX(b), pos.getZ(b)) && inside(pos.getX(c), pos.getZ(c))) keep.push(a, b, c);
+  }
+  geo.setIndex(keep);
+  geo.computeVertexNormals();
+  group.add(new THREE.Mesh(geo, toonMat({ vertexColors: true })));
 }
 
 // Flat decal geometry (y fixed) with a vertex color; everything ground-level is merged into one mesh.
@@ -129,29 +178,38 @@ function strip(x0, z0, x1, z1, w, y, color) { // ribbon between two lane waypoin
   flats.push(ng);
 }
 
-// Ground: jungle pockets, team-tinted bases, flux channel, paved lanes with fountain pads. One merged mesh.
+// Ground: flux channel, lanes laid as metal deck plates over a dark bed (the seams show through), fountain pads. One merged mesh.
 function buildGround(group) {
   const W = MAP.laneW, dashes = [];
-  for (const b of POCKETS) rect(b.cx, b.cz, b.w, b.d, 0.012, mix(PAL.grassDark, 0x2E6B4A, 0.45));
   for (const team of [0, 1]) {
-    const f = fountain(team), sx = team ? -1 : 1;
-    flat(new THREE.CircleGeometry(17, 28), 0.016, mix(PAL.grassLight, TEAM[team].deep, 0.5), f.x + sx * 6, 0);
-    flat(new THREE.CircleGeometry(ARENA.fountainR - 0.4, 24), 0.05, mix(0xE6F4FF, TEAM[team].main, 0.35), f.x, f.z);
+    const f = fountain(team);
+    flat(new THREE.CircleGeometry(ARENA.fountainR - 0.4, 24), 0.05, mix(0xB8C4CE, TEAM[team].main, 0.3), f.x, f.z);
     flat(new THREE.RingGeometry(ARENA.fountainR - 0.4, ARENA.fountainR + 0.3, 28), 0.06, PAL.gold, f.x, f.z);
   }
-  rect(0, 0, 10, 112, 0.02, mix(PAL.lane, 0x7FE0FF, 0.18)); // flux channel
+  rect(0, 0, 10, 112, 0.02, mix(PAL.lane, PAL.laneGlow, 0.14)); // flux channel
   for (const sx of [-1, 1]) rect(sx * 5.2, 0, 0.5, 112, 0.04, PAL.laneGlow);
   for (const lane of ARENA.lanes) {
     for (let i = 1; i < lane.length; i++) {
       const [x0, z0] = lane[i - 1], [x1, z1] = lane[i];
-      strip(x0, z0, x1, z1, W + 1.2, 0.024, mix(PAL.lane, PAL.ink, 0.35));
-      strip(x0, z0, x1, z1, W, 0.03, PAL.lane);
-      const len = Math.hypot(x1 - x0, z1 - z0), n = Math.floor(len / 3);
+      strip(x0, z0, x1, z1, W + 1.2, 0.024, mix(PAL.lane, PAL.ink, 0.45));
+      const len = Math.hypot(x1 - x0, z1 - z0), ux = (x1 - x0) / len, uz = (z1 - z0) / len, plates = Math.max(1, Math.round(len / 4));
+      for (let k = 0; k < plates; k++) { // two rows of plates with a center seam, each a touch lighter or darker
+        const a = (k / plates) * len + 0.07, b = ((k + 1) / plates) * len - 0.07;
+        for (const side of [-1, 1]) {
+          const o = side * (W / 4), px = -uz * o, pz = ux * o;
+          strip(x0 + ux * a + px, z0 + uz * a + pz, x0 + ux * b + px, z0 + uz * b + pz, W / 2 - 0.1, 0.03, mix(PAL.lane, hash(k, side, x0) > 0.5 ? 0xffffff : PAL.ink, hash(x0, k, side) * 0.1));
+        }
+      }
+      for (const side of [-1, 1]) { // brushed-steel curbs
+        const o = side * (W / 2 - 0.2), px = -uz * o, pz = ux * o;
+        strip(x0 + px, z0 + pz, x1 + px, z1 + pz, 0.3, 0.036, mix(PAL.lane, 0xD8DEE6, 0.3));
+      }
+      const n = Math.floor(len / 3);
       for (let k = 0; k < n; k++) dashes.push((x0 + ((x1 - x0) * (k + 0.5)) / n), (z0 + ((z1 - z0) * (k + 0.5)) / n), Math.atan2(z1 - z0, x1 - x0));
     }
-    for (const [x, z] of lane) flat(new THREE.CircleGeometry(W / 2 + 0.6, 14), 0.027, mix(PAL.lane, PAL.ink, 0.35), x, z), flat(new THREE.CircleGeometry(W / 2, 14), 0.032, PAL.lane, x, z);
+    for (const [x, z] of lane) flat(new THREE.CircleGeometry(W / 2 + 0.6, 14), 0.027, mix(PAL.lane, PAL.ink, 0.35), x, z), flat(new THREE.CircleGeometry(W / 2, 14), 0.028, PAL.lane, x, z); // under the plates: only fills the wedge gaps at bends
   }
-  for (const b of BRUSH) rect(b.cx, b.cz, b.w, b.d, 0.045, 0x2C7A3E);
+  for (const b of BRUSH) rect(b.cx, b.cz, b.w, b.d, 0.045, 0x2C5A34);
   group.add(new THREE.Mesh(mergeGeometries(flats), toonMat({ vertexColors: true })));
 
   const glow = instanced(new THREE.BoxGeometry(1.5, 0.06, 0.5), new THREE.MeshBasicMaterial(), dashes.length / 3);
@@ -170,16 +228,17 @@ function coverParts(b, i, rocks, crates) {
   const long = Math.max(b.w, b.d), thick = Math.min(b.w, b.d), alongX = b.w >= b.d, yaw = alongX ? 0 : Math.PI / 2;
   const h = (k) => hash(i, k, long);
   const at = (u, v) => (alongX ? [b.cx + u, b.cz + v] : [b.cx + v, b.cz + u]); // u along the long axis, v across it
-  const slate = mix(PAL.cliffDark, PAL.cliffLight, 0.35), stone = (k) => mix(PAL.cliffDark, PAL.cliffLight, 0.45 + h(k) * 0.5);
+  const slate = mix(PAL.cliffDark, PAL.cliffLight, 0.45), stone = (k) => mix(mix(PAL.cliffDark, PAL.cliffLight, 0.5 + h(k) * 0.45), 0x6E6252, h(k + 9) * 0.3);
   const boulder = (u, v, rx, ry, rz, k) => {
     const [x, z] = at(u, v);
     rocks.push({ g: new THREE.IcosahedronGeometry(1, 1), c: stone(k), p: [x, ry * 0.55, z], s: alongX ? [rx, ry, rz] : [rz, ry, rx], r: [h(k + 1) * 0.4, h(k + 2) * 6.28, h(k + 3) * 0.3] });
   };
   const crate = (u, v, size, ht, k, yawJit = 0.1) => {
-    const [x, z] = at(u, v), j = (h(k) - 0.5) * yawJit, team = h(k + 5) > 0.5 ? 0x3E6E8E : 0x7A5A44;
+    const [x, z] = at(u, v), j = (h(k) - 0.5) * yawJit, team = h(k + 5) > 0.5 ? 0x4A6274 : 0x6E5843;
     crates.push({ g: new THREE.BoxGeometry(size, ht, size), c: team, p: [x, ht / 2 + 0.3, z], r: [0, yaw + j, 0] });
-    crates.push({ g: new THREE.BoxGeometry(size + 0.06, 0.16, size + 0.06), c: PAL.cliffDark, p: [x, 0.3 + 0.1, z], r: [0, yaw + j, 0] }); // base trim
-    crates.push({ g: new THREE.BoxGeometry(size + 0.06, 0.16, size + 0.06), c: PAL.cliffDark, p: [x, ht + 0.22, z], r: [0, yaw + j, 0] }); // top trim
+    crates.push({ g: new THREE.BoxGeometry(size + 0.06, 0.16, size + 0.06), c: 0x3A3E46, p: [x, 0.3 + 0.1, z], r: [0, yaw + j, 0] }); // base trim
+    crates.push({ g: new THREE.BoxGeometry(size + 0.06, 0.16, size + 0.06), c: 0x3A3E46, p: [x, ht + 0.22, z], r: [0, yaw + j, 0] }); // top trim
+    crates.push({ g: new THREE.BoxGeometry(size + 0.04, ht - 0.3, 0.1), c: 0x5C626C, p: [x, ht / 2 + 0.3, z], r: [0, yaw + j + Math.PI / 4, 0] }); // corner straps
     crates.push({ g: new THREE.BoxGeometry(size * 0.5, 0.1, size + 0.1), c: PAL.laneGlow, p: [x, ht * 0.55 + 0.3, z], r: [0, yaw + j, 0] }); // glow band
   };
 
@@ -210,10 +269,10 @@ function buildCover(group) {
   const spots = [];
   for (const b of BRUSH) for (let x = b.x0 + 0.7; x < b.x1; x += 1.3) for (let z = b.z0 + 0.7; z < b.z1; z += 1.3) spots.push([x + (hash(x, 1, z) - 0.5) * 0.5, z + (hash(z, 2, x) - 0.5) * 0.5]);
   const blade = mergeParts([ // a bush: three leaning blades around a round leafy core
-    { g: new THREE.ConeGeometry(0.22, 1.9, 4), c: 0x2E9A4A, p: [0, 0.95, 0] },
-    { g: new THREE.ConeGeometry(0.2, 1.6, 4), c: 0x3FB04F, p: [0.3, 0.8, 0.1], r: [0.1, 0, -0.35] },
-    { g: new THREE.ConeGeometry(0.2, 1.5, 4), c: 0x2A8A44, p: [-0.28, 0.75, -0.12], r: [-0.1, 0, 0.4] },
-    { g: new THREE.IcosahedronGeometry(0.42, 0), c: 0x1F7A3A, p: [0, 0.35, 0] },
+    { g: new THREE.ConeGeometry(0.22, 1.9, 5), c: 0x3C7A45, p: [0, 0.95, 0] },
+    { g: new THREE.ConeGeometry(0.2, 1.6, 5), c: 0x4C8A4C, p: [0.3, 0.8, 0.1], r: [0.1, 0, -0.35] },
+    { g: new THREE.ConeGeometry(0.2, 1.5, 5), c: 0x356C3C, p: [-0.28, 0.75, -0.12], r: [-0.1, 0, 0.4] },
+    { g: new THREE.IcosahedronGeometry(0.42, 1), c: 0x2A5A33, p: [0, 0.35, 0] },
   ]);
   const tufts = instanced(blade, toonMat({ vertexColors: true }), spots.length);
   spots.forEach(([x, z], i) => {
@@ -227,9 +286,10 @@ function buildProps(group) {
   const free = (x, z) => !inCover(x, z) && !inBrush(x, z) && CAMP_SPOTS.every((c) => Math.hypot(c.x - x, c.z - z) > 5);
 
   const treeGeo = mergeParts([
-    { g: new THREE.CylinderGeometry(0.12, 0.17, 0.7, 6), c: 0x8A5A3C, p: [0, 0.35, 0] },
-    { g: new THREE.ConeGeometry(0.8, 1.5, 7), c: 0x3FA050, p: [0, 1.4, 0] },
-    { g: new THREE.ConeGeometry(0.58, 1.2, 7), c: 0x5CC060, p: [0, 2.2, 0] },
+    { g: new THREE.CylinderGeometry(0.1, 0.16, 0.9, 6), c: 0x5E4433, p: [0, 0.45, 0] },
+    { g: new THREE.ConeGeometry(0.85, 1.5, 8), c: 0x2F5A3A, p: [0, 1.4, 0] },
+    { g: new THREE.ConeGeometry(0.66, 1.3, 8), c: 0x3A6B43, p: [0, 2.1, 0] },
+    { g: new THREE.ConeGeometry(0.44, 1.0, 8), c: 0x47784C, p: [0, 2.75, 0] },
   ]);
   const N = 64, trees = instanced(treeGeo, toonMat({ vertexColors: true }), N);
   for (let i = 0; i < N; i++) { // along the north / south rim and behind each base
@@ -272,6 +332,7 @@ export function createMap(scene, camera) {
   scene.add(group);
   const nebula = buildSky(group);
   buildIsland(group);
+  buildGrass(group);
   const glow = buildGround(group);
   buildCover(group);
   const { rocks, rockData } = buildProps(group);
