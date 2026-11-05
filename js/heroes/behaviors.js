@@ -11,6 +11,8 @@ import { particles, FRAME } from '../render/particles.js';
 import { vfx } from '../render/vfx.js';
 
 const DEG = Math.PI / 180;
+// Ability VFX colors: a champion may override its body colors with `fx: { color, accent }` so skills stay distinct.
+const fx = (h) => h.def.fx ?? h.def;
 const telegraph = (h) => (h.team === 0 ? TEAM[0].main : PAL.gloom); // red warns the player; allies show their team tint
 
 // Damage + the optional status / forced movement flags of a skill (stun, slow, air, knock, pull).
@@ -64,7 +66,7 @@ const BEHAVIORS = {
   // Run forward hitting everything on the way. Variants: knock aside, trail field, chain strikes, next-basic bonus.
   dash(h, ab, ctx, aim) {
     if (ab.chain) return chainStrike(h, ab, ctx);
-    const col = h.def.color, acc = h.def.accent, hit = new Set(), hitsAny = ab.dmg || ab.slow || ab.knock || ab.stun;
+    const col = fx(h).color, acc = fx(h).accent, hit = new Set(), hitsAny = ab.dmg || ab.slow || ab.knock || ab.stun;
     const dist = ab.range, half = (ab.width ?? 1.4) / 2 + 0.3;
     let nextTrail = 0;
     vfx.ring(h.x, 0.25, h.z, col, 2.5, 0.3);
@@ -95,7 +97,7 @@ const BEHAVIORS = {
 
   // Jump toward the aim point; the landing is a nova / field / radial bolts.
   leap(h, ab, ctx, aim) {
-    const col = h.def.color, acc = h.def.accent, d = Math.min(aim.dist, ab.range);
+    const col = fx(h).color, acc = fx(h).accent, d = Math.min(aim.dist, ab.range);
     vfx.ring(h.x, 0.25, h.z, col, 2.2, 0.3);
     h.runScript({
       dur: ab.dur ?? 0.45, x1: h.x + aim.dx * d, z1: h.z + aim.dz * d, h: ab.height ?? 3.5,
@@ -125,19 +127,19 @@ const BEHAVIORS = {
       dx /= full; dz /= full;
       d = Math.max(0, full - h.radius - t.radius - 0.2);
     }
-    vfx.ghost(h.x, h.z, h.def.accent, 0.5);
+    vfx.ghost(h.x, h.z, fx(h).accent, 0.5);
     h.runScript({
       dur: 0.1, x1: h.x + dx * d, z1: h.z + dz * d, h: 0.6,
       done: (h) => {
-        vfx.ring(h.x, 0.25, h.z, h.def.color, 3, 0.3);
-        if (t?.alive) { affect(h, t, ab); sparks(t.x, 1, t.z, 10, [h.def.accent, 0xffffff], 4); }
+        vfx.ring(h.x, 0.25, h.z, fx(h).color, 3, 0.3);
+        if (t?.alive) { affect(h, t, ab); sparks(t.x, 1, t.z, 10, [fx(h).accent, 0xffffff], 4); }
       },
     });
   },
 
   // Burst around the hero. Optional expand delay, second pulse, self shield / haste, ally heal.
   nova(h, ab, ctx) {
-    const col = h.def.color, acc = h.def.accent, R = ab.radius, cx = h.x, cz = h.z, wait = ab.expand ?? 0;
+    const col = fx(h).color, acc = fx(h).accent, R = ab.radius, cx = h.x, cz = h.z, wait = ab.expand ?? 0;
     const pulse = () => {
       vfx.ring(cx, 0.25, cz, acc, R * 1.2, wait || 0.4);
       vfx.decal(cx, cz, col, R, 0.6);
@@ -155,7 +157,7 @@ const BEHAVIORS = {
 
   // Fan in front of the hero; waves repeat (channels such as Bullet Storm re-aim each wave).
   cone(h, ab, ctx, aim) {
-    const col = h.def.color, acc = h.def.accent, waves = ab.waves ?? 1, gap = ab.gap ?? 0, half = (ab.arc / 2) * DEG;
+    const col = fx(h).color, acc = fx(h).accent, waves = ab.waves ?? 1, gap = ab.gap ?? 0, half = (ab.arc / 2) * DEG;
     let base = Math.atan2(aim.dx, aim.dz);
     const wave = (i) => {
       if (!h.alive || h.stun > 0) return;
@@ -189,7 +191,7 @@ const BEHAVIORS = {
 
   // Telegraphed strike(s) at the best enemy cluster, or at the lowest-HP enemy hero (`target: 'lowhero'`).
   blast(h, ab, ctx, aim) {
-    const col = h.def.color, acc = h.def.accent, tg = telegraph(h), delay = ab.delay ?? 0.5, R = ab.radius;
+    const col = fx(h).color, acc = fx(h).accent, tg = telegraph(h), delay = ab.delay ?? 0.5, R = ab.radius;
     let pts;
     if (ab.target === 'lowhero') {
       pts = ctx.heroes
@@ -221,7 +223,7 @@ const BEHAVIORS = {
 
   // Many small blasts scattered over an area.
   rain(h, ab, ctx, aim) {
-    const col = h.def.color, acc = h.def.accent, tg = telegraph(h), A = ab.radius, n = ab.count, step = ab.dur / n;
+    const col = fx(h).color, acc = fx(h).accent, tg = telegraph(h), A = ab.radius, n = ab.count, step = ab.dur / n;
     vfx.decal(aim.x, aim.z, tg, A, ab.dur + 0.4);
     vfx.ring(aim.x, 0.2, aim.z, tg, A * 1.2, 0.5);
     for (let i = 0; i < n; i++) {
@@ -235,7 +237,7 @@ const BEHAVIORS = {
 
   // Shield / heal / cleanse / haste on self and nearby allies; stealth + next-basic bonus.
   buff(h, ab, ctx) {
-    const col = h.def.color, dur = ab.dur ?? 3, tgts = [h];
+    const col = fx(h).color, dur = ab.dur ?? 3, tgts = [h];
     if (ab.allyR) forEachAlly(ctx, h.team, h.x, h.z, ab.allyR, (a) => { if (a !== h) tgts.push(a); });
     for (const t of tgts) {
       const me = t === h, sh = me ? ab.shield : ab.allyShield, hp = me ? ab.heal : ab.allyHeal;
@@ -254,7 +256,7 @@ const BEHAVIORS = {
     if (ab.hide) {
       addBuff(h, 'hidden', 1, ab.hide);
       if (ab.nextDmg) h.nextBasic = { dmg: ab.nextDmg, range: 0, t: ab.hide + 2 };
-      vfx.ghost(h.x, h.z, h.def.accent, 0.6);
+      vfx.ghost(h.x, h.z, fx(h).accent, 0.6);
     }
     vfx.ring(h.x, 0.25, h.z, col, (ab.allyR ?? 2.5) * 1.2, 0.45);
   },
@@ -270,15 +272,15 @@ const BEHAVIORS = {
     });
     if (!best) return false;
     const d = Math.hypot(best.x - h.x, best.z - h.z) || 1, keep = h.radius + best.radius + 0.4, move = Math.min(ab.pull, d - keep);
-    vfx.link(h, best, h.def.color, 0.6, 1, best.hitY ?? 1);
+    vfx.link(h, best, fx(h).color, 0.6, 1, best.hitY ?? 1);
     affect(h, best, { ...ab, pull: 0 });
     if (move > 0 && best.alive) shove(best, h.x - best.x, h.z - best.z, move, 0.3);
-    sparks(best.x, 1, best.z, 8, [h.def.color, h.def.accent]);
+    sparks(best.x, 1, best.z, 8, [fx(h).color, fx(h).accent]);
   },
 
   // Persistent zone: around self, at the best ally cluster, or a barrier wall in front.
   field(h, ab, ctx, aim) {
-    const col = h.def.color, base = { team: h.team, src: h, dur: ab.dur, color: col, slow: ab.slow, dps: ab.dps };
+    const col = fx(h).color, base = { team: h.team, src: h, dur: ab.dur, color: col, slow: ab.slow, dps: ab.dps };
     if (ab.wall) {
       ctx.zones.addField({ ...base, wall: true, len: ab.wall, dx: aim.dx, dz: aim.dz, x: h.x + aim.dx * 2.6, z: h.z + aim.dz * 2.6, allySpd: ab.allySpd });
       vfx.ring(h.x + aim.dx * 2.6, 0.25, h.z + aim.dz * 2.6, col, 3, 0.4);
@@ -298,12 +300,12 @@ const BEHAVIORS = {
       selfDr: ab.selfDr, allyDr: ab.allyDr, undying: ab.undying,
     });
     vfx.ring(x, 0.25, z, col, ab.r * 1.2, 0.5);
-    sparks(x, 0.5, z, 12, [col, h.def.accent], ab.r);
+    sparks(x, 0.5, z, 12, [col, fx(h).accent], ab.r);
   },
 
   // Auto-firing turret placed toward the aim point.
   turret(h, ab, ctx, aim) {
-    ctx.zones.addTurret(h, h.x + aim.dx * ab.range, h.z + aim.dz * ab.range, { ...ab, color: h.def.accent });
+    ctx.zones.addTurret(h, h.x + aim.dx * ab.range, h.z + aim.dz * ab.range, { ...ab, color: fx(h).accent });
   },
 
   // Channelled beam that slowly tracks the nearest enemy.
@@ -319,7 +321,7 @@ const BEHAVIORS = {
         h.beam.a = a;
         h.face = a; h.faceHold = 0.2; h.moveMul = 0.35; h.noAttack = true;
         const k = Math.random() * L;
-        particles.emit(h.x + Math.sin(a) * k, 0.4, h.z + Math.cos(a) * k, rand(-1, 1), 1.5, rand(-1, 1), Math.random() < 0.5 ? h.def.accent : 0xffffff, 0.6, 0.4, FRAME.sparkle, 2);
+        particles.emit(h.x + Math.sin(a) * k, 0.4, h.z + Math.cos(a) * k, rand(-1, 1), 1.5, rand(-1, 1), Math.random() < 0.5 ? fx(h).accent : 0xffffff, 0.6, 0.4, FRAME.sparkle, 2);
         if ((tick -= dt) > 0) return;
         tick = 0.2;
         const bx = Math.sin(a), bz = Math.cos(a);
@@ -334,7 +336,7 @@ const BEHAVIORS = {
 
   // Ranged line shot (hitscan with a streak): count / spread fans, pierce, windup, impact burst.
   bolt(h, ab, ctx, aim) {
-    const col = h.def.color, acc = h.def.accent, base = Math.atan2(aim.dx, aim.dz), n = ab.count ?? 1;
+    const col = fx(h).color, acc = fx(h).accent, base = Math.atan2(aim.dx, aim.dz), n = ab.count ?? 1;
     const fire = () => {
       if (!h.alive) return;
       for (let k = 0; k < n; k++) {
@@ -348,13 +350,44 @@ const BEHAVIORS = {
       ctx.later(ab.delay, fire);
     } else fire();
   },
+  // Hidden-ish mine at the aim point: arms briefly, then detonates on the first enemy that steps close.
+  trap(h, ab, ctx, aim) {
+    const col = fx(h).color, acc = fx(h).accent, d = Math.min(aim.dist, ab.range), x = h.x + aim.dx * d, z = h.z + aim.dz * d, arm = ab.arm ?? 0.6;
+    vfx.ring(x, 0.2, z, acc, ab.radius * 0.9, 0.4);
+    let done = false, blink = 0;
+    ctx.anim(ab.dur, (u, dt) => {
+      if (done) return;
+      const age = u * ab.dur;
+      if ((blink -= dt) <= 0) { blink = 0.5; vfx.decal(x, z, h.team === 0 ? col : acc, ab.trigger ?? 1, 0.4); }
+      if (age < arm) return;
+      let hit = false;
+      forEachEnemy(ctx, h.team, x, z, ab.trigger ?? 1.3, (e) => { if (e.type === 'hero' || e.type === 'minion') hit = true; });
+      if (!hit) return;
+      done = true;
+      explodeAt(h, ctx, x, z, ab.radius, ab, col, acc);
+      if (ab.fieldAfter) ctx.zones.addField({ team: h.team, src: h, x, z, color: col, r: ab.radius, ...ab.fieldAfter });
+    });
+  },
+
+  // Leave a glowing double behind, vanish and sprint; the double bursts after a beat.
+  decoy(h, ab, ctx) {
+    const col = fx(h).color, acc = fx(h).accent, x = h.x, z = h.z;
+    addBuff(h, 'hidden', 1, ab.hide);
+    if (ab.spd) addBuff(h, 'speed', ab.spd, ab.spdT ?? ab.hide);
+    ctx.anim(ab.delay, (u) => {
+      if (u < 1) { if (Math.random() < 0.5) vfx.ghost(x, z, u > 0.6 ? col : acc, 0.3); return; }
+      explodeAt(h, ctx, x, z, ab.radius, ab, col, acc);
+    });
+    vfx.ghost(x, z, acc, ab.delay);
+    vfx.ring(x, 0.25, z, col, ab.radius * 0.8, ab.delay);
+  },
 };
 
 // Chain strike: blink between nearby enemies hitting each, untargetable throughout.
 function chainStrike(h, ab, ctx) {
   const near = pickTarget(ctx, h.team, h.x, h.z, ab.range, ['heroes', 'minions']);
   if (!near) return false;
-  const gap = 0.13, col = h.def.color, acc = h.def.accent;
+  const gap = 0.13, col = fx(h).color, acc = fx(h).accent;
   addBuff(h, 'untarget', 1, ab.chain * gap + 0.25);
   h.effects.push({ t: 0, dur: ab.chain * gap + 0.1, update(h) { h.noAttack = true; h.moveMul = 0; } });
   let last = null;
@@ -377,7 +410,7 @@ function chainStrike(h, ab, ctx) {
 // ---- basic attacks ----
 const BASICS = {
   melee(h, ctx, t, b, dmg) {
-    const dx = t.x - h.x, dz = t.z - h.z, d = Math.hypot(dx, dz) || 1, col = b.color ?? h.def.accent;
+    const dx = t.x - h.x, dz = t.z - h.z, d = Math.hypot(dx, dz) || 1, col = b.color ?? fx(h).accent;
     vfx.arc(h.x, GROUND + 0.9, h.z, dx, dz, col, h.basicRange, 0.2);
     const strike = (e, m = 1) => {
       let k = dmg * m;
@@ -400,22 +433,23 @@ const BASICS = {
         const dd = Math.hypot(e.x - t.x, e.z - t.z);
         if (e !== t && e.type !== 'tower' && e.type !== 'core' && dd < bd) { other = e; bd = dd; }
       });
-      if (other) { vfx.link(t, other, h.def.accent, 0.2, 1, 1, 0.12); dealDamage(other, dmg * b.chain.mul, h); }
+      if (other) { vfx.link(t, other, fx(h).accent, 0.2, 1, 1, 0.12); dealDamage(other, dmg * b.chain.mul, h); }
     }
     h.swings = (h.swings ?? 0) + 1;
-    if (b.third && h.swings % 3 === 0 && t.alive) { shove(t, t.x - h.x, t.z - h.z, b.third.knock, 0.25); sparks(t.x, 1, t.z, 8, h.def.accent, 4); }
+    if (b.third && h.swings % 3 === 0 && t.alive) { shove(t, t.x - h.x, t.z - h.z, b.third.knock, 0.25); sparks(t.x, 1, t.z, 8, fx(h).accent, 4); }
   },
 
   line(h, ctx, t, b, dmg) {
     const dx = t.x - h.x, dz = t.z - h.z, d = Math.hypot(dx, dz) || 1;
-    fireBolt(h, ctx, h.x, h.z, dx / d, dz / d, { range: h.basicRange, width: b.width, dmg, pierce: true }, b.color ?? h.def.accent);
+    fireBolt(h, ctx, h.x, h.z, dx / d, dz / d, { range: h.basicRange, width: b.width, dmg, pierce: true }, b.color ?? fx(h).accent);
   },
 
   proj(h, ctx, t, b, dmg) {
-    const col = b.color ?? h.def.accent;
+    const col = b.color ?? fx(h).accent;
     ctx.projectiles.fire(h, t, dmg, b.speed ?? 15, b.arc ?? 0.3, GROUND + 1.4, {
       color: col, frame: FRAME.dot, size: b.size ?? 1.1,
       onHit: (tg) => {
+        if (b.slow && tg.alive) applyStatus(tg, 'slow', b.slow);
         if (b.splash) {
           vfx.ring(tg.x, 0.2, tg.z, col, b.splash * 1.4, 0.3);
           forEachEnemy(ctx, h.team, tg.x, tg.z, b.splash, (e) => { if (e !== tg) dealDamage(e, dmg * 0.5, h); });
@@ -435,7 +469,7 @@ const BASICS = {
   },
 
   spread(h, ctx, t, b, dmg) {
-    const base = Math.atan2(t.x - h.x, t.z - h.z), col = b.color ?? h.def.accent, near = [];
+    const base = Math.atan2(t.x - h.x, t.z - h.z), col = b.color ?? fx(h).accent, near = [];
     forEachEnemy(ctx, h.team, h.x, h.z, h.basicRange + 1, (e) => near.push(e));
     for (let k = 0; k < b.pellets; k++) {
       const a = base + (k / (b.pellets - 1) - 0.5) * b.spread * DEG, dx = Math.sin(a), dz = Math.cos(a);

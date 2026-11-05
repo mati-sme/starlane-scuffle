@@ -47,6 +47,8 @@ export const icons = {
   field: svg(`<circle cx="32" cy="32" r="23" fill="none" stroke="#fff" stroke-width="6" stroke-dasharray="10 6"/><circle cx="32" cy="32" r="8" ${W}/>`),
   turret: svg(`<polygon points="10,56 54,56 48,44 16,44" ${W}/><rect x="20" y="26" width="24" height="18" ${W}/><rect x="40" y="14" width="20" height="9" transform="rotate(20 40 14)" ${W}/>`),
   beam: svg(`<rect x="4" y="25" width="34" height="14" ${W}/><polygon points="38,32 60,8 60,56" ${W}/>`),
+  trap: svg(`<polygon points="32,6 40,24 58,32 40,40 32,58 24,40 6,32 24,24" ${W}/><circle cx="32" cy="32" r="7" fill="${INK}"/>`),
+  decoy: svg(`<circle cx="22" cy="20" r="9" ${W}/><path d="M10 56V38a12 12 0 0 1 24 0v18Z" ${W}/><circle cx="44" cy="20" r="9" ${LINE(4)}/><path d="M36 56V38a12 12 0 0 1 20 -8v26" ${LINE(4)}/>`),
   bolt: svg(`<path d="M4 32h40" ${LINE(8)}/><polygon points="42,16 62,32 42,48" ${W}/>`),
 
   // basic attacks

@@ -251,6 +251,15 @@ body.touch .mouse { display: none; }
   .select .home { width: 44px; height: 44px; padding: 9px; z-index: 2; }
   .selwrap { padding-top: 54px; }
 }
+/* short landscape phones: all 18 champions on screen at once (6 x 3) */
+@media (max-height: 520px) {
+  .grid { grid-template-columns: repeat(6, 1fr); grid-template-rows: repeat(3, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); gap: 5px; }
+  .hcard { min-height: 0; padding: 3px 2px; }
+  .hcard b { font-size: 11px; }
+  .hcard .role { font-size: 9px; gap: 3px; }
+  .hcard .role i { width: 10px; height: 10px; }
+  .hcard .pic { width: auto; height: 100%; aspect-ratio: 1; max-width: 100%; }
+}
 @media (max-height: 460px) {
   .result { gap: 6px; }
   .stars, .stars i { height: 48px; width: 48px; }

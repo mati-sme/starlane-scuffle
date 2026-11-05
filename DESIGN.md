@@ -143,7 +143,7 @@ It is the single source of truth for the overhaul. Tuning numbers move into `js/
 - Each skill's **perk** (→) switches on at its max rank.
 - Every level adds +5% to all damage. HP growth is per champion.
 
-**Pairs:** the 12 champions form 6 role pairs, A/B. See §5 for team composition.
+**Pairs:** the 18 champions form 6 roles of 3 (A/B/C). See §5 for team composition.
 
 **Range bands:** melee 2–3 u · mid 6–6.5 u · ranged 7–8.5 u · towers 9 u. No hero outranges a tower.
 
@@ -527,7 +527,7 @@ Ranged bots back off when an enemy is closer than 0.5 × range (existing logic).
 - The `Hero`/`Bot` split, and the model return contract `{ root, lean, eyes, tail, mats }` (`eyes` = visor mesh for pulse; `tail` = back piece for sway).
 
 **Data first:**
-- `js/heroes/roster.js` *(new)*: 12 champion defs as pure data — `{ id, name, title, role, pair, color, accent, model, stats, basic, s1, s2, ult }`.
+- `js/heroes/roster.js` *(new)*: 18 champion defs as pure data — `{ id, name, title, role, pair, color, accent, model, stats, basic, s1, s2, ult }`.
   - Example skill: `{ kind: 'dash', name, icon, cd, range, dmg, width, knock, perk: { at: 4, stun: 0.6 } }`.
 - `rankStats(ab, rank)` returns the resolved params (scaling + `perk` merged at max rank).
 - `js/heroes/behaviors.js` *(new)*: `BEHAVIORS[kind](hero, ab, ctx, aim)` for the 13 kinds. Port logic from `zip/moss/luma/clink.js`:
@@ -578,7 +578,7 @@ Ranged bots back off when an enemy is closer than 0.5 × range (existing logic).
 
 ## 10. Acceptance Checklist
 
-- [ ] All 12 champions are selectable from first launch with no lock UI. Each one's basic, Q, E and R fire with visible VFX, and each R3/R4 perk works.
+- [ ] All 18 champions are selectable from first launch with no lock UI. Each one's basic, Q, E and R fire with visible VFX, and each R3/R4 perk works.
 - [ ] Every match has 10 heroes (player + 4 BLUE bots + 5 RED bots). Composition follows §5. Both teams have a blaster, a shooter and a support.
 - [ ] The map is 180×112 with 3 lanes, the Flux Channel, jungle pockets, cover that blocks movement and projectiles, brush that hides units, and 4 camps. Minions walk all 3 lanes.
 - [ ] Tower, guardian and core vulnerability, the backdoor shield and tower aggro behave as in §4. No hero outranges a tower.

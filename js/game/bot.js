@@ -286,6 +286,8 @@ export class Bot {
         if (ab.chain) return near(foe, ab.range);
         if (ab.trail) return near(foe, ab.range - 2) && ult;
         return near(foe, ab.range - 1) && (!ab.radius || Math.hypot(foe.x - h.x, foe.z - h.z) > 2);
+      case 'trap': return near(foe, ab.range);
+      case 'decoy': return near(foe, 5);
       case 'bolt': case 'hook': case 'beam':
         return near(foe, ab.range - 0.5);
       case 'nova': return near(foe, ab.radius) || !!cluster(ab.radius, ab.radius);
