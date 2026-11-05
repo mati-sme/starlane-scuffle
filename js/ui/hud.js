@@ -7,6 +7,9 @@ import { icons } from './icons.js';
 import { Abilities } from './abilities.js';
 import { LevelUp } from './levelup.js';
 import { Minimap } from './minimap.js';
+import { Shop } from './shop.js';
+import { BOSS } from '../config.js';
+import { TEAM_NAME } from '../net/protocol.js';
 
 const mmss = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
 
@@ -25,6 +28,9 @@ export class Hud {
         <div class="score"><b class="k0" data-testid="kills-blue">0</b><span class="clock" data-testid="clock">0:00</span><b class="k1" data-testid="kills-red">0</b></div>
         <div class="pips"><div class="t0" data-testid="pips-blue"></div><div class="t1" data-testid="pips-red"></div></div>
       </div>
+      <div class="buffs" data-testid="buffs"></div>
+      <div class="toast" data-testid="boss-toast"></div>
+      <div class="gear" data-testid="gear"></div>
       <div class="respawn"><div class="rring"></div><i>${icons.star('#FFC83D')}</i><b class="rsec" data-testid="respawn-secs"></b></div>
       <div class="ko" data-testid="ko-banner"></div>
       <div class="objective" data-testid="objective-hint">Destroy enemy towers, then the core!</div>
@@ -62,6 +68,25 @@ export class Hud {
     this.pipEls.forEach((el, t) => {
       el.innerHTML = '<i></i>'.repeat(5) + '<i class="core"></i>';
       this.pipKey[t] = '';
+    });
+    this.shop = new Shop(root.querySelector('.gear'), match);
+    this.buffsEl = root.querySelector('.buffs');
+    this.toast = root.querySelector('.toast');
+    this.buffKey = '';
+    const say = (text, team) => {
+      this.toast.textContent = text;
+      this.toast.className = `toast t${team}`;
+      void this.toast.offsetWidth;
+      this.toast.classList.add('pop');
+    };
+    const EL = { fire: ['Fire Dragon', '+damage'], ice: ['Ice Dragon', '+resist'], gale: ['Gale Dragon', '+speed'] };
+    const name = (c) => (c.boss === 'dragon' ? EL[BOSS.elements[c.variant % 3]][0] : BOSS[c.boss].name);
+    bus.on('bossSoon', (c) => { if (this.shown) say(`${BOSS[c.boss].name} awakens in ${BOSS.warn}s`, 2); });
+    bus.on('bossSpawn', (c) => { if (this.shown) say(`${name(c)} has awakened!`, 2); });
+    bus.on('bossTaken', ({ kind, team, variant }) => {
+      if (!this.shown) return;
+      const eff = { dragon: EL[BOSS.elements[variant % 3]][1], titan: 'minions empowered', herald: 'siege power' }[kind];
+      say(`${TEAM_NAME[team]} slayed the ${kind === 'dragon' ? EL[BOSS.elements[variant % 3]][0] : BOSS[kind].name}: ${eff}!`, team);
     });
     this.abilities = new Abilities(match);
     this.levelup = new LevelUp(match);
@@ -104,6 +129,9 @@ export class Hud {
     this.face.innerHTML = icons.champ(hero.def);
     this.root.style.setProperty('--hero', hero.def.css);
     this.abilities.setHero(hero);
+    this.shop.reset();
+    this.toast.className = 'toast';
+    this.buffKey = '';
     this.levelup.reset();
     this.atk.innerHTML = icons[`basic_${hero.basic.kind}`] ?? icons.basic_melee;
     this.lvl = -1;
@@ -169,10 +197,28 @@ export class Hud {
     }
 
     this.mini.update(this.dt, m.rig, this.w / this.h);
+    this.shop.update();
+    this._buffs();
 
     this.abilities.update();
     this.levelup.update();
     this._bars();
+  }
+
+  // Active team buffs under the scorebar: dragon stacks, Titan and Herald timers.
+  _buffs() {
+    const parts = this.match.buffs.map((b) => {
+      const o = [];
+      for (const e of BOSS.elements) if (b[e]) o.push(`${e.toUpperCase()} x${b[e]}`);
+      if (b.dragonT > 0 && o.length) o.push(mmss(b.dragonT));
+      if (b.titanT > 0) o.push(`TITAN ${mmss(b.titanT)}`);
+      if (b.heraldT > 0) o.push(`HERALD ${mmss(b.heraldT)}`);
+      return o.join(' · ');
+    });
+    const key = parts.join('|');
+    if (key === this.buffKey) return;
+    this.buffKey = key;
+    this.buffsEl.innerHTML = parts.map((p, t) => (p ? `<span class="t${t}">${p}</span>` : '')).join('');
   }
 
   // Health bars: heroes and structures always, minions once damaged.
@@ -180,7 +226,7 @@ export class Hud {
     const m = this.match;
     let n = 0;
     const put = (e, cls, y) => {
-      if (!e.alive || ((e.type === 'minion' || e.type === 'camp') && e.hp >= e.maxHp) || (e.type === 'hero' && e.hidden && e.team !== m.myTeam)) return;
+      if (!e.alive || ((e.type === 'minion' || (e.type === 'camp' && !e.boss)) && e.hp >= e.maxHp) || (e.type === 'hero' && e.hidden && e.team !== m.myTeam)) return;
       const v = this._v.set(e.rx ?? e.x, GROUND + y + (e.lift ?? 0), e.rz ?? e.z).project(this.camera);
       if (v.z > 1 || Math.abs(v.x) > 1.1 || Math.abs(v.y) > 1.1) return;
       let b = this.bars[n++];
@@ -198,7 +244,7 @@ export class Hud {
     };
     for (const h of m.heroes) put(h, `hero t${h.team}${h === m.hero ? ' me' : ''}`, h.barY);
     for (const s of m.structures) put(s, `struct t${s.team}`, s.barY);
-    for (const c of m.camps.list) put(c, 'minion t2', c.barY);
+    for (const c of m.camps.list) put(c, c.boss ? 'boss t2' : 'minion t2', c.barY);
     for (const u of m.minions.list) put(u, `minion t${u.team}`, u.barY);
     for (let i = n; i < this.bars.length; i++) this.bars[i].el.style.display = 'none';
   }

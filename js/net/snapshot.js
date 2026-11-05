@@ -1,9 +1,9 @@
 // Host -> guest state. encodeSnap packs the whole match into small arrays (sent ~10 Hz);
 // applySnap lays it onto the guest's mirror Match. Events ride along in `e` so they stay ordered with the state.
-//   hero row:   [x, z, face, hp, maxHp, flags, level, xp, points, ranks, cd0, cd1, cd2, respawn, respawnTotal]
+//   hero row:   [x, z, face, hp, maxHp, flags, level, xp, points, ranks, cd0, cd1, cd2, respawn, respawnTotal, gold, [item index...]]
 //   flags:      1 alive · 2 hidden · 4 stunned · 8 shielded
-//   struct row: [hp, flags]            1 alive · 2 vulnerable · 4 shielded
-//   minion row: [id, team, kind, lane, x, z, hp, facing]      camp row: [alive, hp, x, z]
+//   struct row: [hp, flags]            1 alive · 2 vulnerable · 4 shielded · 8 nexus pulse
+//   minion row: [id, team, kind, lane, x, z, hp, facing]      camp / boss row: [alive, hp, x, z, spawnIn, variant]   buffs bf: [[fire, ice, gale, dragonT, titanT, heraldT] x 2]
 //   events:     ['c', hero, slot] cast · ['w', hero] swing · ['p', src, tgt, speed, arc, y] shot · ['k', victim, killer] takedown
 //   refs (src / tgt): 0-9 hero index · 20+ structure index · 100+ minion id
 import { bus } from '../core/bus.js';
@@ -11,6 +11,7 @@ import { DYING } from '../game/combat.js';
 import { vfx } from '../render/vfx.js';
 import { PAL } from '../config.js';
 import { reconcile } from './client.js';
+import { ITEM_IDS } from '../game/gear.js';
 
 const KINDS = ['blobling', 'zapper', 'bigblob'];
 const r1 = (v) => Math.round(v * 10) / 10;
@@ -38,10 +39,12 @@ export function encodeSnap(match, seq, events) {
       (h.alive ? 1 : 0) | (h.hidden ? 2 : 0) | (h.stun > 0 ? 4 : 0) | (h.shieldHp > 0 && h.shieldT > 0 ? 8 : 0),
       h.level, Math.round(h.xp), h.points, h.ranks[0] | (h.ranks[1] << 3) | (h.ranks[2] << 6),
       r1(h.cds[0]), r1(h.cds[1]), r1(h.cds[2]), r1(h.respawn), r1(h.respawnTotal),
+      Math.floor(h.gold), h.items.map((id) => ITEM_IDS.indexOf(id)),
     ]),
-    s: match.structures.map((x) => [Math.round(x.hp), (x.alive ? 1 : 0) | (x.vulnerable ? 2 : 0) | (x.shielded ? 4 : 0)]),
+    s: match.structures.map((x) => [Math.round(x.hp), (x.alive ? 1 : 0) | (x.vulnerable ? 2 : 0) | (x.shielded ? 4 : 0) | (x.pulseT > 0 ? 8 : 0)]),
     m: match.minions.list.filter((m) => m.alive).map((m) => [m.nid, m.team, KINDS.indexOf(m.kind), m.lane, r1(m.x), r1(m.z), Math.round(m.hp), r2(m.facing)]),
-    c: match.camps.list.map((c) => [c.alive ? 1 : 0, Math.round(c.hp), r1(c.x), r1(c.z)]),
+    c: match.camps.list.map((c) => [c.alive ? 1 : 0, Math.round(c.hp), r1(c.x), r1(c.z), Math.round(match.camps.eta(c, match.time)), c.variant]),
+    bf: match.buffs.map((b) => [b.fire, b.ice, b.gale, Math.round(b.dragonT), Math.round(b.titanT), Math.round(b.heraldT)]),
   };
   if (match.over) { s.ov = 1; s.w = match.win ? 1 : 0; s.rr = match.rawReason; }
   if (events.length) s.e = events;
@@ -57,7 +60,7 @@ export function applySnap(match, s) {
 
   s.h.forEach((r, i) => {
     const h = match.heroes[i], me = h === match.hero;
-    const [x, z, face, hp, maxHp, f, level, xp, points, rk, c0, c1, c2, rs, rst] = r;
+    const [x, z, face, hp, maxHp, f, level, xp, points, rk, c0, c1, c2, rs, rst, gold = 0, items = []] = r;
     const alive = !!(f & 1);
     if (!me) { h.tx = x; h.tz = z; h.face = face; }
     if (alive && !h.alive) { // respawn
@@ -89,6 +92,10 @@ export function applySnap(match, s) {
       h.cds[0] = c0; h.cds[1] = c1; h.cds[2] = c2;
     }
     h.respawn = rs; h.respawnTotal = rst || 1;
+    if (gold > h.gold + 0.5 && me) bus.emit('gold', { hero: h, amount: Math.round(gold - h.gold) });
+    h.gold = gold;
+    const ids = items.map((i) => ITEM_IDS[i]);
+    if (ids.join() !== h.items.join()) { h.items = ids; h.recalc(false); if (me && ids.length > 0) bus.emit('buy', h); }
   });
 
   s.s.forEach(([hp, f], i) => {
@@ -96,14 +103,29 @@ export function applySnap(match, s) {
     if (hp < st.hp && st.alive) { st.flash = 0.08; st.squash = 1; }
     st.hp = hp;
     st.vulnerable = !!(f & 2); st.shielded = !!(f & 4);
+    if (st.type === 'core') st.pulseT = f & 8 ? 0.5 : 0;
     if (!(f & 1) && st.alive) { st.alive = false; st.hp = 0; st.dying = DYING; bus.emit('down', st); }
   });
 
   match.minions.netApply(s.m);
   match.camps.netApply(s.c);
+  if (s.bf) applyBuffs(match, s.bf);
 
   if (s.e) applyEvents(match, s.e);
   if (s.ov && !match.over) { match.time = s.tm; match._end(!!s.w, s.rr); }
+}
+
+// Guest: team buffs from the host; a new Dragon / Titan / Herald buff announces who took the objective.
+function applyBuffs(match, bf) {
+  bf.forEach(([fire, ice, gale, dt, tt, ht], team) => {
+    const b = match.buffs[team];
+    const el = fire > b.fire ? 'fire' : ice > b.ice ? 'ice' : gale > b.gale ? 'gale' : null;
+    if (el) bus.emit('bossTaken', { kind: 'dragon', team, variant: ['fire', 'ice', 'gale'].indexOf(el) });
+    if (tt > b.titanT + 5) bus.emit('bossTaken', { kind: 'titan', team, variant: 0 });
+    if (ht > b.heraldT + 5) bus.emit('bossTaken', { kind: 'herald', team, variant: 0 });
+    Object.assign(b, { fire, ice, gale, dragonT: dt, titanT: tt, heraldT: ht });
+  });
+  match._bonus();
 }
 
 export function applyEvents(match, events) {

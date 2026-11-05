@@ -41,13 +41,14 @@ export const ARENA = {
   brush: [[-26, -34, 8, 4], [-40, -14, 6, 6], [-10, -6, 6, 3], [-3, -22, 5, 5]],
   pockets: [[-30, -19, 44, 22]], // jungle: cx, cz, w, d (quadrant)
   camps: [[-30, -18]],
+  pits: [[0, 29, 'dragon'], [0, -29, 'titan']], // epic boss pits on the centre line (x, z); the Herald shares the Titan pit
   brushSeeRange: 3.5, brushRevealT: 1.2,
 };
 
 export const MATCH = {
   waveEvery: 20, stormWaveEvery: 15, firstWave: 15, siegeFrom: 90, siegeEvery: 2,
-  storm: 300, tieBreak: 480, stormStructMul: 2, stormXpMul: 1.5, stormSiege: 1, // Overdrive at 5:00: extra siege blob per wave, 2x structure damage, 1.5x XP, half respawn
-  respawnBase: 4, respawnPerLevel: 1.5, starTime: 330,
+  storm: 540, tieBreak: 900, stormStructMul: 2.5, stormXpMul: 1.5, stormSiege: 1, // Overdrive at 9:00 (tie-break 15:00): extra siege blob per wave, 2.5x structure damage, 1.5x XP, half respawn
+  respawnBase: 4, respawnPerLevel: 1.5, starTime: 600,
   campFirst: 60, campRespawn: 75,
 };
 
@@ -74,8 +75,24 @@ export const DIFFICULTY = { react: [0.5, 0.4, 0.3], dmg: [0.92, 1, 1.1], allyRea
 export const settings = { stars: 1 };
 export const BOT = { aggro: 10, retreatHp: 0.35, returnHp: 0.9, powerRatio: 0.8, groupDeficit: 2 };
 
-export const TOWER = { range: 9, cd: 1.1, radius: 1.5, hp: { outer: 2200, guard: 2200 }, heroDmg: 70, heroPct: 0.06, minionDmg: 100, shield: 0.35, shieldR: 10 };
-export const CORE = { hp: 2800, radius: 2.4 };
+export const TOWER = { range: 9, cd: 1.1, radius: 1.5, hp: { outer: 2300, guard: 2500 }, armor: { outer: 10, guard: 15 }, heroDmg: 70, heroPct: 0.06, minionDmg: 100, shield: 0.35, shieldR: 10 };
+// The Nexus: 3x a guardian's health plus heavy armor, its own laser, and a shield pulse the first time it is hit once exposed.
+export const CORE = { hp: 7000, armor: 40, radius: 2.4, range: 13, cd: 1.2, heroDmg: 100, heroPct: 0.08, minionDmg: 80, pulse: 3, pulseR: 9, pulseDr: 0.7 };
+
+// Gold: per-kill rewards, a small passive trickle, and the starting purse (auto-buys boots at the fountain).
+export const GOLD = {
+  start: 350, trickle: 1.6, minion: { blobling: 20, zapper: 24, bigblob: 60 }, minionShare: 0.35,
+  camp: 60, campTeam: 25, hero: 300, assist: 120, assistR: 14, tower: { outer: 150, guard: 200 }, towerTeam: 50, towerR: 28,
+};
+
+// Epic bosses (neutral camp-type entities; see world/camps.js). first / respawn in seconds; buffs in match.js.
+export const BOSS = {
+  dragon: { name: 'Dragon', hp: 3200, armor: 10, dmg: 55, cd: 1.7, range: 6, leash: 6, radius: 2.2, regen: 0.04, slam: { every: 7, r: 5.5, dmg: 70 }, first: 180, respawn: 180, xp: 220, xpRange: 25, gold: 110, minLevel: 3, scale: 1.0, hitY: 1.8, barY: 5.2 },
+  titan: { name: 'Titan', hp: 6500, armor: 20, dmg: 85, cd: 1.8, range: 7, leash: 6, radius: 3.0, regen: 0.03, slam: { every: 8, r: 7, dmg: 110 }, first: 540, respawn: 240, xp: 400, xpRange: 25, gold: 250, minLevel: 5, scale: 1.0, hitY: 2.8, barY: 7.4 },
+  herald: { name: 'Herald', hp: 2600, armor: 10, dmg: 45, cd: 1.5, range: 6, leash: 6, radius: 1.8, regen: 0.04, slam: { every: 7, r: 5, dmg: 55 }, first: 330, respawn: 0, xp: 260, xpRange: 25, gold: 120, minLevel: 4, scale: 1.0, hitY: 2.4, barY: 5.0 },
+  dragonT: 300, dragonCap: 4, titanT: 120, titanHp: 0.5, titanDmg: 0.4, heraldT: 60, heraldStruct: 0.5, warn: 30,
+  elements: ['fire', 'ice', 'gale'],
+};
 
 export const CAM = { fov: 38, offset: [-7, 20, 15], follow: 6, lead: 2, wideAspect: 2.0, zoom: 1.22 };
 // Online rooms: worker URL (override with ?ws=wss://host), snapshot / input rates in Hz.

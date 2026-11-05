@@ -1,10 +1,10 @@
 // Damage, hit feedback, status effects and the star-poof defeat animation.
-import { PAL, TEAM, TOWER } from '../config.js';
+import { PAL, TEAM, TOWER, CORE } from '../config.js';
 import { bus } from '../core/bus.js';
 import { particles, poofStars, FRAME } from '../render/particles.js';
 import { vfx } from '../render/vfx.js';
 
-export const sim = { guest: false }; // online guest mirror: damage is the host's business, nothing is dealt locally
+export const sim = { guest: false, bonus: [{}, {}] }; // guest: damage is the host's business, nothing is dealt locally. bonus[team]: dmg / dr / spd / minDmg / minHp / struct from epic bosses (match.js)
 export const DYING = 0.25;
 export const AIR = 0.7; // knock-up hang time
 const SPARK = { color: PAL.gold, speed: 2.5, up: 1.5, size: 0.35, life: 0.35, frame: FRAME.sparkle, grav: 3 };
@@ -18,6 +18,15 @@ export function dealDamage(t, amount, src, skill = false) {
   if (src?.outMul) amount *= src.outMul;
   if (t.buf?.dr) amount *= 1 - t.buf.dr.v;
   if (t.shielded && src?.type === 'hero') amount *= TOWER.shield; // backdoor: no friendly minions nearby
+  const sb = sim.bonus[src?.team];
+  if (sb) {
+    if (src.type === 'hero') amount *= 1 + (sb.dmg ?? 0);
+    else if (src.type === 'minion') amount *= 1 + (sb.minDmg ?? 0);
+    if (t.type === 'tower' || t.type === 'core') amount *= 1 + (sb.struct ?? 0);
+  }
+  if (t.type === 'hero' && sim.bonus[t.team]?.dr) amount *= 1 - sim.bonus[t.team].dr;
+  if (t.armor) amount *= 100 / (100 + t.armor);
+  if (t.pulseT > 0) amount *= 1 - CORE.pulseDr; // nexus shield pulse
   SPARK.color = TEAM[src?.team]?.main ?? PAL.gold;
   if (t.shieldHp > 0) {
     const soak = Math.min(t.shieldHp, amount);

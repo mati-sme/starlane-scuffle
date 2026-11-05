@@ -1,6 +1,6 @@
 // Match orchestration: heroes, waves, timer, Starstorm, XP, structure rules, win/lose, per-frame rendering.
 import * as THREE from 'three';
-import { MATCH, HERO, PAL, CAMP, TOWER } from '../config.js';
+import { MATCH, HERO, PAL, CAMP, TOWER, GOLD, BOSS } from '../config.js';
 import { clamp, damp, rand } from '../core/math.js';
 import { bus } from '../core/bus.js';
 import { input, readMove } from '../core/input.js';
@@ -20,6 +20,7 @@ import { Projectiles } from './projectiles.js';
 import { Zones } from './zones.js';
 import { Bot, assignLanes } from './bot.js';
 import { aimShape } from './aiming.js';
+import { autoBuy, atBase } from './gear.js';
 import { AimPreview } from '../render/aimpreview.js';
 
 const CONFETTI = [PAL.gold, PAL.sunny, PAL.gloom, PAL.heal, PAL.nebulaB, PAL.star];
@@ -40,6 +41,8 @@ export class Match {
     this.preview = new AimPreview(scene);
     this.projectiles.blocker = this.zones;
     this.timers = [];
+    this.buffs = [0, 1].map(() => ({ fire: 0, ice: 0, gale: 0, dragonT: 0, titanT: 0, heraldT: 0 }));
+    this.dragonN = 0; this.shopAt = 0;
     this.role = 'solo'; // solo | host | guest (online: see net/session.js)
     this.myTeam = 0;
     this.peerHero = null;
@@ -65,10 +68,12 @@ export class Match {
       if (this.role === 'guest') return; // the host keeps the books
       if (t.type === 'tower' && t.team === this.myTeam) this.towersLost++;
       if (t.type === 'tower' || t.type === 'core') this.destroyed[1 - t.team]++;
-      if (t.type === 'camp') this._camp(t);
-      else if (t.type === 'minion') this._xp(t, HERO.xp[t.kind], HERO.xpRange);
+      if (t.type === 'tower') this._towerGold(t);
+      if (t.type === 'camp') t.boss ? this._boss(t) : this._camp(t);
+      else if (t.type === 'minion') { this._xp(t, HERO.xp[t.kind], HERO.xpRange); this._minionGold(t); }
       else if (t.type === 'hero') {
         this._xp(t, HERO.xp.hero + HERO.xp.heroPerLevel * t.level, HERO.xpHeroRange);
+        this._heroGold(t);
         const k = t.killer;
         if (k?.type === 'hero') {
           this.kills[k.team]++;
@@ -141,6 +146,10 @@ export class Match {
 
   reset() {
     this.time = 0;
+    this.dragonN = 0;
+    this.shopAt = 0;
+    for (const b of this.buffs) Object.assign(b, { fire: 0, ice: 0, gale: 0, dragonT: 0, titanT: 0, heraldT: 0 });
+    this._bonus();
     this.waveNo = 0;
     this.nextWave = MATCH.firstWave;
     this.storm = false;
@@ -220,8 +229,102 @@ export class Match {
     bus.emit('campDown', c);
   }
 
-  // Order of falling: outer towers always; guardians once any own outer is down; the core once both guardians are down
-  // (or in Overdrive with one guardian down). Structures with no enemy minion within shieldR take reduced hero damage.
+  // ---- gold ----
+  _gold(h, n) {
+    h.gold += n;
+    if (n >= 1) bus.emit('gold', { hero: h, amount: Math.round(n) });
+  }
+
+  _near(team, x, z, r) { return this.heroes.filter((h) => h.team === team && h.alive && Math.hypot(h.x - x, h.z - z) <= r); }
+
+  // Last hit pays the killer in full; a tower / minion kill splits a small share among enemy heroes close by.
+  _minionGold(t) {
+    const g = GOLD.minion[t.kind], k = t.killer;
+    if (k?.type === 'hero') this._gold(k, g);
+    else for (const h of this._near(1 - t.team, t.x, t.z, HERO.xpRange)) this._gold(h, g * GOLD.minionShare);
+  }
+
+  _heroGold(v) {
+    const team = v.killer?.team ?? 1 - v.team, k = v.killer?.type === 'hero' ? v.killer : null;
+    if (k) this._gold(k, GOLD.hero);
+    for (const h of this._near(team, v.x, v.z, GOLD.assistR)) if (h !== k) this._gold(h, GOLD.assist);
+  }
+
+  _towerGold(t) {
+    const team = 1 - t.team, g = GOLD.tower[t.tier];
+    for (const h of this.heroes) {
+      if (h.team !== team) continue;
+      this._gold(h, GOLD.towerTeam + (h.alive && Math.hypot(h.x - t.x, h.z - t.z) <= GOLD.towerR ? g - GOLD.towerTeam : 0));
+    }
+  }
+
+  // ---- epic bosses ----
+  // Dragon: stacking team buff (fire = damage, ice = resist, gale = speed + a little damage). Titan: empowered minions.
+  // Herald: team structure damage up and a siege blob on every lane.
+  _boss(c) {
+    const team = c.killer?.team ?? c.provoked?.team;
+    if (team !== 0 && team !== 1) return;
+    const cf = c.cfg, b = this.buffs[team];
+    for (const h of this.heroes) {
+      if (h.team !== team) continue;
+      this._gold(h, cf.gold);
+      if (h.alive && Math.hypot(h.x - c.x, h.z - c.z) <= cf.xpRange) h.gainXp(cf.xp);
+    }
+    if (c.boss === 'dragon') {
+      const el = BOSS.elements[c.variant % 3];
+      b[el] = Math.min(BOSS.dragonCap, b[el] + 1);
+      b.dragonT = BOSS.dragonT;
+      this.dragonN++;
+    } else if (c.boss === 'titan') {
+      b.titanT = BOSS.titanT;
+      for (const m of this.minions.list) {
+        if (m.team !== team || !m.alive) continue;
+        m.maxHp *= 1 + BOSS.titanHp; m.hp *= 1 + BOSS.titanHp;
+      }
+    } else {
+      b.heraldT = BOSS.heraldT;
+      for (let lane = 0; lane < 3; lane++) this.minions.spawnWave(team, lane, ['bigblob']);
+    }
+    this._bonus();
+    this.rig.shake(0.5);
+    bus.emit('bossTaken', { kind: c.boss, team, variant: c.variant });
+  }
+
+  // Fold the boss buffs into sim.bonus (read by dealDamage / heroes / minion spawns). Runs on host and guest.
+  _bonus() {
+    for (const team of [0, 1]) {
+      const b = this.buffs[team], o = sim.bonus[team];
+      o.dmg = 0.07 * b.fire + 0.03 * b.gale;
+      o.dr = 0.06 * b.ice;
+      o.spd = 0.05 * b.gale;
+      o.minDmg = b.titanT > 0 ? BOSS.titanDmg : 0;
+      o.minHp = b.titanT > 0 ? BOSS.titanHp : 0;
+      o.struct = b.heraldT > 0 ? BOSS.heraldStruct : 0;
+    }
+  }
+
+  _tickBuffs(dt) {
+    for (const b of this.buffs) {
+      if (b.dragonT > 0 && (b.dragonT -= dt) <= 0) b.fire = b.ice = b.gale = 0;
+      if (b.titanT > 0) b.titanT = Math.max(0, b.titanT - dt);
+      if (b.heraldT > 0) b.heraldT = Math.max(0, b.heraldT - dt);
+    }
+    this._bonus();
+  }
+
+  // Passive trickle for everyone; heroes in the base ring buy the next item of their role's build.
+  _economy(dt) {
+    for (const h of this.heroes) if (h.alive) h.gold += GOLD.trickle * dt;
+    if (this.time < this.shopAt) return;
+    this.shopAt = this.time + 0.4;
+    for (const h of this.heroes) {
+      if (!h.alive || !atBase(h) || !autoBuy(h)) continue;
+      vfx.ring(h.x, 0.3, h.z, PAL.gold, 2.6, 0.4);
+      bus.emit('buy', h);
+    }
+  }
+
+  // Order of falling: outer towers always; guardians once any own outer is down; the core once both guardians are down. Structures with no enemy minion within shieldR take reduced hero damage.
   _rules(dt) {
     const shield = (this._shT -= dt) <= 0;
     if (shield) this._shT = 0.25;
@@ -230,7 +333,7 @@ export class Match {
       const outerDown = outer.some((t) => !t.alive), guardsDown = guard.filter((t) => !t.alive).length;
       for (const t of outer) t.vulnerable = true;
       for (const t of guard) t.vulnerable = outerDown;
-      this.cores[team].vulnerable = guardsDown === guard.length || (this.storm && guardsDown > 0);
+      this.cores[team].vulnerable = guardsDown === guard.length; // the nexus only falls once both guardians are down
     }
     if (!shield) return;
     const R2 = TOWER.shieldR * TOWER.shieldR;
@@ -351,6 +454,7 @@ export class Match {
       if (h === this.hero) h.update(dt, this, this.over ? IDLE : this._intent());
       else this._mirror(h, dt);
     }
+    this._tickBuffs(dt);
     this.camps.netStep(dt);
     this.minions.netStep(dt);
     for (const s of this.structures) {
@@ -418,6 +522,7 @@ export class Match {
       }
     }
     this._rules(dt);
+    if (!this.over) { this._tickBuffs(dt); this._economy(dt); }
     this._brush();
     this._timers(dt);
     this.zones.update(dt, this);

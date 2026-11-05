@@ -12,6 +12,17 @@ import { pickTarget, ORDER_TOWER } from '../game/targeting.js';
 
 const AGGRO_T = 2; // an enemy hero that hit an ally hero this recently draws the tower first
 
+// 1. an enemy hero that recently hit an allied hero inside range, 2. nearest minion, 3. nearest hero. Shared by towers and cores.
+export function defenderTarget(ctx, s, range) {
+  let best = null, bd = range;
+  for (const h of ctx.heroes) {
+    if (h.team === s.team || !h.alive || h.hidden || h.untarget || h.aggroAge > AGGRO_T) continue;
+    const d = Math.hypot(h.x - s.x, h.z - s.z) - h.radius;
+    if (d <= bd) { best = h; bd = d; }
+  }
+  return best ?? pickTarget(ctx, s.team, s.x, s.z, range, ORDER_TOWER);
+}
+
 const CRYSTAL_Y = 4.9;
 
 export class Tower {
@@ -29,6 +40,7 @@ export class Tower {
     this.hitY = 2.4;
     this.barY = this.tier === 'guard' ? 7.2 : 6.2;
     this.maxHp = TOWER.hp[this.tier];
+    this.armor = TOWER.armor[this.tier];
 
     const c = TEAM[team];
     this.group = new THREE.Group();
@@ -143,16 +155,7 @@ export class Tower {
     vfx.ring(this.x, GROUND + CRYSTAL_Y, this.z, TEAM[this.team].main, 1.6, 0.25);
   }
 
-  // 1. an enemy hero that recently hit an allied hero inside range, 2. nearest minion, 3. nearest hero.
-  _target(ctx) {
-    let best = null, bd = TOWER.range;
-    for (const h of ctx.heroes) {
-      if (h.team === this.team || !h.alive || h.hidden || h.untarget || h.aggroAge > AGGRO_T) continue;
-      const d = Math.hypot(h.x - this.x, h.z - this.z) - h.radius;
-      if (d <= bd) { best = h; bd = d; }
-    }
-    return best ?? pickTarget(ctx, this.team, this.x, this.z, TOWER.range, ORDER_TOWER);
-  }
+  _target(ctx) { return defenderTarget(ctx, this, TOWER.range); }
 
   shatter() {
     this.top.visible = false;

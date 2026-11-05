@@ -2,7 +2,8 @@
 // RETREAT > DEFEND > FIGHT > PUSH > LANE / ROAM. Decisions are re-made every `react` seconds; steering runs every sim step.
 // Bots walk lane paths with their minion wave, never stand in an enemy tower's range without 2+ friendly minions
 // near it, focus low-HP heroes and cast through the same skill rules the player uses.
-import { TOWER, BOT, DIFFICULTY, settings, MATCH } from '../config.js';
+import { TOWER, CORE, BOT, DIFFICULTY, settings, MATCH } from '../config.js';
+import { nextItem, atBase } from './gear.js';
 import { rand } from '../core/math.js';
 import { pickTarget, bestCluster } from './targeting.js';
 import { forEachAlly } from './combat.js';
@@ -42,6 +43,7 @@ export class Bot {
     this.focus = null;
     this.state = 'lane';
     this.roamT = 0;
+    this.shopping = false; this.shopAt = 0;
     this.stuckT = 0; this.nudge = 0; this.nudgeSide = 1;
     this.sx = this.h.x; this.sz = this.h.z;
     Object.assign(this.goal, { x: this.h.x, z: this.h.z, follow: null, keep: 0.4 });
@@ -70,12 +72,12 @@ export class Bot {
   // The hostile tower whose range covers (x, z) without 2+ friendly minions beside it, if any.
   _unsafe(ctx, x, z) {
     const h = this.h;
-    for (const s of ctx.towers) {
+    for (const s of ctx.structures) {
       if (s.team === h.team || !s.alive) continue;
-      if (Math.hypot(s.x - x, s.z - z) > TOWER.range + 0.8) continue;
+      if (Math.hypot(s.x - x, s.z - z) > (s.type === 'core' ? CORE.range : TOWER.range) + 0.8) continue;
       let near = 0;
       for (const m of ctx.minions.list) if (m.team === h.team && m.alive && Math.hypot(m.x - s.x, m.z - s.z) < 7) near++;
-      if (near < 2) return s;
+      if (near < (s.type === 'core' ? 1 : 2)) return s;
     }
     return null;
   }
@@ -150,7 +152,7 @@ export class Bot {
     if (ctx.time >= MATCH.campFirst && h.hp > h.maxHp * 0.5) {
       let best = null, bd = Infinity;
       for (const c of ctx.camps.list) {
-        if (!c.alive || (c.hx > 0) === (h.team === 0)) continue; // own side only
+        if (!c.alive || c.boss || (c.hx > 0) === (h.team === 0)) continue; // own side only
         const d = Math.hypot(c.x - h.x, c.z - h.z);
         if (d < bd) { best = c; bd = d; }
       }
@@ -176,7 +178,8 @@ export class Bot {
     let foe = this._foe(ctx), crowd = 0;
     if (foe) for (const e of ctx.heroes) if (e.team !== h.team && e.alive && !e.hidden && Math.hypot(e.x - h.x, e.z - h.z) < 8) crowd++;
     if (!this.retreat && (frac < BOT.retreatHp || (frac < 0.5 && crowd >= 2))) this.retreat = true;
-    else if (this.retreat && frac >= BOT.returnHp) this.retreat = false;
+    else if (!this.retreat && !foe && this._wantsShop(ctx)) { this.retreat = true; this.shopping = true; } // enough gold: walk home and buy
+    else if (this.retreat && (this.shopping ? atBase(h) && frac >= 0.6 : frac >= BOT.returnHp)) { this.retreat = false; this.shopping = false; this.shopAt = ctx.time + 40; }
 
     if (this.retreat) {
       const p = this._homeward();
@@ -196,6 +199,7 @@ export class Bot {
     }
 
     const ratio = foe ? this._power(ctx, foe) : 0;
+    const boss = foe ? null : this._boss(ctx);
     let skillFoe = foe;
     if (foe && ratio >= BOT.powerRatio) { // FIGHT
       this.state = 'fight';
@@ -210,6 +214,11 @@ export class Bot {
         if (e.team !== h.team && e.alive && !e.hidden && d < nd && !this._unsafe(ctx, e.x, e.z)) { ne = e; nd = d; }
       }
       if (ne) { g.follow = ne; g.keep = h.basicRange * 0.7; skillFoe = ne; } else { g.x = hurt.x; g.z = hurt.z; g.keep = 4; }
+    } else if (boss) { // OBJECTIVE: contest a Dragon / Herald / Titan with the closest few allies
+      this.state = 'boss';
+      g.follow = boss;
+      g.keep = h.basicRange * 0.7;
+      skillFoe = boss;
     } else {
       const push = foe ? null : this._pushTarget(ctx);
       if (push) { // PUSH
@@ -230,6 +239,33 @@ export class Bot {
     }
 
     for (let i = 0; i < 3; i++) if (h.ranks[i] > 0 && h.cds[i] <= 0 && !it.cast[i] && this._want(ctx, i, skillFoe)) it.cast[i] = true;
+  }
+
+  // The next item is affordable and the bot has not shopped lately.
+  _wantsShop(ctx) {
+    const h = this.h, it = nextItem(h);
+    return !!it && h.gold >= it.cost && ctx.time >= this.shopAt && !atBase(h);
+  }
+
+  // A live boss this bot should take: the 3 closest eligible bots of its team go (healthy, high enough level, no stronger enemy squad at the pit).
+  _boss(ctx) {
+    const h = this.h, c = (ctx._bossCall ??= [{ t: -9, set: [], boss: null }, { t: -9, set: [], boss: null }])[h.team];
+    if (ctx.time < c.t || ctx.time - c.t >= 1) {
+      c.t = ctx.time; c.set = []; c.boss = null;
+      let best = null, bs = Infinity;
+      for (const b of ctx.camps.bosses) {
+        if (!b.alive) continue;
+        let foes = 0;
+        for (const e of ctx.heroes) if (e.team !== h.team && e.alive && !e.hidden && Math.hypot(e.x - b.x, e.z - b.z) < 14) foes++;
+        const cands = ctx.heroes.filter((o) => o.team === h.team && o.brain && o.alive && o.hp > o.maxHp * 0.6 && o.level >= b.cfg.minLevel && !o.brain.retreat)
+          .sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z)).slice(0, 3);
+        if (cands.length < 2 || foes > cands.length) continue;
+        const d = Math.hypot(cands[0].x - b.x, cands[0].z - b.z);
+        if (d < bs) { bs = d; best = b; c.set = cands; }
+      }
+      c.boss = best;
+    }
+    return c.boss && c.set.includes(h) ? c.boss : null;
   }
 
   // Group push: with the numbers advantage (enemy heroes dead) or in Overdrive, every bot walks the lane where our wave is furthest along.
@@ -263,7 +299,7 @@ export class Bot {
       if (d >= bd) continue;
       let near = 0;
       for (const m of ctx.minions.list) if (m.team === h.team && m.alive && Math.hypot(m.x - s.x, m.z - s.z) < 7) near++;
-      if (near < 2) continue;
+      if (near < (s.type === 'core' ? 1 : 2)) continue;
       let guarded = false;
       for (const e of ctx.heroes) if (e.team !== h.team && e.alive && !e.hidden && Math.hypot(e.x - s.x, e.z - s.z) < 7) { guarded = true; break; }
       if (!guarded) { best = s; bd = d; }

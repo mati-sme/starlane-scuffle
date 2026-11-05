@@ -211,6 +211,14 @@ function buildGround(group) {
     flat(new THREE.RingGeometry(ARENA.fountainR - 0.5, ARENA.fountainR - 0.1, 40), 0.06, mix(TEAM[team].main, 0xffffff, 0.2), f.x, f.z);
     flat(new THREE.RingGeometry(2.2, 2.6, 32), 0.06, PAL.gold, f.x, f.z);
   }
+  for (const [x, z, kind] of ARENA.pits) { // epic boss pits: a dark crater, a stone rim and a glowing rune ring
+    const rim = kind === 'dragon' ? 0xFF8A4C : 0xC58CFF;
+    flat(new THREE.CircleGeometry(7.2, 36), 0.045, G.curb, x, z);
+    flat(new THREE.CircleGeometry(6.4, 36), 0.05, mix(G.stoneDark, 0x000000, 0.45), x, z);
+    flat(new THREE.RingGeometry(5.6, 6.0, 40), 0.06, rim, x, z);
+    flat(new THREE.RingGeometry(3.2, 3.5, 32), 0.06, mix(rim, 0xffffff, 0.3), x, z);
+    for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; rect(x + Math.cos(a) * 4.6, z + Math.sin(a) * 4.6, 0.5, 0.5, 0.065, rim); }
+  }
   rect(0, 0, 10, 112, 0.02, mix(G.stoneDark, PAL.laneGlow, 0.12)); // flux channel
   for (const sx of [-1, 1]) rect(sx * 5.2, 0, 0.5, 112, 0.04, PAL.laneGlow);
   for (const lane of ARENA.lanes) {

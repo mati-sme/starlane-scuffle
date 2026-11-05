@@ -1,6 +1,6 @@
 // Hero base: stats, XP / levels, skill ranks, movement, auto-aim basic attack, skills, status effects, respawn and animation.
 import * as THREE from 'three';
-import { PAL, CAM, MAP, MATCH, HERO, DIFFICULTY, ARENA, settings, GROUND, TEAM } from '../config.js';
+import { PAL, CAM, MAP, MATCH, HERO, GOLD, DIFFICULTY, ARENA, settings, GROUND, TEAM } from '../config.js';
 import { padPos, fountain, pushOutCover } from '../world/arena.js';
 import { clamp, lerp, damp, angleLerp } from '../core/math.js';
 import { makeShadow } from '../render/toon.js';
@@ -12,6 +12,7 @@ import { sim, tickHitFx, tickStatus, tickBuffs, buff, airLift, dyingScale, poof 
 import { pickHeroTarget, pickPrefTarget, stickyTarget, bestCluster } from '../game/targeting.js';
 import { BEHAVIORS, BASICS } from './behaviors.js';
 import { rankStats } from './roster.js';
+import { gearStats, emptyGear } from '../game/gear.js';
 
 // Screen-space axes projected onto the ground, derived from the camera offset.
 const FWD = new THREE.Vector2(-CAM.offset[0], -CAM.offset[2]).normalize();
@@ -70,6 +71,9 @@ export class Hero {
     this.xp = 0;
     this.points = 0;
     this.ranks = [1, 1, 0];
+    this.gold = GOLD.start;
+    this.items = [];
+    this.gear = emptyGear();
     this.recalc(true);
     const pad = padPos(this.team, this.slot);
     this.x = this.px = this.rx = pad.x;
@@ -109,11 +113,13 @@ export class Hero {
   // Derived numbers from level + skill ranks. `full` refills HP, otherwise HP grows with the new max.
   recalc(full) {
     const L = this.level - 1;
+    const g = gearStats(this.items, this.gear);
     this.dmgMul = 1 + HERO.dmgPerLevel * L;
-    this.outMul = this.dmgMul * (this.team === 1 && this.brain ? DIFFICULTY.dmg[settings.stars - 1] : 1);
+    this.outMul = this.dmgMul * (1 + g.ad) * (this.team === 1 && this.brain ? DIFFICULTY.dmg[settings.stars - 1] : 1);
+    this.armor = g.armor;
     this.basicRange = this.basic.range + (this.nextBasic?.range ?? 0);
     this.rs = this.ab.map((a, i) => rankStats(a, this.ranks[i]));
-    const max = Math.round(this.baseHp + this.hpLv * L);
+    const max = Math.round(this.baseHp + this.hpLv * L + g.hp);
     this.hp = full ? max : this.hp + (max - (this.maxHp ?? max));
     this.maxHp = max;
   }
@@ -272,7 +278,7 @@ export class Hero {
     const locked = stunned || this.root > 0 || this.windup > 0;
     const mag = locked ? 0 : Math.min(1, Math.hypot(mx, mz));
     if (mag > 0.01) {
-      const sp = this.speed * (1 + buff(this, 'speed')) * this.moveMul * (this.slow > 0 ? 0.55 : 1) * (this.boost > 0 ? BOOST.mul : 1);
+      const sp = this.speed * (1 + buff(this, 'speed') + this.gear.speed + (sim.bonus[this.team].spd ?? 0)) * this.moveMul * (this.slow > 0 ? 0.55 : 1) * (this.boost > 0 ? BOOST.mul : 1);
       this.dirx = mx / mag; this.dirz = mz / mag;
       this.x += this.dirx * sp * mag * dt;
       this.z += this.dirz * sp * mag * dt;
@@ -414,7 +420,7 @@ export class Hero {
     if (this.nextBasic) { dmg += this.nextBasic.dmg; this.nextBasic = null; }
     delete this.buf.hidden;
     this.atkAge = 0;
-    this.cd = b.cd / (1 + buff(this, 'aspd'));
+    this.cd = b.cd / (1 + buff(this, 'aspd') + this.gear.aspd);
     this.lunge = 1;
     this.faceHold = 0.3;
     bus.emit('swing', this);

@@ -1,11 +1,14 @@
-// The Core: floating energy crystal over a stepped reactor dais with conduit pylons, orbiting shards, fresnel shield bubble.
+// The Nexus (core): heavily armored, fires its own laser at nearby enemies, and throws a shield pulse the first time it is hit once exposed.
+// Floating energy crystal over a stepped reactor dais with conduit pylons, orbiting shards, fresnel shield bubble.
 import * as THREE from 'three';
 import { PAL, TEAM, CORE, GROUND } from '../config.js';
+import { bus } from '../core/bus.js';
 import { structSpot } from './arena.js';
 import { toonMat, toonMesh, mergeParts, makeShadow, makeHalo } from '../render/toon.js';
 import { particles, poofStars, FRAME } from '../render/particles.js';
 import { vfx } from '../render/vfx.js';
-import { tickHitFx, dyingScale } from '../game/combat.js';
+import { tickHitFx, dyingScale, shove, applyStatus } from '../game/combat.js';
+import { defenderTarget } from './tower.js';
 
 const CRYSTAL_Y = 3.4;
 
@@ -32,6 +35,7 @@ export class Core {
     this.hitY = CRYSTAL_Y;
     this.barY = 6.4;
     this.maxHp = CORE.hp;
+    this.armor = CORE.armor;
 
     const c = TEAM[team];
     this.group = new THREE.Group();
@@ -91,6 +95,12 @@ export class Core {
     this.shielded = false;
     this.hurtAt = -99;
     this._shielded = true;
+    this.pulsed = false;
+    this.pulseT = 0;
+    this.lastHp = this.hp;
+    this.streak = 0;
+    this.lastTgt = null;
+    this.cd = 1;
     this.dying = 0;
     this.flash = 0;
     this.squash = 0;
@@ -106,6 +116,38 @@ export class Core {
       this.dying -= dt;
       if (this.dying <= 0) this.shatter();
     }
+    if (!this.alive || ctx.over) return;
+    if (this.pulseT > 0) this.pulseT -= dt;
+    if (this.vulnerable && !this.pulsed && this.hp < this.lastHp) this._pulse(ctx);
+    this.lastHp = this.hp;
+    if ((this.cd -= dt) > 0) return;
+    const tgt = defenderTarget(ctx, this, CORE.range);
+    if (!tgt) return;
+    this.cd = CORE.cd;
+    let dmg = CORE.minionDmg;
+    if (tgt.type === 'hero') { // consecutive shots on one hero ramp up to x2
+      this.streak = this.lastTgt === tgt ? Math.min(4, this.streak + 1) : 0;
+      dmg = (CORE.heroDmg + CORE.heroPct * tgt.maxHp) * Math.min(2, 1 + 0.25 * this.streak);
+    } else this.streak = 0;
+    this.lastTgt = tgt;
+    ctx.projectiles.fire(this, tgt, dmg, 18, 1.2, GROUND + CRYSTAL_Y, { color: PAL.gold, size: 1.7 });
+    bus.emit('towerShot', this);
+    vfx.ring(this.x, GROUND + CRYSTAL_Y, this.z, PAL.gold, 2.4, 0.3);
+  }
+
+  // First hit after the nexus is exposed: a short shield (heavy damage cut) that also shoves attackers back.
+  _pulse(ctx) {
+    this.pulsed = true;
+    this.pulseT = CORE.pulse;
+    vfx.ring(this.x, GROUND + CRYSTAL_Y, this.z, PAL.shield, CORE.pulseR * 1.2, 0.7);
+    vfx.ring(this.x, 0.3, this.z, PAL.gold, CORE.pulseR, 0.5);
+    for (const h of ctx.heroes) {
+      const dx = h.x - this.x, dz = h.z - this.z;
+      if (h.team === this.team || !h.alive || Math.hypot(dx, dz) > CORE.pulseR) continue;
+      shove(h, dx, dz, 4, 0.3);
+      applyStatus(h, 'slow', 1.2);
+    }
+    bus.emit('corePulse', this);
   }
 
   shatter() {
@@ -121,9 +163,10 @@ export class Core {
   render(t) {
     const f = this.flash > 0 ? 1 : 0;
     for (const m of this.mats) m.userData.flash.value = f;
-    if (this.shield.visible && this.vulnerable) { // shield drops (Starstorm or both towers down)
-      this.shield.visible = false;
-      vfx.ring(this.x, GROUND + CRYSTAL_Y, this.z, PAL.shield, 6, 0.6);
+    const up = !this.vulnerable || this.pulseT > 0; // the bubble drops once both guardians fall, and flashes back during the pulse
+    if (this.alive && this.shield.visible !== up) {
+      this.shield.visible = up;
+      if (!up) vfx.ring(this.x, GROUND + CRYSTAL_Y, this.z, PAL.shield, 6, 0.6);
     }
     if (!this.body.visible) return;
     const s = this.dying > 0 ? dyingScale(this) : 1, sq = this.squash * 0.1;

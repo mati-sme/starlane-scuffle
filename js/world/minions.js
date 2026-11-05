@@ -4,7 +4,7 @@ import { PAL, TEAM, UNITS, MAP, GROUND, MATCH } from '../config.js';
 import { PATHS, pushOutCover } from './arena.js';
 import { rand, lerp, clamp, angleLerp } from '../core/math.js';
 import { toonMat, outlineMat, mergeParts, shadowGeo, shadowMat, SHADOW_Y } from '../render/toon.js';
-import { DYING, dealDamage, tickHitFx, tickStatus, airLift, dyingScale, poof } from '../game/combat.js';
+import { DYING, sim, dealDamage, tickHitFx, tickStatus, airLift, dyingScale, poof } from '../game/combat.js';
 import { pickTarget, ORDER_MINION } from '../game/targeting.js';
 
 const TYPES = ['blobling', 'zapper', 'bigblob'];
@@ -122,7 +122,7 @@ export class MinionSystem {
     if (alive >= g.max || !this.free.length) return;
     const st = UNITS[kind], m = this.free.pop(), p0 = PATHS[team][lane].pts[0];
     Object.assign(m, {
-      kind, team, x: p0.x + rand(-1.5, 1.5), z: p0.z + rand(-1.5, 1.5), hp: st.hp, maxHp: st.hp, alive: true,
+      kind, team, x: p0.x + rand(-1.5, 1.5), z: p0.z + rand(-1.5, 1.5), hp: st.hp * (1 + (sim.bonus[team].minHp ?? 0)), maxHp: st.hp * (1 + (sim.bonus[team].minHp ?? 0)), alive: true,
       radius: st.radius, hitY: st.hitY, barY: st.barY, flash: 0, squash: 0, dying: 0, lunge: 0, cd: rand(0, 0.5),
       phase: rand(0, 6), lane, wp: 1, prog: 0, stun: 0, root: 0, slow: 0, air: 0, pull: null, nid: ++this.nid,
     });

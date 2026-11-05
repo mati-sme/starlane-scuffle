@@ -1,6 +1,7 @@
 // Corner minimap: static layer (lanes, bases, jungle, cover, brush) drawn once; dynamic layer at 10 Hz.
 // Enemies only show while one of our heroes / structures / minions can see them and they are not hidden in brush.
-import { ARENA, MAP, TEAM, PAL } from '../config.js';
+import { ARENA, MAP, TEAM, PAL, BOSS } from '../config.js';
+import { BOSS_COLORS } from '../world/camps.js';
 import { COVER, BRUSH, POCKETS, fountain } from '../world/arena.js';
 
 const hex = (n) => '#' + n.toString(16).padStart(6, '0');
@@ -63,6 +64,21 @@ export class Minimap {
     return false;
   }
 
+  // Boss pit marker: a glowing disc while it lives, a ring with the respawn clock while it is away.
+  _boss(c, b, dpr) {
+    const x = this.px(b.hx), z = this.pz(b.hz), r = 6 * dpr, eta = this.match.camps.eta(b, this.match.time);
+    const col = hex(BOSS_COLORS[b.boss === 'dragon' ? BOSS.elements[b.variant % 3] : b.boss]);
+    if (b.done || (!b.alive && b.boss === 'herald' && eta <= 0)) return;
+    c.lineWidth = 2 * dpr; c.strokeStyle = col; c.fillStyle = col;
+    c.beginPath(); c.arc(x, z, r, 0, 7);
+    if (b.alive) { c.globalAlpha = 0.9; c.fill(); c.globalAlpha = 1; c.strokeStyle = '#0B1020'; c.lineWidth = dpr; c.stroke(); }
+    else { c.stroke(); }
+    c.fillStyle = '#fff'; c.strokeStyle = '#0B1020'; c.lineWidth = 2.5 * dpr; c.font = `800 ${8 * dpr}px system-ui, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+    const t = b.alive ? b.boss[0].toUpperCase() : `${Math.floor(eta / 60)}:${String(Math.floor(eta % 60)).padStart(2, '0')}`;
+    const ty = b.alive ? z : z + (b.hz > 0 ? -r - 5 * dpr : r + 5 * dpr);
+    c.strokeText(t, x, ty); c.fillText(t, x, ty);
+  }
+
   update(dt, rig, aspect) {
     this.acc += dt;
     if (this.acc < 0.1) return;
@@ -71,6 +87,7 @@ export class Minimap {
     c.drawImage(this.layer, 0, 0);
 
     for (const camp of m.camps.list) {
+      if (camp.boss) { this._boss(c, camp, dpr); continue; }
       if (!camp.alive) continue;
       c.fillStyle = '#FFB020';
       c.fillRect(this.px(camp.x) - 2 * dpr, this.pz(camp.z) - 2 * dpr, 4 * dpr, 4 * dpr);

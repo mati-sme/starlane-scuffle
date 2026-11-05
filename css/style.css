@@ -26,6 +26,8 @@ svg { display: block; width: 100%; height: 100%; }
 .bar.hero { width: 70px; height: 12px; }
 .bar.me { border-color: var(--gold); }
 .bar.struct { width: 92px; height: 12px; }
+.bar.boss { width: 130px; height: 14px; }
+.bar.boss i { background: #C58CFF; }
 
 /* ---------- HUD ---------- */
 #hud { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
@@ -330,3 +332,32 @@ body.playing #pause { display: block; }
 @media (max-width: 700px) { .hcard.mini { flex-direction: column; height: 62px; } .hcard.mini .pic { width: 28px; height: 28px; } }
 #netbanner { position: fixed; left: 50%; top: calc(60px + var(--st)); translate: -50% 0; z-index: 30; padding: 8px 18px; background: rgba(13, 16, 23, .88); border: 2px solid var(--gold); color: #fff; font-weight: 800; letter-spacing: .08em; pointer-events: none; }
 #netbanner[hidden] { display: none; }
+
+/* ---------- gold + gear, boss toast, team buffs ---------- */
+.gear { position: absolute; left: calc(160px + var(--sl)); bottom: calc(6px + var(--sb)); scale: .85; transform-origin: left bottom; display: flex; align-items: center; gap: 6px; padding: 4px 8px; border: 2px solid var(--ink); background: var(--panel); pointer-events: none; }
+.gear .gold { position: relative; display: flex; align-items: center; gap: 4px; min-width: 58px; font-weight: 800; font-size: 18px; color: var(--gold); -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; font-variant-numeric: tabular-nums; }
+.gear .gold i { width: 22px; height: 22px; display: block; }
+.gear .plus { position: absolute; left: 6px; top: -22px; font-style: normal; font-size: 16px; color: #fff; opacity: 0; }
+.gear .plus.go { animation: gplus .9s ease-out; }
+@keyframes gplus { 0% { transform: translateY(6px); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(-8px); opacity: 0; } }
+.gear .slots { display: flex; gap: 3px; }
+.gear .slot { width: 28px; height: 28px; border: 2px solid var(--ink); background: rgba(255,255,255,.08); box-sizing: border-box; }
+.gear .slot.boots { border-color: #3EE89A; }
+.gear .slot svg { display: block; width: 100%; height: 100%; }
+.gear .next { position: relative; width: 38px; height: 38px; padding: 0; border: 2px dashed rgba(255,255,255,.45); background: rgba(0,0,0,.35); pointer-events: auto; touch-action: manipulation; cursor: default; }
+.gear .next .nic { position: absolute; inset: 2px 2px 9px; opacity: .6; }
+.gear .next .nic svg { display: block; width: 100%; height: 100%; }
+.gear .next small { position: absolute; left: 0; right: 0; bottom: 3px; text-align: center; font-size: 10px; line-height: 1; font-weight: 800; color: #fff; -webkit-text-stroke: 2px var(--ink); paint-order: stroke fill; }
+.gear .next u { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--gold); transition: width .3s; }
+.gear .next.ready { border-style: solid; border-color: var(--gold); }
+.gear .next.ready .nic { opacity: 1; }
+.gear .next.home { cursor: pointer; animation: pulse 1s ease-in-out infinite; }
+.gear.bought { animation: bought .5s ease-out; }
+@keyframes bought { 0% { filter: brightness(2.2); } 100% { filter: none; } }
+.buffs { position: absolute; top: calc(66px + var(--st)); left: 50%; translate: -50% 0; display: flex; gap: 6px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+.buffs:empty { display: none; }
+.buffs span { padding: 1px 6px; border: 2px solid var(--ink); background: var(--panel); }
+.buffs .t0 { color: var(--sunny); } .buffs .t1 { color: var(--gloom); }
+.toast { position: absolute; left: 50%; top: calc(88px + var(--st)); translate: -50% 0; opacity: 0; white-space: nowrap; font-weight: 800; font-size: clamp(14px, 2.4vw, 20px); color: #fff; -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; text-shadow: 0 3px 0 var(--ink); }
+.toast.t0 { color: var(--sunny); } .toast.t1 { color: var(--gloom); } .toast.t2 { color: #C58CFF; }
+.toast.pop { animation: kopop 4s ease-out; }
