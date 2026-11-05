@@ -1,5 +1,5 @@
 // In-match HUD: portrait + HP ring + XP arc + level, corner minimap, scorebar (kills, clock, structure pips), respawn ring,
-// takedown banner, pooled health bars. Owns the skill buttons and the upgrade drawer.
+// takedown banner, pooled health bars. Owns the skill buttons (with their rank-up +) and the level pill.
 import * as THREE from 'three';
 import { HERO, GROUND } from '../config.js';
 import { bus } from '../core/bus.js';

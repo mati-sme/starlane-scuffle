@@ -1,65 +1,34 @@
-// Skill upgrade drawer: a compact edge tab (always shows unspent points) that opens a row of Q / E / R rank buttons.
-// Fully nonmodal: never pauses or slows the game. U toggles it, keys 1 / 2 / 3 rank up Q / E / R (core/input.js).
+// Level / XP feedback: a compact pill beside the portrait (level, unspent points, XP bar) plus the level toast and +XP pop.
+// Skill ranking itself lives on the skill buttons (ui/abilities.js); nothing here ever pauses the game.
 import { bus } from '../core/bus.js';
 import { HERO } from '../config.js';
-import { icons } from './icons.js';
-
-const KEYS = ['Q', 'E', 'R'];
-const COLLAPSE_AFTER = 1500;
-const USER_HOLD = 3000; // auto-collapse never fires this soon after a user toggle
 
 export class LevelUp {
   constructor(match) {
     this.match = match;
-    this.collapseAt = 0;
-    this.userAt = -1e9;
-    this.last = { pts: -1, lv: -1, xp: -1, slots: ['', '', ''] };
+    this.last = { pts: -1, lv: -1, xp: -1 };
     this.root = document.createElement('div');
-    this.root.id = 'upgrades';
-    this.root.dataset.testid = 'upgrades';
+    this.root.id = 'lvinfo';
+    this.root.dataset.testid = 'level-info';
     this.root.innerHTML = `
-      <div class="upanel" data-testid="upgrade-panel">${KEYS.map((k, i) => `
-        <button type="button" class="upbtn" data-slot="${i}" data-testid="upgrade-${k.toLowerCase()}" aria-label="Upgrade ${k}">
-          <span class="ico"></span><b>${k}</b><span class="pips">${'<i></i>'.repeat(HERO.maxRank[i])}</span><u class="mark"></u>
-        </button>`).join('')}
-      </div>
-      <button type="button" class="utab" data-testid="upgrade-tab" aria-label="Skill points" aria-expanded="false">
-        <span class="chev">${icons.plus}</span><em class="pts" data-testid="upgrade-points">0</em>
-        <small class="lv" data-testid="level-label">Lv 1</small><span class="xpb"><i></i></span>
-      </button>
+      <div class="lvpill"><small class="lv" data-testid="level-label">Lv 1</small><em class="pts" data-testid="upgrade-points">0</em><span class="xpb"><i></i></span></div>
       <div class="lvtoast" data-testid="level-toast"></div>
       <div class="xpgain" data-testid="xp-gain"></div>`;
     document.body.appendChild(this.root);
 
-    this.tab = this.root.querySelector('.utab');
+    this.pill = this.root.querySelector('.lvpill');
     this.pts = this.root.querySelector('.pts');
     this.lv = this.root.querySelector('.lv');
     this.xpb = this.root.querySelector('.xpb i');
     this.toast = this.root.querySelector('.lvtoast');
     this.gain = this.root.querySelector('.xpgain');
-    this.btns = [...this.root.querySelectorAll('.upbtn')].map((el) => ({
-      el, pips: [...el.querySelectorAll('.pips i')], mark: el.querySelector('.mark'), ico: el.querySelector('.ico'),
-    }));
-
-    this.tab.addEventListener('click', (e) => { e.stopPropagation(); this.toggle(true); }); // click (not pointerdown) so taps, mouse and synthetic clicks all open it
-    for (const [i, b] of this.btns.entries()) {
-      b.el.addEventListener('click', () => this.match.hero.spendPoint(i));
-    }
-    addEventListener('keydown', (e) => {
-      if (e.code === 'KeyU' && !e.repeat && document.body.classList.contains('playing')) this.toggle(true);
-    });
 
     const mine = (h) => h === match.hero;
-    bus.on('rankUp', ({ hero, slot }) => {
-      if (!mine(hero)) return;
-      this._pop(this.btns[slot].el, 'shine');
-      if (hero.points === 0) this.collapseAt = performance.now() + COLLAPSE_AFTER;
-    });
     bus.on('levelUp', (h) => {
       if (!mine(h)) return;
       this.toast.textContent = h.level === HERO.ultLevel ? `LEVEL ${h.level} · R UNLOCKED · +1 POINT` : `LEVEL ${h.level} · +1 POINT`;
       this._pop(this.toast, 'pop');
-      this._pop(this.tab, 'bump');
+      this._pop(this.pill, 'bump');
     });
     bus.on('xp', ({ hero, amount }) => {
       if (!mine(hero)) return;
@@ -74,34 +43,21 @@ export class LevelUp {
     el.classList.add(cls);
   }
 
-  // The 'open' class is the single source of truth; aria-expanded always mirrors it. `user` marks a deliberate toggle.
-  open(v, user = false) {
-    v = !!v;
-    this.root.classList.toggle('open', v);
-    this.tab.setAttribute('aria-expanded', String(v));
-    this.collapseAt = 0;
-    if (user) this.userAt = performance.now();
-  }
-
-  toggle(user = false) { this.open(!this.root.classList.contains('open'), user); }
-
-  // Fresh match: close the drawer and re-read everything.
+  // Fresh match: re-read everything.
   reset() {
-    this.open(false);
     this.toast.classList.remove('pop');
     this.gain.classList.remove('pop');
-    this.last = { pts: -1, lv: -1, xp: -1, slots: ['', '', ''] };
-    this.btns.forEach((b, i) => { b.ico.innerHTML = icons[this.match.hero.ab[i].kind]; });
+    this.last = { pts: -1, lv: -1, xp: -1 };
   }
 
-  hide() { this.open(false); }
+  hide() {}
 
   update() {
     const h = this.match.hero, L = this.last;
     if (h.points !== L.pts) {
       L.pts = h.points;
       this.pts.textContent = h.points;
-      this.tab.classList.toggle('has', h.points > 0);
+      this.pill.classList.toggle('has', h.points > 0);
     }
     if (h.level !== L.lv) {
       L.lv = h.level;
@@ -109,22 +65,5 @@ export class LevelUp {
     }
     const xp = h.level >= HERO.maxLevel ? 100 : Math.round((h.xp / HERO.xpNeed(h.level)) * 100);
     if (xp !== L.xp) { L.xp = xp; this.xpb.style.width = `${xp}%`; }
-
-    this.btns.forEach((b, i) => {
-      const r = h.ranks[i], max = HERO.maxRank[i], can = h.canSpend(i);
-      const gate = r < max ? HERO.gate(i, r + 1) : 0, gated = r < max && h.level < gate;
-      const key = `${r}|${can}|${gated ? gate : 0}`;
-      if (key === L.slots[i]) return;
-      L.slots[i] = key;
-      b.pips.forEach((p, k) => p.classList.toggle('on', k < r));
-      b.mark.textContent = r >= max ? 'MAX' : can ? '+' : gated ? `Lv ${gate}` : '';
-      b.el.classList.toggle('can', can);
-      b.el.classList.toggle('off', !can);
-      b.el.classList.toggle('maxed', r >= max);
-      b.el.dataset.rank = r;
-    });
-
-    const now = performance.now();
-    if (this.collapseAt && now > this.collapseAt && now - this.userAt > USER_HOLD) this.open(false);
   }
 }

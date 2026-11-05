@@ -1,5 +1,6 @@
 // Q / E / R buttons on an arc around Attack: radial cooldown wipe, last-3-seconds digit,
 // ready bounce, gold glow + slam when R unlocks. Desktop: same buttons with Q / E / R hints.
+// Wild Rift style ranking: a small gold + sits above each skill button that can take a point right now (tap = spendPoint).
 import { input } from '../core/input.js';
 import { bus } from '../core/bus.js';
 import { icons } from './icons.js';
@@ -11,6 +12,7 @@ export class Abilities {
     this.match = match;
     this.root = document.createElement('div');
     this.root.id = 'abilities';
+    this.ups = [];
     this.btns = SLOTS.map((s, i) => {
       const el = document.createElement('button');
       el.type = 'button';
@@ -26,6 +28,18 @@ export class Abilities {
       for (const type of ['pointerup', 'pointercancel', 'pointerleave']) el.addEventListener(type, () => el.classList.remove('down'));
       el.addEventListener('contextmenu', (e) => e.preventDefault());
       this.root.appendChild(el);
+      const up = document.createElement('button');
+      up.type = 'button';
+      up.className = `skup ${s.cls}`;
+      up.hidden = true;
+      up.dataset.testid = `skill-up-${s.key.toLowerCase()}`;
+      up.setAttribute('aria-label', `Rank up ${s.key}`);
+      up.innerHTML = '<span>+</span>';
+      up.addEventListener('pointerdown', (e) => e.stopPropagation()); // never leaks into the attack / stick zones
+      up.addEventListener('click', () => this.match.hero.spendPoint(i)); // click so taps, mouse and synthetic clicks all work
+      up.addEventListener('contextmenu', (e) => e.preventDefault());
+      this.root.appendChild(up);
+      this.ups.push(up);
       return { el, face: el.querySelector('.face'), cd: el.querySelector('.cd'), num: el.querySelector('.num'), p: -1, n: -1, ready: true };
     });
     document.body.appendChild(this.root);
@@ -33,6 +47,11 @@ export class Abilities {
     this.note.id = 'notarget';
     this.note.dataset.testid = 'no-target';
     document.body.appendChild(this.note);
+    bus.on('rankUp', ({ hero, slot }) => {
+      if (hero !== match.hero) return;
+      const el = this.btns[slot].el;
+      el.classList.remove('ranked'); void el.offsetWidth; el.classList.add('ranked');
+    });
     bus.on('ultUnlock', (h) => { if (h === match.hero) this._slam(); });
     bus.on('noCast', ({ hero, slot, why }) => { // a skill press that did nothing always says why
       if (hero !== match.hero) return;
@@ -65,6 +84,7 @@ export class Abilities {
       if (n !== b.n) { b.num.textContent = n; b.n = n; }
       b.el.classList.toggle('locked', locked);
       b.el.classList.toggle('dead', !h.alive);
+      this.ups[i].hidden = !h.canSpend(i);
       const ready = !locked && left <= 0;
       if (ready === b.ready) return;
       b.ready = ready;

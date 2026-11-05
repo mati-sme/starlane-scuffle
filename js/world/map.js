@@ -164,22 +164,61 @@ function buildGround(group) {
   return glow;
 }
 
-// Cover blocks (collision AABBs in arena.js) and brush tufts, each one instanced draw.
+// Cover: each collision AABB (arena.js) is dressed as a low barricade of cargo crates and boulders on a concrete slab,
+// or, for the small ones, a rock pile / crate stack. Everything stays inside its footprint; two merged meshes.
+function coverParts(b, i, rocks, crates) {
+  const long = Math.max(b.w, b.d), thick = Math.min(b.w, b.d), alongX = b.w >= b.d, yaw = alongX ? 0 : Math.PI / 2;
+  const h = (k) => hash(i, k, long);
+  const at = (u, v) => (alongX ? [b.cx + u, b.cz + v] : [b.cx + v, b.cz + u]); // u along the long axis, v across it
+  const slate = mix(PAL.cliffDark, PAL.cliffLight, 0.35), stone = (k) => mix(PAL.cliffDark, PAL.cliffLight, 0.45 + h(k) * 0.5);
+  const boulder = (u, v, rx, ry, rz, k) => {
+    const [x, z] = at(u, v);
+    rocks.push({ g: new THREE.IcosahedronGeometry(1, 1), c: stone(k), p: [x, ry * 0.55, z], s: alongX ? [rx, ry, rz] : [rz, ry, rx], r: [h(k + 1) * 0.4, h(k + 2) * 6.28, h(k + 3) * 0.3] });
+  };
+  const crate = (u, v, size, ht, k, yawJit = 0.1) => {
+    const [x, z] = at(u, v), j = (h(k) - 0.5) * yawJit, team = h(k + 5) > 0.5 ? 0x3E6E8E : 0x7A5A44;
+    crates.push({ g: new THREE.BoxGeometry(size, ht, size), c: team, p: [x, ht / 2 + 0.3, z], r: [0, yaw + j, 0] });
+    crates.push({ g: new THREE.BoxGeometry(size + 0.06, 0.16, size + 0.06), c: PAL.cliffDark, p: [x, 0.3 + 0.1, z], r: [0, yaw + j, 0] }); // base trim
+    crates.push({ g: new THREE.BoxGeometry(size + 0.06, 0.16, size + 0.06), c: PAL.cliffDark, p: [x, ht + 0.22, z], r: [0, yaw + j, 0] }); // top trim
+    crates.push({ g: new THREE.BoxGeometry(size * 0.5, 0.1, size + 0.1), c: PAL.laneGlow, p: [x, ht * 0.55 + 0.3, z], r: [0, yaw + j, 0] }); // glow band
+  };
+
+  if (long >= 3.5 * thick - 0.01 || long >= 5) { // barricade: slab + alternating crates and boulders along the run
+    const [sx, sz] = at(0, 0);
+    crates.push({ g: new THREE.BoxGeometry(alongX ? long - 0.1 : thick - 0.1, 0.6, alongX ? thick - 0.1 : long - 0.1), c: slate, p: [sx, 0.3, sz] });
+    const n = Math.max(2, Math.round(long / 2.2)), step = long / n;
+    for (let k = 0; k < n; k++) {
+      const u = -long / 2 + step * (k + 0.5), kk = k * 11;
+      if (k % 2 === 0 || h(kk) > 0.75) crate(u, 0, Math.min(step, thick) * 0.82, 1.1 + h(kk + 1) * 0.9, kk);
+      else boulder(u, (h(kk + 2) - 0.5) * 0.2, step * 0.47, 0.9 + h(kk + 3) * 0.7, thick * 0.42, kk);
+    }
+  } else if (long > thick + 0.5 || long >= 3) { // small block: two crates with a boulder tucked beside
+    crate(-long * 0.2, 0, Math.min(long * 0.5, thick) * 0.85, 1.4, 3);
+    boulder(long * 0.25, 0, long * 0.24, 1.0, thick * 0.4, 7);
+  } else { // square pillar-sized block: a rock pile
+    boulder(0, 0, thick * 0.46, 1.5, thick * 0.46, 1);
+    boulder(thick * 0.1, thick * 0.12, thick * 0.3, 1.1, thick * 0.3, 4);
+  }
+}
+
 function buildCover(group) {
-  const blocks = instanced(new THREE.BoxGeometry(1, 1, 1), toonMat(), COVER.length);
-  COVER.forEach((b, i) => {
-    const h = 1.8 + ((i * 7) % 3) * 0.3;
-    blocks.setMatrixAt(i, _m.compose(_p.set(b.cx, h / 2, b.cz), _q.identity(), _s.set(b.w, h, b.d)));
-    blocks.setColorAt(i, _c.set(PAL.cliffLight).multiplyScalar(0.9 + (i % 3) * 0.08));
-  });
-  group.add(blocks);
+  const rocks = [], crates = [];
+  COVER.forEach((b, i) => coverParts(b, i, rocks, crates));
+  const mat = toonMat({ vertexColors: true });
+  group.add(new THREE.Mesh(mergeParts(rocks), mat), toonMesh(mergeParts(crates), mat, 0.04));
 
   const spots = [];
   for (const b of BRUSH) for (let x = b.x0 + 0.7; x < b.x1; x += 1.3) for (let z = b.z0 + 0.7; z < b.z1; z += 1.3) spots.push([x + (hash(x, 1, z) - 0.5) * 0.5, z + (hash(z, 2, x) - 0.5) * 0.5]);
-  const tufts = instanced(new THREE.ConeGeometry(0.55, 1.5, 5), toonMat(), spots.length);
+  const blade = mergeParts([ // a bush: three leaning blades around a round leafy core
+    { g: new THREE.ConeGeometry(0.22, 1.9, 4), c: 0x2E9A4A, p: [0, 0.95, 0] },
+    { g: new THREE.ConeGeometry(0.2, 1.6, 4), c: 0x3FB04F, p: [0.3, 0.8, 0.1], r: [0.1, 0, -0.35] },
+    { g: new THREE.ConeGeometry(0.2, 1.5, 4), c: 0x2A8A44, p: [-0.28, 0.75, -0.12], r: [-0.1, 0, 0.4] },
+    { g: new THREE.IcosahedronGeometry(0.42, 0), c: 0x1F7A3A, p: [0, 0.35, 0] },
+  ]);
+  const tufts = instanced(blade, toonMat({ vertexColors: true }), spots.length);
   spots.forEach(([x, z], i) => {
-    place(tufts, i, x, 0.7, z, hash(x, 3, z) * 6, 0.8 + hash(z, 4, x) * 0.5);
-    tufts.setColorAt(i, _c.set(hash(x, 5, z) > 0.5 ? 0x3FB04F : 0x2E9A4A));
+    place(tufts, i, x, 0, z, hash(x, 3, z) * 6, 0.8 + hash(z, 4, x) * 0.6);
+    tufts.setColorAt(i, _c.setScalar(0.85 + hash(x, 5, z) * 0.3));
   });
   group.add(tufts);
 }

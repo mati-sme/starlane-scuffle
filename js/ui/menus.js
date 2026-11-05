@@ -42,7 +42,7 @@ export function createMenus(root) {
         <h1><span>Starlane</span><span>Scuffle</span></h1>
         <div class="parade">${row}</div>
         <button class="btn primary play" type="button" data-testid="play-btn">PLAY</button>
-        <p class="hint"><span class="mouse">WASD move · Space attack · Q E R skills · U upgrades</span><span class="touchhint">Left thumb move · Right thumb attack · tab on the right: upgrades</span></p>`,
+        <p class="hint"><span class="mouse">WASD move · Space attack · Q E R skills · 1 2 3 or Ctrl+Q/E/R rank up</span><span class="touchhint">Left thumb move · Right thumb attack · tap the gold + above a skill to level it</span></p>`,
       (el) => on(el, '.play', onPlay));
     },
 

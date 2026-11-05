@@ -116,54 +116,36 @@ body:not(.touch) .sk .key { display: flex; }
 @keyframes shock { 0% { scale: .6; opacity: 1; } 100% { scale: 3.4; opacity: 0; } }
 @keyframes glow { 50% { opacity: .45; } }
 
-/* ---------- upgrade drawer (nonmodal edge tab) ---------- */
-#upgrades { display: none; position: fixed; right: calc(8px + var(--sr)); top: calc(78px + var(--st)); z-index: 4; pointer-events: none; }
-body.playing #upgrades { display: flex; align-items: flex-start; gap: 6px; }
-.upanel { display: none; gap: 6px; }
-#upgrades.open .upanel { display: flex; animation: upfade .16s ease-out; }
-@keyframes upfade { from { opacity: 0; } to { opacity: 1; } }
-.upbtn { position: relative; width: 64px; height: 72px; padding: 6px 4px 4px; display: flex; flex-direction: column; align-items: center; gap: 1px; border: 2px solid var(--c, #fff); background: linear-gradient(180deg, rgba(28,38,64,.95), rgba(11,16,32,.95)); color: #fff; font-family: inherit; cursor: pointer;
-  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%); pointer-events: none; touch-action: manipulation; --c: var(--hero, #fff); }
-#upgrades.open .upbtn { pointer-events: auto; }
-.upbtn .ico { width: 30px; height: 30px; padding: 3px; background: var(--hero, #666); display: block; }
-.upbtn b { position: absolute; left: 4px; top: 2px; font-size: 13px; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; }
-.upbtn .pips { display: flex; gap: 3px; margin-top: 3px; }
-.upbtn .pips i { width: 8px; height: 6px; background: rgba(255,255,255,.18); border: 1px solid var(--ink); }
-.upbtn .pips i.on { background: var(--gold); }
-.upbtn .mark { text-decoration: none; font-size: 15px; font-weight: 700; line-height: 1; height: 16px; color: var(--gold); -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; }
-.upbtn.off { filter: brightness(.6) saturate(.7); }
-.upbtn.maxed .mark { color: #fff; font-size: 12px; }
-.upbtn.can { --c: var(--gold); animation: upglow 1.2s ease-in-out infinite; }
-.upbtn:active { scale: .94; }
-.upbtn.shine::after, .utab.bump::after { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 30%, rgba(255,230,140,.9) 50%, transparent 70%); animation: shine .3s ease-out forwards; }
-.utab { position: relative; pointer-events: auto; cursor: pointer; width: 64px; height: 64px; padding: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px solid var(--gold); background: linear-gradient(180deg, rgba(28,38,64,.95), rgba(11,16,32,.95)); color: #fff; font-family: inherit; cursor: pointer; pointer-events: auto; touch-action: manipulation;
-  clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%, 0 10px); }
-.utab .chev { width: 20px; height: 20px; display: block; }
-.utab .chev svg { stroke: none; }
-.utab .chev path { stroke: var(--gold); stroke-width: 10; }
-#upgrades.open .utab .chev { rotate: 45deg; }
-.utab .pts { position: absolute; right: 3px; top: 3px; min-width: 20px; height: 20px; padding: 0 4px; display: flex; align-items: center; justify-content: center; font-style: normal; font-size: 14px; font-weight: 700; color: var(--ink); background: var(--gold); border: 2px solid var(--ink); }
-.utab:not(.has) .pts { background: #46506B; color: #aab; }
-.utab.has { animation: upglow 1.2s ease-in-out infinite; }
-.utab .lv { font-size: 12px; font-weight: 700; margin-top: 2px; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; }
-.utab .xpb { position: absolute; left: 6px; right: 6px; bottom: 4px; height: 4px; background: rgba(255,255,255,.15); }
-.utab .xpb i { display: block; height: 100%; width: 0; background: var(--gold); transition: width .2s; }
-.lvtoast, .xpgain { position: absolute; right: 0; pointer-events: none; opacity: 0; white-space: nowrap; text-align: right; font-weight: 700; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; }
-.lvtoast { top: 72px; font-size: 16px; color: var(--gold); }
-.xpgain { top: 96px; font-size: 14px; color: #fff; }
+/* ---------- skill rank-up (+ above each skill button) and level / XP pill ---------- */
+.skup { position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; margin: -15px 0 0 -15px; padding: 0; z-index: 2; border-radius: 50%; border: 3px solid var(--ink); background: radial-gradient(circle at 35% 30%, #FFF2A8, var(--gold)); color: var(--ink); font-family: inherit; font-size: 22px; font-weight: 800; line-height: 1; cursor: pointer; pointer-events: auto; touch-action: manipulation; box-shadow: 0 3px 0 rgba(0,0,0,.35); animation: upglow 1.1s ease-in-out infinite, uppop .25s cubic-bezier(.3, 1.6, .5, 1); }
+.skup[hidden] { display: none; }
+.skup span { display: block; margin-top: -2px; }
+.skup::before { content: ''; position: absolute; inset: -9px; border-radius: 50%; } /* bigger thumb target than the 30px disc */
+.skup:active { scale: .9; }
+.skup.s1 { translate: calc(var(--r) * -1) -34px; }
+.skup.s2 { translate: calc(var(--r) * -.71) calc(var(--r) * -.71 - 34px); }
+.skup.ult { translate: 0 calc(var(--r) * -1 - 38px); }
+.sk.ranked::before { content: ''; position: absolute; inset: -3px; border-radius: 50%; border: 4px solid var(--gold); animation: shock .4s ease-out forwards; pointer-events: none; }
+@keyframes uppop { from { scale: 0; } to { scale: 1; } }
+@keyframes upglow { 50% { filter: drop-shadow(0 0 7px rgba(255,200,61,.9)); } }
+#lvinfo { display: none; position: fixed; left: calc(100px + var(--sl)); top: calc(14px + var(--st)); z-index: 4; pointer-events: none; }
+body.playing #lvinfo { display: block; }
+.lvpill { position: relative; display: flex; align-items: center; gap: 6px; padding: 2px 8px 6px; border: 2px solid var(--ink); background: rgba(11,16,32,.8); color: #fff; font-weight: 700; }
+.lvpill .lv { font-size: 13px; }
+.lvpill .pts { display: none; min-width: 18px; height: 18px; padding: 0 4px; align-items: center; justify-content: center; font-style: normal; font-size: 13px; color: var(--ink); background: var(--gold); border: 2px solid var(--ink); border-radius: 9px; }
+.lvpill.has .pts { display: flex; }
+.lvpill .xpb { position: absolute; left: 4px; right: 4px; bottom: 2px; height: 3px; background: rgba(255,255,255,.15); }
+.lvpill .xpb i { display: block; height: 100%; width: 0; background: var(--gold); transition: width .2s; }
+.lvpill.bump { animation: ding .5s cubic-bezier(.3, 1.6, .5, 1); }
+.lvtoast, .xpgain { position: absolute; left: 0; pointer-events: none; opacity: 0; white-space: nowrap; font-weight: 700; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; }
+.lvtoast { top: 30px; font-size: 16px; color: var(--gold); }
+.xpgain { top: 54px; font-size: 14px; color: #fff; }
 .lvtoast.pop { animation: toast 2s ease-out; }
 .xpgain.pop { animation: toast 1s ease-out; }
-@keyframes toast { 0% { transform: translateX(20px); opacity: 0; } 10% { transform: none; opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; } }
-@keyframes upglow { 50% { filter: drop-shadow(0 0 7px rgba(255,200,61,.9)); } }
-@keyframes shine { from { transform: translateX(-100%); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
-.utab.bump { animation: ding .5s cubic-bezier(.3, 1.6, .5, 1); }
-/* short landscape phones: smaller drawer, panel stays left of the tab and above the skill arc */
+@keyframes toast { 0% { transform: translateX(-20px); opacity: 0; } 10% { transform: none; opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; } }
 @media (max-height: 420px) {
-  #upgrades { top: calc(66px + var(--st)); }
-  .upbtn { width: 56px; height: 62px; }
-  .upbtn .ico { width: 26px; height: 26px; }
-  .utab { width: 56px; height: 56px; }
-  .lvtoast { top: 62px; } .xpgain { top: 84px; }
+  .skup { width: 28px; height: 28px; margin: -14px 0 0 -14px; font-size: 20px; }
+  #lvinfo { left: calc(90px + var(--sl)); top: calc(10px + var(--st)); }
 }
 
 /* ---------- screens ---------- */
