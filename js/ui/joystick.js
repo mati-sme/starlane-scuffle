@@ -9,7 +9,7 @@ export function initTouchControls() {
   const base = document.getElementById('stick-base');
   const knob = document.getElementById('stick-knob');
   const atk = document.getElementById('atk');
-  atk.innerHTML = icons.claw;
+  atk.innerHTML = icons.basic_melee; // the HUD swaps in the champion's own basic-attack glyph
 
   if (matchMedia('(pointer: coarse)').matches) document.body.classList.add('touch');
   addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });

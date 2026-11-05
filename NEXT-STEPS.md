@@ -1,8 +1,10 @@
 # Next steps
-Stage 1 (12 champions, skill ranks, upgrade drawer, champion select, sci-fi palette and font) is in. Still to do, per DESIGN.md:
-- Stage 2: larger arena (MAP data, collisions, brush), 3-lane waves, 5v5, minimap and scorebar, Overdrive and tiebreak rules. The match is still 2v2 on the old one-lane map.
-- Stage 3: full bot brain (lanes, roaming, neutral camps, difficulty split) and team composition. Bots currently use the old lane logic plus per-kind skill rules and auto-spend.
-- Stage 4: telegraph/hit polish, damage numbers, bust-render portraits (portraits are SVG role glyphs), audio retune, tutorial hints, results reasons, VS splash.
-- Balance pass: all numbers are first-draft (the Bullet Storm, Orbital Lock and trail damage were not tuned in full matches).
-- Simplifications to revisit: slow is one strength (not %), Prism's turret has no HP and cannot be targeted, shots are hitscan lines, stealth is only hidden from enemy targeting (allies see it as normal).
+Stages 1 and 2 (plus the bot essentials of stage 3) are in: 12 champions with ranks, the nonmodal upgrade drawer, the 180 x 112 three-lane arena with cover and brush, towers / guardians / cores with the unlock order, 5v5 with fair compositions, minion waves on all lanes, 4 neutral camps, Overdrive and the tiebreak, the minimap and scorebar, and one shared bot brain. Verified headless only (stubbed-DOM sim of full matches, see below); **not yet verified in a browser or on a phone** - check the minimap, scorebar, drawer tap and camera framing on 844 x 390 first.
+
+Still to do, per DESIGN.md:
+- Stage 3 leftovers: pause-menu difficulty switch (`settings.stars` exists, default 1, no UI), a DEFEND that reacts to attackers rather than structure damage, `matchIndex`-based composition (the melee slots are random), smarter jungle (camp clears do not check the camp's damage race).
+- Stage 4: telegraph / hit polish, damage numbers, bust-render portraits (portraits are SVG role glyphs), audio retune, tutorial ghost hints and the first-20 s lane arrow, VS splash, 1-3 star rules beyond the current ones.
+- Not implemented from the arena design: the hex shimmer on shielded structures (the 35% backdoor reduction itself works), 50% opacity for hidden allies (they only shrink slightly), minions inside brush are never hidden, no per-projectile segment test (cover is a point test per step, so a very fast shot could skip a thin wall), cover has no outline pass.
+- Balance: all numbers are first-draft. Headless sims (default difficulty, Sunny driven by the bot brain) end by tiebreak at 9:00 with Sunny ahead; cores rarely fall in the sims, so the Overdrive pace and tower HP may want trimming. The player-side bots are equal to Gloom's except for the difficulty handicap.
+- Simplifications to revisit: slow is one strength (not %), Prism's turret has no HP and cannot be targeted, shots are hitscan lines, bots steer straight at goals (cover is handled by push-out plus a sidestep nudge, no pathfinding), fog of war is only the minimap (the 3D view shows everything outside brush).
 - Check skill and drawer button sizes on a real phone (skills are 68/76 px, spec asks 76/84).

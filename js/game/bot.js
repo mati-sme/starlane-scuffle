@@ -1,36 +1,63 @@
-// Simple hero AI: push behind the minion wave, fight nearby heroes / minions, retreat to the fountain when low.
-// Decisions are re-made every DIFFICULTY.react seconds; steering toward the current goal runs every sim step.
-import { MAP, TOWER, BOT, DIFFICULTY, settings, TEAM, sideX } from '../config.js';
+// Hero AI for both teams (identical rules, only reaction time / damage scale by difficulty on Gloom):
+// RETREAT > DEFEND > FIGHT > PUSH > LANE / ROAM. Decisions are re-made every `react` seconds; steering runs every sim step.
+// Bots walk lane paths with their minion wave, never stand in an enemy tower's range without 2+ friendly minions
+// near it, focus low-HP heroes and cast through the same skill rules the player uses.
+import { TOWER, BOT, DIFFICULTY, settings, MATCH } from '../config.js';
 import { rand } from '../core/math.js';
 import { pickTarget, bestCluster } from './targeting.js';
 import { forEachAlly } from './combat.js';
+import { PATHS, fountain, structSpot, laneOf } from '../world/arena.js';
 
-const nearestHero = (ctx, h, range) => pickTarget(ctx, h.team, h.x, h.z, range, ['heroes']);
+const MELEE = { tank: 0, bruiser: 1, assassin: 2 };
+// Where to stand relative to the minion front: > 0 is ahead of it, < 0 behind (units along the lane).
+const SPACING = { tank: 1, bruiser: 0, assassin: 0, blaster: -3, shooter: -4, support: -2 };
+const ROAM = 3;
+
+// Lane plan per team: bot lane = shooter + support, mid = blaster, top = the more durable melee, roam = the other melee.
+export function assignLanes(heroes) {
+  for (const team of [0, 1]) {
+    const bots = heroes.filter((h) => h.team === team && h.brain);
+    const melee = bots.filter((h) => h.def.role in MELEE).sort((a, b) => MELEE[a.def.role] - MELEE[b.def.role]);
+    for (const h of bots) {
+      const r = h.def.role;
+      h.brain.lane = r === 'blaster' ? 1 : r === 'shooter' || r === 'support' ? 2 : melee.indexOf(h) === 0 ? 0 : ROAM;
+      h.brain.roamLane = h.brain.lane === ROAM ? 1 : h.brain.lane;
+    }
+  }
+}
 
 export class Bot {
   constructor(hero) {
     this.h = hero;
     this.it = { x: 0, z: 0, attack: true, cast: [false, false, false] };
     this.goal = { x: hero.x, z: hero.z, follow: null, keep: 0.5 };
+    this.lane = 1;
+    this.roamLane = 1;
     this.reset();
   }
 
   reset() {
     this.t = rand(0, 0.5);
     this.retreat = false;
+    this.focus = null;
+    this.state = 'lane';
+    this.roamT = 0;
+    this.stuckT = 0; this.nudge = 0; this.nudgeSide = 1;
+    this.sx = this.h.x; this.sz = this.h.z;
     Object.assign(this.goal, { x: this.h.x, z: this.h.z, follow: null, keep: 0.4 });
   }
 
   // -> intent { x, z, attack, cast[3] } for Hero.update
   think(dt, ctx) {
-    const it = this.it;
+    const it = this.it, h = this.h;
     it.cast[0] = it.cast[1] = it.cast[2] = false;
-    if (this.h.points > 0) this._spend();
+    if (!h.alive) return it;
+    if (h.points > 0) this._spend();
     if ((this.t -= dt) <= 0) {
-      this.t = DIFFICULTY.react[settings.stars - 1] * rand(0.8, 1.2);
+      this.t = (h.team === 1 ? DIFFICULTY.react[settings.stars - 1] : DIFFICULTY.allyReact) * rand(0.8, 1.2);
       this._decide(ctx);
     }
-    this._steer();
+    this._steer(dt, ctx);
     return it;
   }
 
@@ -40,48 +67,185 @@ export class Bot {
     for (const s of order) if (h.spendPoint(s)) return;
   }
 
-  // Furthest progress (in march direction) we may stand at: an enemy tower with no friendly minions near it
-  // is off limits inside its range.
-  _limit(ctx, dir) {
+  // The hostile tower whose range covers (x, z) without 2+ friendly minions beside it, if any.
+  _unsafe(ctx, x, z) {
     const h = this.h;
     for (const s of ctx.towers) {
       if (s.team === h.team || !s.alive) continue;
+      if (Math.hypot(s.x - x, s.z - z) > TOWER.range + 0.8) continue;
       let near = 0;
-      for (const m of ctx.minions.list) if (m.team === h.team && m.alive && Math.abs(m.x - s.x) < 7) near++;
-      if (near < 2) return dir * (s.x - dir * (TOWER.range + 1.2));
+      for (const m of ctx.minions.list) if (m.team === h.team && m.alive && Math.hypot(m.x - s.x, m.z - s.z) < 7) near++;
+      if (near < 2) return s;
     }
-    return Infinity;
+    return null;
+  }
+
+  // Best visible enemy hero inside aggro range: low HP, already hitting heroes, focused by allies, assassin prey.
+  _foe(ctx) {
+    const h = this.h, role = h.def.role;
+    let best = null, bs = -Infinity;
+    for (const e of ctx.heroes) {
+      if (e.team === h.team || !e.alive || e.hidden || e.untarget) continue;
+      const d = Math.hypot(e.x - h.x, e.z - h.z) - e.radius;
+      if (d > BOT.aggro) continue;
+      let sc = 60 * (1 - e.hp / e.maxHp) - d * 2;
+      if (e.aggroAge < 2) sc += 30;
+      if (role === 'assassin' && (e.def.role === 'blaster' || e.def.role === 'shooter' || e.def.role === 'support')) sc += 40;
+      for (const a of ctx.heroes) if (a !== h && a.team === h.team && a.brain?.focus === e) { sc += 15; break; }
+      if (sc > bs) { best = e; bs = sc; }
+    }
+    return best;
+  }
+
+  // HP-weighted local power: allies (incl. self) vs visible enemies within 10 u of the foe.
+  _power(ctx, foe) {
+    const h = this.h;
+    let a = 0, e = 0;
+    for (const o of ctx.heroes) {
+      if (!o.alive || Math.hypot(o.x - foe.x, o.z - foe.z) > 10) continue;
+      if (o.team === h.team) a += o.hp; else if (!o.hidden) e += o.hp;
+    }
+    return a / Math.max(1, e);
+  }
+
+  // Walk the lane path home: nearest waypoint first, then the one before it, finally the fountain.
+  _homeward() {
+    const h = this.h, fo = fountain(h.team), pts = PATHS[h.team][this.lane === ROAM ? laneOf(h.z) : this.lane].pts;
+    if (Math.hypot(fo.x - h.x, fo.z - h.z) < 14) return fo;
+    let bi = 0, bd = Infinity;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const d = Math.hypot(pts[i].x - h.x, pts[i].z - h.z);
+      if (d < bd) { bd = d; bi = i; }
+    }
+    if (bi === 0) return fo;
+    return bd < 4 ? pts[bi - 1] : pts[bi];
+  }
+
+  // Lane front: just behind (or ahead of, for tanks) our furthest minion on the lane; with no wave, at our outer tower.
+  _laneGoal(ctx, lane, g) {
+    const h = this.h, off = SPACING[h.def.role] ?? 0;
+    let front = null;
+    for (const m of ctx.minions.list) {
+      if (m.team === h.team && m.alive && m.lane === lane && m.dying <= 0 && (!front || m.prog > front.prog)) front = m;
+    }
+    if (front) {
+      const p = PATHS[h.team][lane].pts[Math.max(0, front.wp - 1)];
+      const dx = p.x - front.x, dz = p.z - front.z, d = Math.hypot(dx, dz) || 1;
+      g.x = front.x - (dx / d) * off; g.z = front.z - (dz / d) * off;
+    } else {
+      const t = structSpot(h.team, 'outer', lane), fo = fountain(h.team);
+      const dx = fo.x - t.x, dz = fo.z - t.z, d = Math.hypot(dx, dz) || 1;
+      g.x = t.x + (dx / d) * 3; g.z = t.z + (dz / d) * 3;
+    }
+    if (h.def.role === 'support') { // stay with the lane partner
+      const mate = ctx.heroes.find((o) => o !== h && o.team === h.team && o.alive && o.def.role === 'shooter');
+      if (mate && Math.hypot(mate.x - h.x, mate.z - h.z) > 5) { g.x = mate.x; g.z = mate.z; }
+    }
+    g.keep = 0.6;
+  }
+
+  // Roamer: our own camps first (from their spawn time), otherwise the lane with the biggest hero deficit (re-checked every 10 s).
+  _roam(ctx, g) {
+    const h = this.h;
+    if (ctx.time >= MATCH.campFirst && h.hp > h.maxHp * 0.5) {
+      let best = null, bd = Infinity;
+      for (const c of ctx.camps.list) {
+        if (!c.alive || (c.hx > 0) === (h.team === 0)) continue; // own side only
+        const d = Math.hypot(c.x - h.x, c.z - h.z);
+        if (d < bd) { best = c; bd = d; }
+      }
+      if (best) { g.follow = best; g.keep = h.basicRange * 0.7; this.state = 'camp'; return best; }
+    }
+    if (ctx.time >= this.roamT) {
+      this.roamT = ctx.time + 10;
+      const bal = [0, 0, 0];
+      for (const o of ctx.heroes) if (o.alive) bal[laneOf(o.z)] += o.team === h.team ? -1 : 1;
+      let bl = this.roamLane;
+      for (let i = 0; i < 3; i++) if (bal[i] > bal[bl]) bl = i;
+      this.roamLane = bl;
+    }
+    this._laneGoal(ctx, this.roamLane, g);
+    return null;
   }
 
   _decide(ctx) {
-    const h = this.h, g = this.goal, it = this.it, dir = TEAM[h.team].dir, frac = h.hp / h.maxHp;
-    if (!this.retreat && frac < BOT.retreatHp) this.retreat = true;
+    const h = this.h, g = this.goal, it = this.it, frac = h.hp / h.maxHp;
+    g.follow = null;
+    this.focus = null;
+
+    let foe = this._foe(ctx), crowd = 0;
+    if (foe) for (const e of ctx.heroes) if (e.team !== h.team && e.alive && !e.hidden && Math.hypot(e.x - h.x, e.z - h.z) < 8) crowd++;
+    if (!this.retreat && (frac < BOT.retreatHp || (frac < 0.5 && crowd >= 2))) this.retreat = true;
     else if (this.retreat && frac >= BOT.returnHp) this.retreat = false;
 
-    const foe = nearestHero(ctx, h, BOT.aggro);
-    g.follow = null;
-
-    if (this.retreat) { // home fountain heals; use the defensive skill if someone is on our heels
-      g.x = sideX(h.team, MAP.heroX); g.z = (h.slot ? 1 : -1) * 1.4; g.keep = 0.4;
-      if (foe && Math.hypot(foe.x - h.x, foe.z - h.z) < 4 && h.cds[1] <= 0) it.cast[1] = true;
+    if (this.retreat) {
+      const p = this._homeward();
+      g.x = p.x; g.z = p.z; g.keep = 0.4;
+      this.state = 'retreat';
+      if (foe && Math.hypot(foe.x - h.x, foe.z - h.z) < 5) { // escape-capable skill when someone is on our heels
+        for (let i = 1; i >= 0; i--) if (h.ranks[i] > 0 && h.cds[i] <= 0 && h.rs[i].kind !== 'nova') { it.cast[i] = true; break; }
+      }
       return;
     }
 
-    const limit = this._limit(ctx, dir);
-    const minion = pickTarget(ctx, h.team, h.x, h.z, h.basicRange + 3, ['minions']);
-    const tgt = foe ?? minion;
-    if (tgt && dir * tgt.x <= limit + 0.5) {
-      g.follow = tgt;
-      g.keep = h.basic.range >= 6 ? h.basicRange * 0.8 : h.basicRange * 0.7;
-    } else {
-      let front = -MAP.towerX[0]; // wait at our outer tower until a wave marches
-      for (const m of ctx.minions.list) if (m.team === h.team && m.alive) front = Math.max(front, dir * m.x);
-      g.x = dir * Math.min(front - 0.5, limit);
-      g.z = (h.slot ? 1 : -1) * 1.5;
-      g.keep = 0.4;
+    if (foe && this._unsafe(ctx, foe.x, foe.z)) foe = null; // never dive a tower for a hero
+
+    let hurt = null; // DEFEND: an own structure was hit lately and we are close
+    for (const s of ctx.structures) {
+      if (s.team === h.team && s.alive && ctx.time - s.hurtAt < 3 && Math.hypot(s.x - h.x, s.z - h.z) < 35) { hurt = s; break; }
     }
 
-    for (let i = 0; i < 3; i++) if (h.ranks[i] > 0 && h.cds[i] <= 0 && !it.cast[i] && this._want(ctx, i, foe)) it.cast[i] = true;
+    const ratio = foe ? this._power(ctx, foe) : 0;
+    let skillFoe = foe;
+    if (foe && ratio >= BOT.powerRatio) { // FIGHT
+      this.state = 'fight';
+      this.focus = foe;
+      g.follow = foe;
+      g.keep = h.basicRange * (h.basic.range >= 6 ? 0.8 : 0.7);
+    } else if (hurt) { // DEFEND
+      this.state = 'defend';
+      let ne = null, nd = 14;
+      for (const e of ctx.heroes) {
+        const d = Math.hypot(e.x - hurt.x, e.z - hurt.z);
+        if (e.team !== h.team && e.alive && !e.hidden && d < nd && !this._unsafe(ctx, e.x, e.z)) { ne = e; nd = d; }
+      }
+      if (ne) { g.follow = ne; g.keep = h.basicRange * 0.7; skillFoe = ne; } else { g.x = hurt.x; g.z = hurt.z; g.keep = 4; }
+    } else {
+      const push = foe ? null : this._pushTarget(ctx);
+      if (push) { // PUSH
+        this.state = 'push';
+        g.follow = push;
+        g.keep = h.basicRange * 0.75;
+      } else { // LANE / ROAM
+        this.state = 'lane';
+        if (this.lane === ROAM) skillFoe = this._roam(ctx, g) ?? foe;
+        else this._laneGoal(ctx, this.lane, g);
+        if (!g.follow && !foe && this.lane !== ROAM) {
+          const m = pickTarget(ctx, h.team, h.x, h.z, h.basicRange + 2, ['minions']);
+          if (m) { g.follow = m; g.keep = h.basicRange * 0.8; }
+        }
+      }
+    }
+
+    for (let i = 0; i < 3; i++) if (h.ranks[i] > 0 && h.cds[i] <= 0 && !it.cast[i] && this._want(ctx, i, skillFoe)) it.cast[i] = true;
+  }
+
+  // A vulnerable enemy structure with 2+ of our minions beside it and no enemy hero close by.
+  _pushTarget(ctx) {
+    const h = this.h;
+    let best = null, bd = 55;
+    for (const s of ctx.structures) {
+      if (s.team === h.team || !s.alive || !s.vulnerable) continue;
+      const d = Math.hypot(s.x - h.x, s.z - h.z);
+      if (d >= bd) continue;
+      let near = 0;
+      for (const m of ctx.minions.list) if (m.team === h.team && m.alive && Math.hypot(m.x - s.x, m.z - s.z) < 7) near++;
+      if (near < 2) continue;
+      let guarded = false;
+      for (const e of ctx.heroes) if (e.team !== h.team && e.alive && !e.hidden && Math.hypot(e.x - s.x, e.z - s.z) < 7) { guarded = true; break; }
+      if (!guarded) { best = s; bd = d; }
+    }
+    return best;
   }
 
   // Per-kind rule of thumb for when a skill is worth casting.
@@ -120,13 +284,36 @@ export class Bot {
     }
   }
 
-  _steer() {
+  _steer(dt, ctx) {
     const h = this.h, g = this.goal, it = this.it;
     const tx = g.follow ? g.follow.x : g.x, tz = g.follow ? g.follow.z : g.z;
     const dx = tx - h.x, dz = tz - h.z, d = Math.hypot(dx, dz);
-    const keep = g.follow ? g.keep + g.follow.radius : 0.4;
+    const keep = g.follow ? g.keep + g.follow.radius : 0.6;
     if (d > keep) { it.x = dx / d; it.z = dz / d; }
     else if (g.follow && h.basic.range >= 6 && d < keep * 0.5) { it.x = -dx / d; it.z = -dz / d; } // ranged heroes back off
     else it.x = it.z = 0;
+
+    // Never walk into an enemy tower's range without friendly minions beside it.
+    if (it.x || it.z) {
+      const s = this._unsafe(ctx, h.x + it.x * 1.5, h.z + it.z * 1.5);
+      if (s) {
+        const ax = h.x - s.x, az = h.z - s.z, ad = Math.hypot(ax, az) || 1;
+        it.x = ax / ad; it.z = az / ad;
+      }
+    }
+
+    // Stuck behind cover: sidestep for a moment.
+    this.stuckT += dt;
+    if (this.stuckT >= 1.5) {
+      this.stuckT = 0;
+      if ((it.x || it.z) && d > 4 && Math.hypot(h.x - this.sx, h.z - this.sz) < 0.6) { this.nudge = 0.7; this.nudgeSide = Math.random() < 0.5 ? -1 : 1; }
+      this.sx = h.x; this.sz = h.z;
+    }
+    if (this.nudge > 0) {
+      this.nudge -= dt;
+      const a = 1.2 * this.nudgeSide, c = Math.cos(a), s = Math.sin(a), x = it.x;
+      it.x = x * c - it.z * s;
+      it.z = x * s + it.z * c;
+    }
   }
 }

@@ -1,6 +1,7 @@
 // Towers: stone shaft, team band, spinning crystal. Shoot minions first, then heroes.
 import * as THREE from 'three';
-import { PAL, TEAM, TOWER, MAP, GROUND, sideX } from '../config.js';
+import { PAL, TEAM, TOWER, GROUND } from '../config.js';
+import { structSpot } from './arena.js';
 import { rand } from '../core/math.js';
 import { bus } from '../core/bus.js';
 import { toonMat, toonMesh, mergeParts, makeShadow, makeHalo } from '../render/toon.js';
@@ -9,24 +10,30 @@ import { vfx } from '../render/vfx.js';
 import { tickHitFx, dyingScale } from '../game/combat.js';
 import { pickTarget, ORDER_TOWER } from '../game/targeting.js';
 
+const AGGRO_T = 2; // an enemy hero that hit an ally hero this recently draws the tower first
+
 const CRYSTAL_Y = 4.9;
 
 export class Tower {
   constructor(scene, team, idx) {
     this.type = 'tower';
     this.team = team;
-    this.idx = idx;
-    this.x = sideX(team, MAP.towerX[idx]);
-    this.z = 0;
+    this.idx = idx; // 0-2 outer towers (top / mid / bot lane), 3-4 guardians
+    this.tier = idx < 3 ? 'outer' : 'guard';
+    this.lane = idx < 3 ? idx : -1;
+    const spot = structSpot(team, this.tier, this.lane >= 0 ? idx : idx - 3);
+    this.x = spot.x;
+    this.z = spot.z;
     this.rx = this.x; this.rz = this.z;
     this.radius = TOWER.radius;
     this.hitY = 2.4;
-    this.barY = 6.2;
-    this.maxHp = TOWER.hp[idx];
+    this.barY = this.tier === 'guard' ? 7.2 : 6.2;
+    this.maxHp = TOWER.hp[this.tier];
 
     const c = TEAM[team];
     this.group = new THREE.Group();
-    this.group.position.set(this.x, GROUND, 0);
+    this.group.position.set(this.x, GROUND, this.z);
+    if (this.tier === 'guard') this.group.scale.setScalar(1.18);
     this.group.add(makeShadow(4.4));
 
     this.mat = toonMat({ vertexColors: true });
@@ -69,7 +76,11 @@ export class Tower {
   reset() {
     this.hp = this.maxHp;
     this.alive = true;
-    this.vulnerable = this.idx === 0;
+    this.vulnerable = this.tier === 'outer';
+    this.shielded = false;
+    this.hurtAt = -99;
+    this.streak = 0;
+    this.lastTgt = null;
     this.dying = 0;
     this.flash = 0;
     this.squash = 0;
@@ -86,14 +97,32 @@ export class Tower {
       if (this.dying <= 0) this.shatter();
     }
     if (!this.alive || ctx.over) return;
+    if (this.flash > 0) this.hurtAt = ctx.time;
     this.cd -= dt;
     if (this.cd > 0) return;
-    const tgt = pickTarget(ctx, this.team, this.x, this.z, TOWER.range, ORDER_TOWER);
+    const tgt = this._target(ctx);
     if (!tgt) return;
     this.cd = TOWER.cd;
-    ctx.projectiles.fire(this, tgt, TOWER.dmg, 14, 1.5, GROUND + CRYSTAL_Y);
+    let dmg = TOWER.minionDmg;
+    if (tgt.type === 'hero') { // consecutive shots on the same hero ramp up to x2
+      this.streak = this.lastTgt === tgt ? Math.min(4, this.streak + 1) : 0;
+      dmg = (TOWER.heroDmg + TOWER.heroPct * tgt.maxHp) * Math.min(2, 1 + 0.25 * this.streak);
+    } else this.streak = 0;
+    this.lastTgt = tgt;
+    ctx.projectiles.fire(this, tgt, dmg, 14, 1.5, GROUND + CRYSTAL_Y);
     bus.emit('towerShot', this);
     vfx.ring(this.x, GROUND + CRYSTAL_Y, this.z, TEAM[this.team].main, 1.6, 0.25);
+  }
+
+  // 1. an enemy hero that recently hit an allied hero inside range, 2. nearest minion, 3. nearest hero.
+  _target(ctx) {
+    let best = null, bd = TOWER.range;
+    for (const h of ctx.heroes) {
+      if (h.team === this.team || !h.alive || h.hidden || h.untarget || h.aggroAge > AGGRO_T) continue;
+      const d = Math.hypot(h.x - this.x, h.z - this.z) - h.radius;
+      if (d <= bd) { best = h; bd = d; }
+    }
+    return best ?? pickTarget(ctx, this.team, this.x, this.z, TOWER.range, ORDER_TOWER);
   }
 
   shatter() {

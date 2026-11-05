@@ -40,9 +40,9 @@ export class LevelUp {
       el, pips: [...el.querySelectorAll('.pips i')], mark: el.querySelector('.mark'), ico: el.querySelector('.ico'),
     }));
 
-    this.tab.addEventListener('pointerdown', (e) => { e.preventDefault(); this.toggle(); });
+    this.tab.addEventListener('click', () => this.toggle()); // click (not pointerdown) so taps, mouse and synthetic clicks all open it
     for (const [i, b] of this.btns.entries()) {
-      b.el.addEventListener('pointerdown', (e) => { e.preventDefault(); this.match.hero.spendPoint(i); });
+      b.el.addEventListener('click', () => this.match.hero.spendPoint(i));
     }
     addEventListener('keydown', (e) => {
       if (e.code === 'KeyU' && !e.repeat && document.body.classList.contains('playing')) this.toggle();

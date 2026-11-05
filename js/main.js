@@ -58,7 +58,7 @@ function leave(next) {
   document.body.classList.remove('playing');
   hud.hide();
   match.reset();
-  rig.orbit(-MAP.heroX + 1, 1.5, 0);
+  rig.orbit(-MAP.heroX + 4, 1.5, 0);
   audio.music(true);
 }
 
@@ -127,7 +127,7 @@ const loop = createLoop({
     vfx.update(dt, t);
     rig.update(dt, gfx.camera.aspect);
     gfx.camera.updateMatrixWorld(); // health bars project with this frame's camera
-    hud.update();
+    hud.update(dt);
     gfx.renderer.render(gfx.scene, gfx.camera);
     gfx.adapt(realDt);
   },

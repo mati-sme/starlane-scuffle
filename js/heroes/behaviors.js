@@ -195,8 +195,7 @@ const BEHAVIORS = {
         .filter((e) => e.team !== h.team && e.alive && !e.hidden && !e.untarget && Math.hypot(e.x - h.x, e.z - h.z) - e.radius <= ab.range)
         .sort((a, b) => a.hp - b.hp).slice(0, ab.strikes ?? 1).map((e) => ({ x: e.x, z: e.z }));
       if (!pts.length) return false;
-    } else if (aim.has) pts = [{ x: aim.x, z: aim.z }];
-    else return false;
+    } else pts = [{ x: aim.x, z: aim.z }]; // no cluster: strike ahead of the hero
 
     const x0 = h.x, z0 = h.z;
     for (const { x, z } of pts) {
@@ -221,7 +220,6 @@ const BEHAVIORS = {
 
   // Many small blasts scattered over an area.
   rain(h, ab, ctx, aim) {
-    if (!aim.has) return false;
     const col = h.def.color, acc = h.def.accent, A = ab.radius, n = ab.count, step = ab.dur / n;
     vfx.decal(aim.x, aim.z, col, A, ab.dur + 0.4);
     vfx.ring(aim.x, 0.2, aim.z, acc, A * 1.2, 0.5);

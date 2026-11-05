@@ -1,5 +1,5 @@
 // Damage, hit feedback, status effects and the star-poof defeat animation.
-import { PAL, TEAM } from '../config.js';
+import { PAL, TEAM, TOWER } from '../config.js';
 import { bus } from '../core/bus.js';
 import { particles, poofStars, FRAME } from '../render/particles.js';
 import { vfx } from '../render/vfx.js';
@@ -14,7 +14,8 @@ export function dealDamage(t, amount, src) {
   if (!t.alive || t.untarget) return;
   if (src?.outMul) amount *= src.outMul;
   if (t.buf?.dr) amount *= 1 - t.buf.dr.v;
-  SPARK.color = src ? TEAM[src.team].main : PAL.gold;
+  if (t.shielded && src?.type === 'hero') amount *= TOWER.shield; // backdoor: no friendly minions nearby
+  SPARK.color = TEAM[src?.team]?.main ?? PAL.gold;
   if (t.shieldHp > 0) {
     const soak = Math.min(t.shieldHp, amount);
     t.shieldHp -= soak;
@@ -35,7 +36,11 @@ export function dealDamage(t, amount, src) {
     t.x += (dx / d) * 0.3;
     t.z += (dz / d) * 0.3;
   }
-  if (t.type === 'hero' && src) { t.attacker = src; t.attackerAge = 0; }
+  if (t.type === 'hero' && src) {
+    t.attacker = src; t.attackerAge = 0;
+    if (src.type === 'hero') src.aggroAge = 0; // towers punish heroes that hit heroes
+  }
+  if (t.type === 'camp' && src) t.provoked = src;
   bus.emit('hit', t);
   if (t.hp <= 0) {
     t.hp = 0;
@@ -60,10 +65,11 @@ export function forEachEnemy(ctx, team, x, z, r, fn) {
   for (const e of ctx.heroes) test(e);
   for (const e of ctx.minions.list) test(e);
   for (const e of ctx.structures) test(e);
+  for (const e of ctx.camps.list) test(e);
 }
 
 // ---- status effects: stun / root / slow / air (knock-up) timers and forced movement ----
-const SOLID = new Set(['tower', 'core']);
+const SOLID = new Set(['tower', 'core', 'camp']);
 
 export function applyStatus(e, kind, dur) {
   if (SOLID.has(e.type) || !e.alive) return;

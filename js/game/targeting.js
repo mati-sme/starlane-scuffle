@@ -1,13 +1,14 @@
 // Auto-aim: nearest valid enemy by edge distance, searched in priority order.
-export const ORDER_HERO = ['heroes', 'minions', 'structures'];
+export const ORDER_HERO = ['heroes', 'minions', 'camps', 'structures'];
 export const ORDER_MINION = ['minions', 'heroes', 'structures'];
 export const ORDER_TOWER = ['minions', 'heroes'];
-const ORDER_REST = ['minions', 'structures'];
+const ORDER_REST = ['minions', 'camps', 'structures'];
 
 const lists = {
   heroes: (ctx) => ctx.heroes,
   minions: (ctx) => ctx.minions.list,
   structures: (ctx) => ctx.structures,
+  camps: (ctx) => ctx.camps.list,
 };
 
 const valid = (e, team) => e.team !== team && e.alive && e.vulnerable !== false && !e.hidden && !e.untarget;

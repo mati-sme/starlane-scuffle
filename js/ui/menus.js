@@ -104,12 +104,12 @@ export function createMenus(root) {
       (el) => { on(el, '.resume', onResume); on(el, '.home', onHome); });
     },
 
-    showResult({ win, stars, time }, { onAgain, onHome }) {
+    showResult({ win, stars, time, reason }, { onAgain, onHome }) {
       const row = [0, 1, 2].map((i) => `<i class="${i < stars ? 'on' : ''}" style="--i:${i}">${icons.star(i < stars ? hex(PAL.gold) : '#2B3550')}</i>`).join('');
       const btns = `<div class="row"><button class="btn primary again" type="button" data-testid="again-btn">PLAY AGAIN</button><button class="btn home" type="button" data-testid="champions-btn">CHAMPIONS</button></div>`;
       show(win ? 'result win modal' : 'result lose modal', `
         <h2 data-testid="result-title">${win ? 'Victory' : 'Defeat'}</h2>
-        <p class="reason">${win ? 'Enemy core destroyed' : 'Your core fell'} · ${mmss(time)}</p>
+        <p class="reason">${reason} · ${mmss(time)}</p>
         ${win ? `<div class="stars">${row}</div>` : ''}${btns}`,
       (el) => { on(el, '.again', onAgain); on(el, '.home', onHome); });
     },

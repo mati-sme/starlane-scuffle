@@ -1,16 +1,14 @@
-// In-match HUD: portrait + HP ring + XP arc + level, lane bar (minimap), match clock, respawn ring,
+// In-match HUD: portrait + HP ring + XP arc + level, corner minimap, scorebar (kills, clock, structure pips), respawn ring,
 // takedown banner, pooled health bars. Owns the skill buttons and the upgrade drawer.
 import * as THREE from 'three';
-import { MAP, MATCH, HERO, TEAM, GROUND } from '../config.js';
-import { clamp } from '../core/math.js';
+import { HERO, GROUND } from '../config.js';
 import { bus } from '../core/bus.js';
 import { icons } from './icons.js';
 import { Abilities } from './abilities.js';
 import { LevelUp } from './levelup.js';
+import { Minimap } from './minimap.js';
 
-const hex = (n) => '#' + n.toString(16).padStart(6, '0');
-const pct = (x) => `${clamp((x + MAP.halfLen) / (MAP.halfLen * 2), 0, 1) * 100}%`;
-const MAX_BLIPS = 48;
+const mmss = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
 
 export class Hud {
   constructor(root, barsRoot, match, camera) {
@@ -22,9 +20,10 @@ export class Hud {
 
     root.innerHTML = `
       <div class="portrait"><div class="xp"></div><div class="ring"></div><div class="face"></div><b class="lvl" data-testid="hud-level">1</b></div>
-      <div class="top">
-        <div class="lane"><div class="track"></div><div class="items"></div></div>
-        <div class="clock"><i class="pie"></i><i class="storm">${icons.star('#FFC83D')}</i></div>
+      <canvas id="mini" data-testid="minimap"></canvas>
+      <div class="top" data-testid="scorebar">
+        <div class="score"><b class="k0" data-testid="kills-blue">0</b><span class="clock" data-testid="clock">0:00</span><b class="k1" data-testid="kills-red">0</b></div>
+        <div class="pips"><div class="t0" data-testid="pips-blue"></div><div class="t1" data-testid="pips-red"></div></div>
       </div>
       <div class="respawn"><div class="rring"></div><i>${icons.star('#FFC83D')}</i></div>
       <div class="takedown"><i class="k"></i><s>${icons.star('#FFC83D')}</s><i class="v"></i></div>
@@ -35,27 +34,20 @@ export class Hud {
     this.lvlEl = root.querySelector('.lvl');
     this.respawn = root.querySelector('.respawn');
     this.rring = root.querySelector('.rring');
-    this.pie = root.querySelector('.pie');
     this.clock = root.querySelector('.clock');
+    this.kills = [root.querySelector('.k0'), root.querySelector('.k1')];
+    this.pipEls = [0, 1].map((t) => root.querySelector(`.pips .t${t}`));
+    this.pipKey = ['', ''];
+    this.sec = -1;
+    this.mini = new Minimap(root.querySelector('#mini'), match);
+    this.atk = document.getElementById('atk');
     this.banner = root.querySelector('.banner');
     this.take = root.querySelector('.takedown');
 
-    this.items = root.querySelector('.items');
-    this.icons = match.structures.map((s) => {
-      const el = document.createElement('i');
-      el.className = `struct ${s.type}`;
-      el.innerHTML = s.type === 'tower' ? icons.tower(hex(TEAM[s.team].main)) : icons.core(hex(TEAM[s.team].main));
-      el.style.left = pct(s.x);
-      this.items.appendChild(el);
-      return el;
+    this.pipEls.forEach((el, t) => {
+      el.innerHTML = '<i></i>'.repeat(5) + '<i class="core"></i>';
+      this.pipKey[t] = '';
     });
-    this.blips = Array.from({ length: MAX_BLIPS }, () => {
-      const el = document.createElement('b');
-      el.className = 'blip';
-      this.items.appendChild(el);
-      return el;
-    });
-    this.dots = [];
     this.abilities = new Abilities(match);
     this.levelup = new LevelUp(match);
 
@@ -73,7 +65,7 @@ export class Hud {
       this.take.classList.add('pop');
     });
     this.onResize();
-    addEventListener('resize', () => this.onResize());
+    addEventListener('resize', () => { this.onResize(); this.mini.resize(); });
   }
 
   onResize() { this.w = innerWidth; this.h = innerHeight; }
@@ -85,19 +77,15 @@ export class Hud {
     this.root.style.setProperty('--hero', hero.def.css);
     this.abilities.setHero(hero);
     this.levelup.reset();
-    for (const d of this.dots) d.remove();
-    this.dots = m.heroes.map((h) => {
-      const el = document.createElement('b');
-      el.className = `hero-dot t${h.team}${h === hero ? ' me' : ''}`;
-      this.items.appendChild(el);
-      return el;
-    });
+    this.atk.innerHTML = icons[`basic_${hero.basic.kind}`] ?? icons.basic_melee;
     this.lvl = -1;
+    this.sec = -1;
   }
 
   show() {
     this._setup();
     this.root.hidden = false;
+    this.mini.resize(); // needs real layout size, so after un-hiding
     this.shown = true;
     this.clock.classList.remove('storming');
     this.take.classList.remove('pop');
@@ -105,30 +93,32 @@ export class Hud {
 
   hide() { this.root.hidden = true; this.shown = false; this.barsRoot.replaceChildren(); this.bars.length = 0; this.levelup.hide(); }
 
-  update() {
+  update(dt = 0.016) {
     if (!this.shown) return;
+    this.dt = dt;
     const m = this.match, hero = m.hero;
 
     this.ring.style.setProperty('--p', (hero.hp / hero.maxHp) * 100);
     this.xp.style.setProperty('--p', hero.level >= HERO.maxLevel ? 100 : (hero.xp / HERO.xpNeed(hero.level)) * 100);
     if (this.lvl !== hero.level) { this.lvl = hero.level; this.lvlEl.textContent = hero.level; }
-    this.pie.style.setProperty('--p', clamp(m.time / MATCH.storm, 0, 1) * 100);
+    const sec = Math.floor(m.time);
+    if (sec !== this.sec) { this.sec = sec; this.clock.textContent = mmss(m.time); }
+    this.clock.classList.toggle('storming', m.storm);
+    for (const t of [0, 1]) {
+      const k = String(m.kills[t]);
+      if (this.kills[t].textContent !== k) this.kills[t].textContent = k;
+      const alive = m.structures.filter((s) => s.team === t).map((s) => (s.alive ? 1 : 0)).join('');
+      if (alive !== this.pipKey[t]) { // 3 outer towers, 2 guardians, core
+        this.pipKey[t] = alive;
+        [...this.pipEls[t].children].forEach((el, i) => el.classList.toggle('dead', alive[i] === '0'));
+      }
+    }
 
     const respawning = !hero.alive && hero.dying <= 0 && !m.over;
     this.respawn.classList.toggle('on', respawning);
     if (respawning) this.rring.style.setProperty('--p', (1 - hero.respawn / hero.respawnTotal) * 100);
 
-    m.structures.forEach((s, i) => this.icons[i].classList.toggle('dead', !s.alive));
-    m.heroes.forEach((h, i) => {
-      this.dots[i].style.left = pct(h.x);
-      this.dots[i].classList.toggle('off', !h.alive);
-    });
-    const L = m.minions.list;
-    this.blips.forEach((el, i) => {
-      const u = L[i];
-      el.style.display = u && u.alive ? '' : 'none';
-      if (u && u.alive) { el.style.left = pct(u.x); el.style.background = hex(TEAM[u.team].main); }
-    });
+    this.mini.update(this.dt, m.rig, this.w / this.h);
 
     this.abilities.update();
     this.levelup.update();
@@ -140,9 +130,9 @@ export class Hud {
     const m = this.match;
     let n = 0;
     const put = (e, cls, y) => {
-      if (!e.alive || (e.type === 'minion' && e.hp >= e.maxHp)) return;
+      if (!e.alive || ((e.type === 'minion' || e.type === 'camp') && e.hp >= e.maxHp) || (e.type === 'hero' && e.hidden && e.team !== 0)) return;
       const v = this._v.set(e.rx ?? e.x, GROUND + y + (e.lift ?? 0), e.rz ?? e.z).project(this.camera);
-      if (v.z > 1) return;
+      if (v.z > 1 || Math.abs(v.x) > 1.1 || Math.abs(v.y) > 1.1) return;
       let b = this.bars[n++];
       if (!b) {
         const el = document.createElement('div');
@@ -158,6 +148,7 @@ export class Hud {
     };
     for (const h of m.heroes) put(h, `hero t${h.team}${h === m.hero ? ' me' : ''}`, h.barY);
     for (const s of m.structures) put(s, `struct t${s.team}`, s.barY);
+    for (const c of m.camps.list) put(c, 'minion t2', c.barY);
     for (const u of m.minions.list) put(u, `minion t${u.team}`, u.barY);
     for (let i = n; i < this.bars.length; i++) this.bars[i].el.style.display = 'none';
   }

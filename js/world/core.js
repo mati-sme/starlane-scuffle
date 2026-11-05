@@ -1,6 +1,7 @@
 // The Core: floating crystal over a ring dais, orbiting shards, fresnel shield bubble.
 import * as THREE from 'three';
-import { PAL, TEAM, CORE, MAP, GROUND, sideX } from '../config.js';
+import { PAL, TEAM, CORE, GROUND } from '../config.js';
+import { structSpot } from './arena.js';
 import { toonMat, toonMesh, mergeParts, makeShadow, makeHalo } from '../render/toon.js';
 import { particles, poofStars, FRAME } from '../render/particles.js';
 import { vfx } from '../render/vfx.js';
@@ -23,8 +24,9 @@ export class Core {
   constructor(scene, team) {
     this.type = 'core';
     this.team = team;
-    this.x = sideX(team, MAP.coreX);
-    this.z = 0;
+    const spot = structSpot(team, 'core');
+    this.x = spot.x;
+    this.z = spot.z;
     this.rx = this.x; this.rz = this.z;
     this.radius = CORE.radius;
     this.hitY = CRYSTAL_Y;
@@ -33,7 +35,7 @@ export class Core {
 
     const c = TEAM[team];
     this.group = new THREE.Group();
-    this.group.position.set(this.x, GROUND, 0);
+    this.group.position.set(this.x, GROUND, this.z);
     this.group.add(makeShadow(7));
 
     this.mat = toonMat({ vertexColors: true });
@@ -70,6 +72,8 @@ export class Core {
     this.hp = this.maxHp;
     this.alive = true;
     this.vulnerable = false;
+    this.shielded = false;
+    this.hurtAt = -99;
     this._shielded = true;
     this.dying = 0;
     this.flash = 0;
@@ -79,8 +83,9 @@ export class Core {
     this.shield.visible = true;
   }
 
-  update(dt) {
+  update(dt, ctx) {
     tickHitFx(this, dt);
+    if (this.flash > 0) this.hurtAt = ctx.time;
     if (this.dying > 0) {
       this.dying -= dt;
       if (this.dying <= 0) this.shatter();

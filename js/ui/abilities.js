@@ -29,7 +29,17 @@ export class Abilities {
       return { el, face: el.querySelector('.face'), cd: el.querySelector('.cd'), num: el.querySelector('.num'), p: -1, n: -1, ready: true };
     });
     document.body.appendChild(this.root);
+    this.note = document.createElement('div');
+    this.note.id = 'notarget';
+    this.note.dataset.testid = 'no-target';
+    document.body.appendChild(this.note);
     bus.on('ultUnlock', (h) => { if (h === match.hero) this._slam(); });
+    bus.on('noCast', ({ hero, slot, why }) => { // a skill press that did nothing always says why
+      if (hero !== match.hero) return;
+      const el = this.btns[slot].el;
+      this.note.textContent = why === 'locked' ? 'Unlocks at Lv 3' : 'No target';
+      for (const [node, cls] of [[el, 'nope'], [this.note, 'pop']]) { node.classList.remove(cls); void node.offsetWidth; node.classList.add(cls); }
+    });
   }
 
   setHero(hero) {

@@ -1,6 +1,7 @@
 // Friendly/enemy minion waves. Instanced per team per type (body + outline), pooled, simple lane AI.
 import * as THREE from 'three';
-import { PAL, TEAM, UNITS, MAP, GROUND, MATCH, sideX } from '../config.js';
+import { PAL, TEAM, UNITS, MAP, GROUND, MATCH } from '../config.js';
+import { PATHS, pushOutCover } from './arena.js';
 import { rand, lerp, clamp, angleLerp } from '../core/math.js';
 import { toonMat, outlineMat, mergeParts, shadowGeo, shadowMat, SHADOW_Y } from '../render/toon.js';
 import { dealDamage, tickHitFx, tickStatus, airLift, dyingScale, poof } from '../game/combat.js';
@@ -8,8 +9,7 @@ import { pickTarget, ORDER_MINION } from '../game/targeting.js';
 
 const TYPES = ['blobling', 'zapper', 'bigblob'];
 const SPAWN_GAP = 0.6;
-const LANE_Z = 5.8;
-const MAX_TOTAL = 128;
+const MAX_TOTAL = 140;
 
 const SPH = new THREE.SphereGeometry(1, 12, 8);
 const CONE = new THREE.ConeGeometry(1, 1, 8);
@@ -95,7 +95,7 @@ export class MinionSystem {
     return {
       type: 'minion', kind: '', team: 0, x: 0, z: 0, px: 0, pz: 0, rx: 0, rz: 0, hp: 1, maxHp: 1, alive: false,
       radius: 0.5, hitY: 1, barY: 1.5, flash: 0, squash: 0, dying: 0, lunge: 0, cd: 0, facing: 0, yaw: 0, phase: 0, lane: 0,
-      stun: 0, root: 0, slow: 0, air: 0, pull: null,
+      stun: 0, root: 0, slow: 0, air: 0, pull: null, wp: 1, prog: 0,
     };
   }
 
@@ -107,22 +107,20 @@ export class MinionSystem {
     this.shadows.count = 0;
   }
 
-  // Queue a wave for one team; units trickle out of the base.
-  spawnWave(team, big) {
-    const kinds = ['blobling', 'blobling', 'blobling', 'zapper'];
-    if (big) kinds.push('bigblob');
-    kinds.forEach((kind, i) => this.queue.push({ t: i * SPAWN_GAP, team, kind }));
+  // Queue one lane's wave for one team; units trickle out of the base.
+  spawnWave(team, lane, kinds) {
+    kinds.forEach((kind, i) => this.queue.push({ t: i * SPAWN_GAP, team, kind, lane }));
   }
 
-  _spawn(team, kind) {
+  _spawn(team, kind, lane) {
     const g = this.groups[`${team}${kind}`];
     const alive = this.list.reduce((n, m) => n + (m.team === team && m.kind === kind), 0);
     if (alive >= g.max || !this.free.length) return;
-    const st = UNITS[kind], m = this.free.pop();
+    const st = UNITS[kind], m = this.free.pop(), p0 = PATHS[team][lane].pts[0];
     Object.assign(m, {
-      kind, team, x: sideX(team, MAP.spawnX), z: rand(-2, 2), hp: st.hp, maxHp: st.hp, alive: true,
+      kind, team, x: p0.x + rand(-1.5, 1.5), z: p0.z + rand(-1.5, 1.5), hp: st.hp, maxHp: st.hp, alive: true,
       radius: st.radius, hitY: st.hitY, barY: st.barY, flash: 0, squash: 0, dying: 0, lunge: 0, cd: rand(0, 0.5),
-      phase: rand(0, 6), lane: rand(-2.5, 2.5), stun: 0, root: 0, slow: 0, air: 0, pull: null,
+      phase: rand(0, 6), lane, wp: 1, prog: 0, stun: 0, root: 0, slow: 0, air: 0, pull: null,
     });
     m.px = m.x; m.pz = m.z;
     m.facing = m.yaw = TEAM[team].dir > 0 ? Math.PI / 2 : -Math.PI / 2;
@@ -132,7 +130,7 @@ export class MinionSystem {
   update(dt, ctx) {
     for (let i = this.queue.length - 1; i >= 0; i--) {
       const q = this.queue[i];
-      if ((q.t -= dt) <= 0) { this._spawn(q.team, q.kind); this.queue.splice(i, 1); }
+      if ((q.t -= dt) <= 0) { this._spawn(q.team, q.kind, q.lane); this.queue.splice(i, 1); }
     }
 
     for (let i = this.list.length - 1; i >= 0; i--) {
@@ -172,13 +170,20 @@ export class MinionSystem {
       }
       m.x += (dx / d) * go;
       m.z += (dz / d) * go;
-    } else if (go > 0) {
-      const dir = TEAM[m.team].dir;
-      m.facing = Math.atan2(dir, (m.lane - m.z) * 0.3);
-      m.x += dir * go;
-      m.z += clamp(m.lane - m.z, -1, 1) * dt;
+    } else if (go > 0) { // follow the lane path toward the enemy base
+      const path = PATHS[m.team][m.lane], pts = path.pts;
+      if (m.wp < pts.length) {
+        const w = pts[m.wp], dx = w.x - m.x, dz = w.z - m.z, d = Math.hypot(dx, dz) || 1;
+        if (d < 1.8) m.wp++;
+        m.facing = Math.atan2(dx, dz);
+        m.x += (dx / d) * go;
+        m.z += (dz / d) * go;
+        m.prog = path.cum[m.wp - 1] + Math.hypot(m.x - pts[m.wp - 1].x, m.z - pts[m.wp - 1].z);
+      }
     }
-    m.z = clamp(m.z, -LANE_Z, LANE_Z);
+    pushOutCover(m, m.radius);
+    m.x = clamp(m.x, -MAP.halfX, MAP.halfX);
+    m.z = clamp(m.z, -MAP.halfZ, MAP.halfZ);
   }
 
   _separate() {

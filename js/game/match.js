@@ -1,6 +1,6 @@
 // Match orchestration: heroes, waves, timer, Starstorm, XP, structure rules, win/lose, per-frame rendering.
 import * as THREE from 'three';
-import { MATCH, HERO, PAL } from '../config.js';
+import { MATCH, HERO, PAL, CAMP, TOWER } from '../config.js';
 import { clamp, damp, rand } from '../core/math.js';
 import { bus } from '../core/bus.js';
 import { input, readMove } from '../core/input.js';
@@ -8,12 +8,17 @@ import { particles, FRAME } from '../render/particles.js';
 import { vfx } from '../render/vfx.js';
 import { Hero, screenToWorld } from '../heroes/hero.js';
 import { HEROES, ROSTER } from '../heroes/index.js';
+import { addBuff, heal } from './combat.js';
+import { composeTeams } from './compose.js';
+import { inBrush } from '../world/arena.js';
+import { ARENA } from '../config.js';
+import { Camps } from '../world/camps.js';
 import { Tower } from '../world/tower.js';
 import { Core } from '../world/core.js';
 import { MinionSystem } from '../world/minions.js';
 import { Projectiles } from './projectiles.js';
 import { Zones } from './zones.js';
-import { Bot } from './bot.js';
+import { Bot, assignLanes } from './bot.js';
 
 const CONFETTI = [PAL.gold, PAL.sunny, PAL.gloom, PAL.heal, PAL.nebulaB, PAL.star];
 const IDLE = { x: 0, z: 0, attack: false, cast: [false, false, false] };
@@ -23,10 +28,11 @@ export class Match {
     this.scene = scene;
     this.rig = rig;
     this.map = map;
-    this.towers = [0, 1].flatMap((team) => [0, 1].map((idx) => new Tower(scene, team, idx)));
+    this.towers = [0, 1].flatMap((team) => [0, 1, 2, 3, 4].map((idx) => new Tower(scene, team, idx)));
     this.cores = [0, 1].map((team) => new Core(scene, team));
     this.structures = [...this.towers, ...this.cores];
     this.minions = new MinionSystem(scene);
+    this.camps = new Camps(scene);
     this.projectiles = new Projectiles(scene);
     this.zones = new Zones(scene);
     this.projectiles.blocker = this.zones;
@@ -43,11 +49,14 @@ export class Match {
     bus.on('down', (t) => {
       if (t.type === 'tower' || t.type === 'core') rig.shake(0.4);
       if (t.type === 'tower' && t.team === 0) this.towersLost++;
-      if (t.type === 'minion') this._xp(t, HERO.xp[t.kind], HERO.xpRange);
+      if (t.type === 'tower' || t.type === 'core') this.destroyed[1 - t.team]++;
+      if (t.type === 'camp') this._camp(t);
+      else if (t.type === 'minion') this._xp(t, HERO.xp[t.kind], HERO.xpRange);
       else if (t.type === 'hero') {
         this._xp(t, HERO.xp.hero + HERO.xp.heroPerLevel * t.level, HERO.xpHeroRange);
         const k = t.killer;
         if (k?.type === 'hero') {
+          this.kills[k.team]++;
           bus.emit('takedown', { killer: k, victim: t });
           const w = k.rs[0].resetOnKill; // Phase Step perk: a takedown soon after the cast refreshes it
           if (w && this.time - k.castAt[0] <= w) k.cds[0] = 0;
@@ -60,16 +69,15 @@ export class Match {
     this.setHero(Object.hasOwn(HEROES, id) ? id : ROSTER[0], q.get('bots')?.split(','));
   }
 
-  // The player takes `id`; three bots take random other champions (friendly first, then the two enemies).
-  // `bots` (optional, from ?bots=a,b,c) forces their ids.
+  // The player takes `id` on Sunny with 4 bot allies against 5 Gloom bots (see compose.js); `bots` (?bots=a,b,...) forces ids.
   setHero(id, bots) {
     for (const h of this.heroes ?? []) h.dispose();
-    const forced = bots?.filter((k) => k !== id && Object.hasOwn(HEROES, k)) ?? [];
-    const rest = forced.length >= 3 ? forced : ROSTER.filter((k) => k !== id).sort(() => Math.random() - 0.5), bot = (hero) => new Bot(hero);
-    const roster = [[id, 0, 0, null], [rest[0], 0, 1, bot], [rest[1], 1, 0, bot], [rest[2], 1, 1, bot]];
+    const { blue, red } = composeTeams(id, bots ?? []), bot = (hero) => new Bot(hero);
+    const roster = [...blue.map((k, i) => [k, 0, i, i ? bot : null]), ...red.map((k, i) => [k, 1, i, bot])];
     this.heroes = roster.map(([k, team, slot, brain]) => new Hero(this.scene, HEROES[k], team, slot, brain));
     this.hero = this.heroes[0];
     this.heroId = id;
+    assignLanes(this.heroes);
     this.reset();
   }
 
@@ -80,6 +88,10 @@ export class Match {
     this.storm = false;
     this.over = false;
     this.towersLost = 0;
+    this.kills = [0, 0];
+    this.destroyed = [0, 0];
+    this.reason = '';
+    this._shT = 0;
     this.push = 0;
     this.fw = 0;
     this.win = false;
@@ -90,6 +102,7 @@ export class Match {
     this.towers.forEach((t) => t.reset());
     this.cores.forEach((c) => c.reset());
     this.minions.reset();
+    this.camps.reset();
     this.projectiles.reset();
     this.zones.reset();
     particles.clear();
@@ -98,6 +111,13 @@ export class Match {
   }
 
   towersAlive(team) { return this.towers.filter((t) => t.team === team && t.alive).length; }
+
+  // Fraction of a team's structure HP still standing.
+  hpFrac(team) {
+    let hp = 0, max = 0;
+    for (const s of this.structures) if (s.team === team) { hp += s.hp; max += s.maxHp; }
+    return hp / max;
+  }
 
   // Run fn(u in 0..1, dt) every sim step for `dur` seconds after `delay` (final call has u = 1).
   anim(dur, fn, delay = 0) { this.timers.push({ t: -delay, dur, fn }); }
@@ -115,6 +135,7 @@ export class Match {
 
   // XP from something that just fell: enemy heroes nearby get it, with gold motes flying to them.
   _xp(src, amount, range) {
+    amount *= this.storm ? MATCH.stormXpMul : 1;
     for (const h of this.heroes) {
       if (h.team === src.team || !h.alive || Math.hypot(h.x - src.x, h.z - src.z) > range) continue;
       h.gainXp(amount);
@@ -123,12 +144,55 @@ export class Match {
     }
   }
 
-  _rules() {
+  // Sentinel down: the killing team's nearby heroes get XP, the killer a heal and a short speed / attack-speed buff.
+  _camp(c) {
+    const k = c.killer;
+    if (k?.type !== 'hero') return;
+    for (const h of this.heroes) {
+      if (h.team === k.team && h.alive && Math.hypot(h.x - c.x, h.z - c.z) <= CAMP.xpRange) h.gainXp(CAMP.xp * (this.storm ? MATCH.stormXpMul : 1));
+    }
+    heal(k, k.maxHp * CAMP.heal);
+    addBuff(k, 'speed', 0.2, CAMP.buffT);
+    addBuff(k, 'aspd', 0.25, CAMP.buffT);
+    bus.emit('campDown', c);
+  }
+
+  // Order of falling: outer towers always; guardians once any own outer is down; the core once both guardians are down
+  // (or in Overdrive with one guardian down). Structures with no enemy minion within shieldR take reduced hero damage.
+  _rules(dt) {
+    const shield = (this._shT -= dt) <= 0;
+    if (shield) this._shT = 0.25;
     for (const team of [0, 1]) {
-      const [outer, inner] = this.towers.filter((t) => t.team === team);
-      outer.vulnerable = true;
-      inner.vulnerable = !outer.alive;
-      this.cores[team].vulnerable = (!outer.alive && !inner.alive) || this.storm;
+      const mine = this.towers.filter((t) => t.team === team), outer = mine.filter((t) => t.tier === 'outer'), guard = mine.filter((t) => t.tier === 'guard');
+      const outerDown = outer.some((t) => !t.alive), guardsDown = guard.filter((t) => !t.alive).length;
+      for (const t of outer) t.vulnerable = true;
+      for (const t of guard) t.vulnerable = outerDown;
+      this.cores[team].vulnerable = guardsDown === guard.length || (this.storm && guardsDown > 0);
+    }
+    if (!shield) return;
+    const R2 = TOWER.shieldR * TOWER.shieldR;
+    for (const s of this.structures) {
+      let near = false;
+      for (const m of this.minions.list) {
+        if (m.team === s.team || !m.alive) continue;
+        const dx = m.x - s.x, dz = m.z - s.z;
+        if (dx * dx + dz * dz <= R2) { near = true; break; }
+      }
+      s.shielded = !near;
+    }
+  }
+
+  // Brush stealth: hidden from the other team unless an enemy hero is within sight range or the unit just attacked / was hit.
+  _brush() {
+    const R = ARENA.brushSeeRange, T = ARENA.brushRevealT;
+    for (const h of this.heroes) {
+      let hid = h.alive && h.atkAge > T && h.sinceHit > T && inBrush(h.x, h.z);
+      if (hid) {
+        for (const e of this.heroes) {
+          if (e.team !== h.team && e.alive && Math.hypot(e.x - h.x, e.z - h.z) < R) { hid = false; break; }
+        }
+      }
+      h.brushHidden = hid;
     }
   }
 
@@ -176,10 +240,11 @@ export class Match {
       this.time += dt;
       if (this.time >= this.nextWave) {
         this.waveNo++;
-        this.nextWave += MATCH.waveEvery;
-        const big = this.time >= MATCH.bigBlobFrom && this.waveNo % MATCH.bigBlobEvery === 0;
-        this.minions.spawnWave(0, big);
-        this.minions.spawnWave(1, big);
+        this.nextWave += this.storm ? MATCH.stormWaveEvery : MATCH.waveEvery;
+        const kinds = ['blobling', 'blobling', 'blobling', 'zapper'];
+        if (this.storm) kinds.push('blobling');
+        if (this.time >= MATCH.siegeFrom && this.waveNo % MATCH.siegeEvery === 0) kinds.push('bigblob');
+        for (const team of [0, 1]) for (let lane = 0; lane < 3; lane++) this.minions.spawnWave(team, lane, kinds);
       }
       if (!this.storm && this.time >= MATCH.storm) {
         this.storm = true;
@@ -187,7 +252,8 @@ export class Match {
         bus.emit('storm');
       }
     }
-    this._rules();
+    this._rules(dt);
+    this._brush();
     this._timers(dt);
     this.zones.update(dt, this);
     for (const h of this.heroes) {
@@ -195,6 +261,7 @@ export class Match {
       h.update(dt, this, it);
     }
     this._separate();
+    this.camps.update(dt, this);
     this.minions.update(dt, this);
     for (const s of this.structures) s.update(dt, this);
     if (!this.over) this._checkEnd();
@@ -206,24 +273,31 @@ export class Match {
   }
 
   _checkEnd() {
-    for (const c of this.cores) if (!c.alive) return this._end(c.team === 1);
-    if (this.time >= MATCH.tieBreak) this._end(this.towersAlive(0) >= this.towersAlive(1));
+    for (const c of this.cores) if (!c.alive) return this._end(c.team === 1, 'core');
+    if (this.time < MATCH.tieBreak) return;
+    const [d0, d1] = this.destroyed, f0 = this.hpFrac(0), f1 = this.hpFrac(1), [k0, k1] = this.kills, mm = Math.floor(MATCH.tieBreak / 60);
+    if (d0 !== d1) this._end(d0 > d1, `structures destroyed at ${mm}:00`);
+    else if (Math.abs(f0 - f1) > 1e-6) this._end(f0 > f1, `structure health at ${mm}:00`);
+    else if (k0 !== k1) this._end(k0 > k1, `takedowns at ${mm}:00`);
+    else this._end(true, `a dead heat at ${mm}:00 (Sunny takes ties)`);
   }
 
-  _end(win) {
+  _end(win, reason) {
     this.over = true;
     this.win = win;
+    this.reason = reason === 'core' ? (win ? 'Enemy core destroyed' : 'Your core fell') : `${win ? 'Won' : 'Lost'} on ${reason}`;
     const stars = win ? 1 + (this.towersLost === 0) + (this.time < MATCH.starTime) : 0;
     for (const h of this.heroes) h.celebrate = (h.team === 0) === win;
     this.rig.follow(this.cores[win ? 1 : 0]);
     this.rig.lead.set(0, 0, 0);
-    bus.emit('end', { win, stars, time: this.time });
+    bus.emit('end', { win, stars, time: this.time, reason: this.reason, kills: this.kills, destroyed: this.destroyed });
   }
 
   // state: 'title' | 'match' | 'results'
   render(alpha, dt, t, state) {
     for (const h of this.heroes) h.render(alpha, t, dt);
     for (const s of this.structures) s.render(t);
+    this.camps.render(t);
     this.minions.render(alpha, t);
     this.zones.render();
     if (state !== 'title') this.projectiles.update(dt);

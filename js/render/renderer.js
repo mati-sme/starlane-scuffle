@@ -9,7 +9,7 @@ export function createRenderer(canvas) {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(PAL.fog, 45, 110);
+  scene.fog = new THREE.Fog(PAL.fog, 70, 150);
 
   scene.add(new THREE.HemisphereLight(0xBFD9FF, PAL.cliffDark, 1.1));
   const sun = new THREE.DirectionalLight(0xFFE8C2, 1.6);

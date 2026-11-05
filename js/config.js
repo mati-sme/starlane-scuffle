@@ -23,36 +23,59 @@ export const sideX = (team, d) => (team === 0 ? -d : d);
 export const GROUND = 0.08;
 export const SIM_STEP = 1 / 30;
 
-export const MAP = { halfLen: 60, halfWidth: 7, towerX: [20, 40], coreX: 54, spawnX: 48, heroX: 46, heroBound: { x: 58, z: 7.5 } };
+export const MAP = { halfX: 90, halfZ: 56, heroX: 80, heroBound: { x: 87, z: 53 }, laneW: 10 };
+
+// Quadrant data (x < 0, z < 0), mirrored 4x by world/arena.js. Team 0 (Sunny) owns -x; the top lane is z < 0.
+export const ARENA = {
+  lanes: [ // waypoints run Sunny base -> Gloom base
+    [[-70, -6], [-62, -20], [-52, -38], [52, -38], [62, -20], [70, -6]],
+    [[-70, 0], [70, 0]],
+    [[-70, 6], [-62, 20], [-52, 38], [52, 38], [62, 20], [70, 6]],
+  ],
+  outer: [[-34, -38], [-30, 0], [-34, 38]],
+  guard: [[-62, -7], [-62, 7]],
+  core: [-74, 0],
+  fountain: [-84, 0], fountainR: 6,
+  pads: [[-80, -7], [-82, -3.5], [-78, 0], [-82, 3.5], [-80, 7]],
+  cover: [[-44, -24, 10, 2], [-20, -26, 2, 10], [-14, -12, 6, 2], [-56, -30, 2, 8], [-12, -41, 3, 2], [-16, -4, 2, 2]], // cx, cz, w, d
+  brush: [[-26, -34, 8, 4], [-40, -14, 6, 6], [-10, -6, 6, 3], [-3, -22, 5, 5]],
+  pockets: [[-30, -19, 44, 22]], // jungle: cx, cz, w, d (quadrant)
+  camps: [[-30, -18]],
+  brushSeeRange: 3.5, brushRevealT: 1.2,
+};
 
 export const MATCH = {
-  waveEvery: 25, firstWave: 4, bigBlobFrom: 180, bigBlobEvery: 3,
-  storm: 390, tieBreak: 510, stormStructMul: 2,
-  respawnBase: 4, respawnPerLevel: 1, starTime: 360,
+  waveEvery: 20, stormWaveEvery: 15, firstWave: 15, siegeFrom: 120, siegeEvery: 3,
+  storm: 360, tieBreak: 540, stormStructMul: 2, stormXpMul: 1.5,
+  respawnBase: 4, respawnPerLevel: 1.5, starTime: 360,
+  campFirst: 60, campRespawn: 75,
 };
 
+// blobling = trooper, zapper = gunner, bigblob = siege.
 export const UNITS = {
-  blobling: { hp: 120, speed: 2.6, range: 1.1, dmg: 12, cd: 1.0, radius: 0.55, aggro: 5, structMul: 1, hitY: 0.6, barY: 1.6, max: 40 },
-  zapper: { hp: 80, speed: 2.4, range: 5, dmg: 14, cd: 1.3, radius: 0.45, aggro: 7, structMul: 1, hitY: 1.3, barY: 2.5, max: 16, ranged: true },
-  bigblob: { hp: 420, speed: 2.0, range: 1.6, dmg: 24, cd: 1.4, radius: 1.0, aggro: 5, structMul: 2.5, hitY: 1.1, barY: 3.0, max: 8 },
+  blobling: { hp: 150, speed: 3.2, range: 1.2, dmg: 14, cd: 1.0, radius: 0.55, aggro: 6, structMul: 1, hitY: 0.6, barY: 1.6, max: 36 },
+  zapper: { hp: 100, speed: 3.0, range: 5.5, dmg: 16, cd: 1.3, radius: 0.45, aggro: 7, structMul: 1, hitY: 1.3, barY: 2.5, max: 12, ranged: true },
+  bigblob: { hp: 520, speed: 2.6, range: 6, dmg: 30, cd: 1.6, radius: 1.0, aggro: 7, structMul: 2.5, hitY: 1.1, barY: 3.0, max: 6, ranged: true },
 };
+
+export const CAMP = { hp: 900, dmg: 30, cd: 1.2, range: 5, leash: 8, xp: 90, xpRange: 12, heal: 0.25, radius: 1.3, buffT: 12 };
 
 export const HERO = {
   maxLevel: 9, ultLevel: 3, dmgPerLevel: 0.05, maxRank: [4, 4, 3],
   // Q/E rank r needs level 2r-2; R rank 1 is free at level 3, R2 needs level 5, R3 level 8.
   gate: (slot, rank) => (slot < 2 ? 2 * rank - 2 : [0, 3, 5, 8][rank]),
   xpNeed: (lv) => 40 + 20 * (lv - 1),
-  xpRange: 6, xpHeroRange: 14, xp: { blobling: 10, zapper: 10, bigblob: 30, hero: 50, heroPerLevel: 10 },
-  baseHeal: { radius: 6, rate: 0.2 },
+  xpRange: 9, xpHeroRange: 14, xp: { blobling: 16, zapper: 18, bigblob: 40, hero: 70, heroPerLevel: 10 },
+  baseHeal: { rate: 0.2 },
 };
 
-// Bots: reaction time (s) and damage multiplier per difficulty star (1-3).
-export const DIFFICULTY = { react: [0.8, 0.5, 0.3], dmg: [0.7, 0.85, 1] };
-export const settings = { stars: 2 };
-export const BOT = { aggro: 9, retreatHp: 0.35, returnHp: 0.85 };
+// Bots: reaction time (s) and damage multiplier per difficulty star (1-3). Only Gloom's bots scale; Sunny allies stay at 0.4 s / 1.0x.
+export const DIFFICULTY = { react: [0.55, 0.4, 0.3], dmg: [0.85, 1, 1.1], allyReact: 0.4 };
+export const settings = { stars: 1 };
+export const BOT = { aggro: 10, retreatHp: 0.35, returnHp: 0.9, powerRatio: 0.8 };
 
-export const TOWER ={ range: 8, dmg: 55, cd: 1.2, radius: 1.5, hp: [1200, 1500] };
-export const CORE = { hp: 2200, radius: 2.2 };
+export const TOWER = { range: 9, cd: 1.1, radius: 1.5, hp: { outer: 1600, guard: 2000 }, heroDmg: 70, heroPct: 0.06, minionDmg: 120, shield: 0.35, shieldR: 10 };
+export const CORE = { hp: 3600, radius: 2.4 };
 
-export const CAM = { fov: 38, offset: [-7, 20, 15], follow: 6, lead: 2, wideAspect: 1.9 };
+export const CAM = { fov: 38, offset: [-7, 20, 15], follow: 6, lead: 2, wideAspect: 2.0, zoom: 1.35 };
 export const BUDGET = { dprMax: 2, scaleMin: 0.6, maxParticles: 1500 };

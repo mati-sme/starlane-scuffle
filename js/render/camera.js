@@ -10,11 +10,11 @@ export class CameraRig {
     this.camera = camera;
     this.mode = 'orbit';
     this.target = null;       // anything with x / z (rx / rz preferred)
-    this.focus = new THREE.Vector3(-47, 1.5, 0);
+    this.focus = new THREE.Vector3(-76, 1.5, 0);
     this.lead = new THREE.Vector3();
     this.look = new THREE.Vector3().copy(this.focus);
     this.pos = new THREE.Vector3();
-    this.zoom = 1;
+    this.zoom = CAM.zoom;
     this.k = 30;
     this.angle = 0;
     this.amp = 0;
@@ -51,7 +51,7 @@ export class CameraRig {
       this.focus.x = damp(this.focus.x, tx, CAM.follow, dt);
       this.focus.z = damp(this.focus.z, tz, CAM.follow, dt);
       this.focus.y = 0.5;
-      this.zoom = damp(this.zoom, clamp(CAM.wideAspect / aspect, 1, 1.4), 4, dt);
+      this.zoom = damp(this.zoom, CAM.zoom * clamp(CAM.wideAspect / aspect, 1, 1.35), 4, dt);
       want.copy(this.focus).addScaledVector(OFFSET, this.zoom);
       this.look.lerp(this.focus, 1 - Math.exp(-this.k * dt));
     }
