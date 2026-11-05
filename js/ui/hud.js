@@ -180,7 +180,7 @@ export class Hud {
     const m = this.match;
     let n = 0;
     const put = (e, cls, y) => {
-      if (!e.alive || ((e.type === 'minion' || e.type === 'camp') && e.hp >= e.maxHp) || (e.type === 'hero' && e.hidden && e.team !== 0)) return;
+      if (!e.alive || ((e.type === 'minion' || e.type === 'camp') && e.hp >= e.maxHp) || (e.type === 'hero' && e.hidden && e.team !== m.myTeam)) return;
       const v = this._v.set(e.rx ?? e.x, GROUND + y + (e.lift ?? 0), e.rz ?? e.z).project(this.camera);
       if (v.z > 1 || Math.abs(v.x) > 1.1 || Math.abs(v.y) > 1.1) return;
       let b = this.bars[n++];

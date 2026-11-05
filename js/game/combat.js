@@ -4,6 +4,7 @@ import { bus } from '../core/bus.js';
 import { particles, poofStars, FRAME } from '../render/particles.js';
 import { vfx } from '../render/vfx.js';
 
+export const sim = { guest: false }; // online guest mirror: damage is the host's business, nothing is dealt locally
 export const DYING = 0.25;
 export const AIR = 0.7; // knock-up hang time
 const SPARK = { color: PAL.gold, speed: 2.5, up: 1.5, size: 0.35, life: 0.35, frame: FRAME.sparkle, grav: 3 };
@@ -13,7 +14,7 @@ const dmgEv = { t: null, amount: 0, src: null, skill: false }; // reused: listen
 // Any entity: { type, team, x, z, hp, maxHp, alive, hitY, flash, squash, dying }
 // src.outMul scales outgoing damage (hero level / upgrades / bot difficulty); heroes may carry shieldHp.
 export function dealDamage(t, amount, src, skill = false) {
-  if (!t.alive || t.untarget) return;
+  if (sim.guest || !t.alive || t.untarget) return;
   if (src?.outMul) amount *= src.outMul;
   if (t.buf?.dr) amount *= 1 - t.buf.dr.v;
   if (t.shielded && src?.type === 'hero') amount *= TOWER.shield; // backdoor: no friendly minions nearby

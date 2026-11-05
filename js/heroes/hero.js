@@ -8,7 +8,7 @@ import { makeDome, makeBeam } from '../render/fx.js';
 import { vfx } from '../render/vfx.js';
 import { particles, FRAME } from '../render/particles.js';
 import { bus } from '../core/bus.js';
-import { tickHitFx, tickStatus, tickBuffs, buff, airLift, dyingScale, poof } from '../game/combat.js';
+import { sim, tickHitFx, tickStatus, tickBuffs, buff, airLift, dyingScale, poof } from '../game/combat.js';
 import { pickHeroTarget, bestCluster } from '../game/targeting.js';
 import { BEHAVIORS, BASICS } from './behaviors.js';
 import { rankStats } from './roster.js';
@@ -198,7 +198,7 @@ export class Hero {
       return;
     }
     if (!this.alive) {
-      if (!ctx.over && (this.respawn -= dt) <= 0) this.spawn();
+      if (!ctx.over && !sim.guest && (this.respawn -= dt) <= 0) this.spawn(); // guest: the host says when
       return;
     }
     if (ctx.over) { this.moveAmt = 0; this.aim = null; return; }
@@ -394,8 +394,8 @@ export class Hero {
     bus.emit('heroRespawn', this);
   }
 
-  render(alpha, t, dt) {
-    const show = (this.alive || this.dying > 0) && !(this.hidden && this.team !== 0); // stealth: only the player's team sees it
+  render(alpha, t, dt, myTeam = 0) {
+    const show = (this.alive || this.dying > 0) && !(this.hidden && this.team !== myTeam); // stealth: only the viewer's team sees it
     this.holder.scale.setScalar((this.hidden ? 0.92 : 1) * HERO_SCALE);
     this.holder.visible = show;
     this.dome.visible = false;

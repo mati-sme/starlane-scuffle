@@ -85,12 +85,12 @@ export class Minimap {
       c.fill(); c.stroke();
     }
     for (const u of m.minions.list) {
-      if (!u.alive || !this._seen(u, 0)) continue;
+      if (!u.alive || !this._seen(u, m.myTeam)) continue;
       c.fillStyle = hex(TEAM[u.team].main);
       c.fillRect(this.px(u.x) - dpr, this.pz(u.z) - dpr, 2 * dpr, 2 * dpr);
     }
     for (const h of m.heroes) {
-      if (!h.alive || h === m.hero || !this._seen(h, 0)) continue;
+      if (!h.alive || h === m.hero || !this._seen(h, m.myTeam)) continue;
       c.fillStyle = hex(TEAM[h.team].main);
       c.strokeStyle = '#0B1020'; c.lineWidth = dpr;
       c.beginPath(); c.arc(this.px(h.x), this.pz(h.z), 3.2 * dpr, 0, 7); c.fill(); c.stroke();

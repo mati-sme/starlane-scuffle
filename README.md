@@ -20,6 +20,10 @@ Built with three.js, no build step. All art, icons and sound are procedural.
 - **HUD:** portrait and a corner minimap at top-left (lanes, towers and cores by team, minions, heroes; enemies are only drawn while visible), kills / clock / structure pips at top-centre.
 - Skill presses never fail silently: with no target the skill goes toward your aim / facing, or the skill button shakes and shows "No target" (or "Unlocks at Lv 3").
 
+## Play online (2 humans + bots)
+
+PLAY ONLINE -> CREATE ROOM shows a 4-character code and a share link (`?room=CODE` opens the join flow). Each player picks Sunny / Gloom and a champion: same team = co-op vs bots, different teams = versus; bots fill every side to 5v5. The creator is the sim host (their browser runs the match); the guest sends inputs and mirrors host snapshots, predicting only their own hero. A dropped player resumes the same slot within 45 s. Server and protocol: `worker/README.md`. Local dev: `npx wrangler dev` in `worker/`, then `?ws=ws://localhost:8787`.
+
 ## Run locally
 
 ```sh

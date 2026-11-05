@@ -22,6 +22,7 @@ export class Projectiles {
 
   // opts: { color, frame (trail particle), size (orb scale), onHit(target) }
   fire(src, tgt, dmg, speed, arc, fromY, opts = {}) {
+    this.onFire?.(src, tgt, speed, arc, fromY); // online host: mirrored to the guest
     const p = this.list.find((q) => !q.on);
     if (!p) return;
     p.on = true; p.src = src; p.tgt = tgt; p.dmg = dmg; p.speed = speed; p.arc = arc;

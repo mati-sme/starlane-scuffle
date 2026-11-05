@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { PAL, CAMP, MATCH, GROUND } from '../config.js';
 import { toonMat, toonMesh, mergeParts, makeShadow } from '../render/toon.js';
-import { poof, tickHitFx, dealDamage, dyingScale } from '../game/combat.js';
+import { DYING, poof, tickHitFx, dealDamage, dyingScale } from '../game/combat.js';
 import { CAMP_SPOTS, pushOutCover } from './arena.js';
 
 const STEEL = 0x8A94A6, DARK = 0x4A5263, AMBER = 0xFFB020;
@@ -73,6 +73,24 @@ export class Camps {
         c.hp = Math.min(c.maxHp, c.hp + c.maxHp * 0.1 * dt);
       }
       pushOutCover(c, c.radius);
+    }
+  }
+
+  // ---- online guest: rows [alive, hp, x, z] per camp from the host ----
+  netApply(rows) {
+    rows.forEach(([alive, hp, x, z], i) => {
+      const c = this.list[i];
+      if (alive && !c.alive) this._spawn(c);
+      else if (!alive && c.alive) { c.alive = false; c.dying = DYING; }
+      if (alive) { if (hp < c.hp) { c.flash = 0.08; c.squash = 1; } c.hp = hp; c.tx = x; c.tz = z; }
+    });
+  }
+
+  netStep(dt) {
+    for (const c of this.list) {
+      tickHitFx(c, dt);
+      if (c.dying > 0 && (c.dying -= dt) <= 0) { c.group.visible = false; poof(c, 26); }
+      else if (c.alive && c.tx !== undefined) { c.x += (c.tx - c.x) * 0.2; c.z += (c.tz - c.z) * 0.2; }
     }
   }
 

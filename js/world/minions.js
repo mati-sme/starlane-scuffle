@@ -4,7 +4,7 @@ import { PAL, TEAM, UNITS, MAP, GROUND, MATCH } from '../config.js';
 import { PATHS, pushOutCover } from './arena.js';
 import { rand, lerp, clamp, angleLerp } from '../core/math.js';
 import { toonMat, outlineMat, mergeParts, shadowGeo, shadowMat, SHADOW_Y } from '../render/toon.js';
-import { dealDamage, tickHitFx, tickStatus, airLift, dyingScale, poof } from '../game/combat.js';
+import { DYING, dealDamage, tickHitFx, tickStatus, airLift, dyingScale, poof } from '../game/combat.js';
 import { pickTarget, ORDER_MINION } from '../game/targeting.js';
 
 const TYPES = ['blobling', 'zapper', 'bigblob'];
@@ -66,6 +66,8 @@ export class MinionSystem {
   constructor(scene) {
     this.list = [];
     this.queue = [];
+    this.nid = 0;
+    this.byId = new Map(); // guest mirror: host id -> minion
     this.free = Array.from({ length: MAX_TOTAL }, () => this._blank());
     this.mat = toonMat({ vertexColors: true });
     this.groups = {};
@@ -103,6 +105,7 @@ export class MinionSystem {
     this.free.push(...this.list);
     this.list.length = 0;
     this.queue.length = 0;
+    this.byId.clear();
     for (const g of Object.values(this.groups)) g.mesh.count = g.outline.count = 0;
     this.shadows.count = 0;
   }
@@ -120,7 +123,7 @@ export class MinionSystem {
     Object.assign(m, {
       kind, team, x: p0.x + rand(-1.5, 1.5), z: p0.z + rand(-1.5, 1.5), hp: st.hp, maxHp: st.hp, alive: true,
       radius: st.radius, hitY: st.hitY, barY: st.barY, flash: 0, squash: 0, dying: 0, lunge: 0, cd: rand(0, 0.5),
-      phase: rand(0, 6), lane, wp: 1, prog: 0, stun: 0, root: 0, slow: 0, air: 0, pull: null,
+      phase: rand(0, 6), lane, wp: 1, prog: 0, stun: 0, root: 0, slow: 0, air: 0, pull: null, nid: ++this.nid,
     });
     m.px = m.x; m.pz = m.z;
     m.facing = m.yaw = TEAM[team].dir > 0 ? Math.PI / 2 : -Math.PI / 2;
@@ -146,6 +149,45 @@ export class MinionSystem {
       if (!ctx.over) this._think(m, dt, ctx);
     }
     if (!ctx.over) this._separate();
+  }
+
+  // ---- online guest: rows [id, team, kindIdx, lane, x, z, hp, facing] from the host replace the local sim ----
+  netApply(rows) {
+    const seen = new Set();
+    for (const [id, team, k, lane, x, z, hp, facing] of rows) {
+      seen.add(id);
+      let m = this.byId.get(id);
+      if (!m) {
+        const n = this.list.length;
+        this._spawn(team, TYPES[k], lane);
+        if (this.list.length === n) continue; // group cap
+        m = this.list[n];
+        m.x = m.px = x; m.z = m.pz = z;
+        this.byId.set(id, m);
+      }
+      if (hp < m.hp) { m.flash = 0.08; m.squash = 1; }
+      m.hp = hp; m.tx = x; m.tz = z; m.facing = facing;
+    }
+    for (const [id, m] of this.byId) {
+      if (seen.has(id)) continue;
+      this.byId.delete(id);
+      if (m.alive) { m.alive = false; m.dying = DYING; }
+    }
+  }
+
+  netStep(dt) {
+    const k = 1 - Math.exp(-12 * dt);
+    for (let i = this.list.length - 1; i >= 0; i--) {
+      const m = this.list[i];
+      m.px = m.x; m.pz = m.z;
+      tickHitFx(m, dt);
+      m.lunge = Math.max(0, m.lunge - dt * 5);
+      if (m.dying > 0) {
+        if ((m.dying -= dt) <= 0) { poof(m, 18); this.list.splice(i, 1); this.free.push(m); }
+        continue;
+      }
+      if (m.tx !== undefined) { m.x += (m.tx - m.x) * k; m.z += (m.tz - m.z) * k; }
+    }
   }
 
   _think(m, dt, ctx) {

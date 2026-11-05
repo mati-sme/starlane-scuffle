@@ -8,7 +8,7 @@ import { particles, FRAME } from '../render/particles.js';
 import { vfx } from '../render/vfx.js';
 import { Hero, screenToWorld } from '../heroes/hero.js';
 import { HEROES, ROSTER } from '../heroes/index.js';
-import { addBuff, heal } from './combat.js';
+import { addBuff, heal, sim, tickStatus, tickHitFx, poof } from './combat.js';
 import { composeTeams } from './compose.js';
 import { inBrush } from '../world/arena.js';
 import { ARENA } from '../config.js';
@@ -37,6 +37,13 @@ export class Match {
     this.zones = new Zones(scene);
     this.projectiles.blocker = this.zones;
     this.timers = [];
+    this.role = 'solo'; // solo | host | guest (online: see net/session.js)
+    this.myTeam = 0;
+    this.peerHero = null;
+    this.peerIn = { x: 0, z: 0, attack: false, cast: [false, false, false], spend: [false, false, false], at: 0 };
+    this.peerIt = { x: 0, z: 0, attack: false, cast: [false, false, false] };
+    this.outbox = null; // guest: { x, z, attack, cast[], spend[] } collected for the next input message
+    this.snapAt = 0;
 
     this.intent = { x: 0, z: 0, attack: false, cast: [false, false, false] };
     this._screen = { x: 0, y: 0 };
@@ -50,7 +57,8 @@ export class Match {
     bus.on('down', (t) => {
       if (t.type === 'hero' && t.killer === this.hero) rig.shake(0.3);
       if (t.type === 'tower' || t.type === 'core') rig.shake(0.4);
-      if (t.type === 'tower' && t.team === 0) this.towersLost++;
+      if (this.role === 'guest') return; // the host keeps the books
+      if (t.type === 'tower' && t.team === this.myTeam) this.towersLost++;
       if (t.type === 'tower' || t.type === 'core') this.destroyed[1 - t.team]++;
       if (t.type === 'camp') this._camp(t);
       else if (t.type === 'minion') this._xp(t, HERO.xp[t.kind], HERO.xpRange);
@@ -73,6 +81,7 @@ export class Match {
 
   // The player takes `id` on Sunny with 4 bot allies against 5 Gloom bots (see compose.js); `bots` (?bots=a,b,...) forces ids.
   setHero(id, bots) {
+    this.role = 'solo'; this.myTeam = 0; this.peerHero = null; this.outbox = null; sim.guest = false;
     for (const h of this.heroes ?? []) h.dispose();
     const { blue, red } = composeTeams(id, bots ?? []), bot = (hero) => new Bot(hero);
     const roster = [...blue.map((k, i) => [k, 0, i, i ? bot : null]), ...red.map((k, i) => [k, 1, i, bot])];
@@ -81,6 +90,39 @@ export class Match {
     this.heroId = id;
     assignLanes(this.heroes);
     this.reset();
+  }
+
+  // Online 5v5: blue / red are champion ids (see composeOnline); me / peer = { team, idx } for the two human slots.
+  // role 'host' runs everything, 'guest' mirrors the host (net/snapshot.js).
+  setOnline({ blue, red, me, peer = null }, role) {
+    for (const h of this.heroes ?? []) h.dispose();
+    this.role = role; this.myTeam = me.team; this.outbox = role === 'guest' ? { x: 0, z: 0, attack: false, cast: [false, false, false], spend: [false, false, false] } : null;
+    sim.guest = role === 'guest';
+    const human = (team, i) => (me.team === team && me.idx === i) || (peer && peer.team === team && peer.idx === i);
+    const bot = (hero) => new Bot(hero);
+    const roster = [...blue.map((k, i) => [k, 0, i, human(0, i) ? null : bot]), ...red.map((k, i) => [k, 1, i, human(1, i) ? null : bot])];
+    this.heroes = roster.map(([k, team, slot, brain]) => new Hero(this.scene, HEROES[k], team, slot, brain));
+    this.hero = this.heroes[me.team * 5 + me.idx];
+    this.peerHero = peer ? this.heroes[peer.team * 5 + peer.idx] : null;
+    this.heroId = this.hero.id;
+    assignLanes(this.heroes);
+    this.reset();
+  }
+
+  // Host: the guest's latest input (cast / spend are one-shot bits, consumed by the next sim step).
+  applyPeerInput(m) {
+    const p = this.peerIn;
+    p.x = +m.x || 0; p.z = +m.z || 0; p.attack = !!m.a; p.at = performance.now();
+    for (let i = 0; i < 3; i++) { if (m.c & (1 << i)) p.cast[i] = true; if (m.s & (1 << i)) p.spend[i] = true; }
+  }
+
+  // The guest left for good: their hero plays on as a bot.
+  botify(hero) {
+    if (!hero || hero.brain) return;
+    hero.brain = new Bot(hero);
+    hero.isPlayer = false;
+    if (hero === this.peerHero) this.peerHero = null;
+    assignLanes(this.heroes);
   }
 
   reset() {
@@ -98,6 +140,7 @@ export class Match {
     this.fw = 0;
     this.win = false;
     this.timers.length = 0;
+    this.snapAt = 0;
     input.cast.fill(false);
     input.spend.fill(false);
     this.heroes.forEach((h) => h.reset());
@@ -209,7 +252,12 @@ export class Match {
     }
     for (let i = 0; i < 3; i++) {
       it.cast[i] = input.cast[i]; input.cast[i] = false;
-      if (input.spend[i]) { hero.spendPoint(i); input.spend[i] = false; }
+      if (input.spend[i]) { hero.spendPoint(i); this.lastSpend = performance.now(); if (this.outbox) this.outbox.spend[i] = true; input.spend[i] = false; }
+    }
+    if (this.outbox) {
+      const o = this.outbox;
+      o.x = it.x; o.z = it.z; o.attack = it.attack;
+      for (let i = 0; i < 3; i++) if (it.cast[i]) o.cast[i] = true;
     }
     if (input.walkClick) {
       this._ray.setFromCamera(input.walkClick, this.rig.camera);
@@ -237,7 +285,61 @@ export class Match {
     }
   }
 
+  // Guest: predict my own hero, ease everything else toward the host's snapshots, deal no damage.
+  _guestUpdate(dt) {
+    if (!this.over) this.time += dt;
+    this._timers(dt);
+    this.zones.update(dt, this);
+    for (const h of this.heroes) {
+      if (h === this.hero) h.update(dt, this, this.over ? IDLE : this._intent());
+      else this._mirror(h, dt);
+    }
+    this.camps.netStep(dt);
+    this.minions.netStep(dt);
+    for (const s of this.structures) {
+      tickHitFx(s, dt);
+      if (s.dying > 0 && (s.dying -= dt) <= 0) s.shatter();
+    }
+    let sum = 0;
+    const L = this.minions.list;
+    for (const m of L) sum += m.x;
+    this.push = damp(this.push, L.length ? clamp(sum / L.length / 30, -1, 1) : 0, 1.5, dt);
+  }
+
+  // A remote hero on the guest: chase the snapshot position, derive the walk animation from the motion.
+  _mirror(h, dt) {
+    h.px = h.x; h.pz = h.z;
+    tickHitFx(h, dt);
+    h.sinceHit = h.flash > 0 ? 0 : h.sinceHit + dt;
+    h.lunge = Math.max(0, h.lunge - dt * 5);
+    h.pull = null;
+    tickStatus(h, dt);
+    if (h.dying > 0) {
+      if ((h.dying -= dt) <= 0) poof(h, 40);
+      return;
+    }
+    if (!h.alive || h.tx === undefined) { h.moveAmt = damp(h.moveAmt, 0, 14, dt); return; }
+    const k = 1 - Math.exp(-12 * dt), dx = (h.tx - h.x) * k, dz = (h.tz - h.z) * k, v = Math.hypot(dx, dz) / dt;
+    h.x += dx; h.z += dz;
+    h.moveAmt = damp(h.moveAmt, Math.min(1, v / h.speed), 10, dt);
+    if (v > 0.3) { h.dirx = dx / (v * dt); h.dirz = dz / (v * dt); }
+    h.yaw = h.face;
+    if (h.shieldT > 0) h.shieldT -= dt;
+  }
+
+  // Host: the guest's hero is driven by their last input; no input for a second = stand still.
+  _peerIntent() {
+    const p = this.peerIn, it = this.peerIt, stale = performance.now() - p.at > 1000;
+    it.x = stale ? 0 : p.x; it.z = stale ? 0 : p.z; it.attack = !stale && p.attack;
+    for (let i = 0; i < 3; i++) {
+      it.cast[i] = p.cast[i]; p.cast[i] = false;
+      if (p.spend[i]) { this.peerHero.spendPoint(i); p.spend[i] = false; }
+    }
+    return it;
+  }
+
   update(dt) {
+    if (this.role === 'guest') return this._guestUpdate(dt);
     if (!this.over) {
       this.time += dt;
       if (this.time >= this.nextWave) {
@@ -260,7 +362,7 @@ export class Match {
     this._timers(dt);
     this.zones.update(dt, this);
     for (const h of this.heroes) {
-      const it = this.over ? IDLE : h === this.hero ? this._intent() : h.brain.think(dt, this);
+      const it = this.over ? IDLE : h === this.hero ? this._intent() : h === this.peerHero ? this._peerIntent() : h.brain.think(dt, this);
       h.update(dt, this, it);
     }
     this._separate();
@@ -285,20 +387,23 @@ export class Match {
     else this._end(true, `a dead heat at ${mm}:00 (Sunny takes ties)`);
   }
 
-  _end(win, reason) {
+  // team0Wins: Sunny took it. The 'end' event's `win` is from the local player's side.
+  _end(team0Wins, reason) {
+    const win = team0Wins === (this.myTeam === 0);
     this.over = true;
-    this.win = win;
+    this.win = team0Wins;
+    this.rawReason = reason;
     this.reason = reason === 'core' ? (win ? 'Enemy core destroyed' : 'Your core fell') : `${win ? 'Won' : 'Lost'} on ${reason}`;
     const stars = win ? 1 + (this.towersLost === 0) + (this.time < MATCH.starTime) : 0;
-    for (const h of this.heroes) h.celebrate = (h.team === 0) === win;
-    this.rig.follow(this.cores[win ? 1 : 0]);
+    for (const h of this.heroes) h.celebrate = (h.team === 0) === team0Wins;
+    this.rig.follow(this.cores[team0Wins ? 1 : 0]);
     this.rig.lead.set(0, 0, 0);
     bus.emit('end', { win, stars, time: this.time, reason: this.reason, kills: this.kills, destroyed: this.destroyed });
   }
 
   // state: 'title' | 'match' | 'results'
   render(alpha, dt, t, state) {
-    for (const h of this.heroes) h.render(alpha, t, dt);
+    for (const h of this.heroes) h.render(alpha, t, dt, this.myTeam);
     for (const s of this.structures) s.render(t);
     this.camps.render(t);
     this.minions.render(alpha, t);
@@ -309,9 +414,9 @@ export class Match {
     vfx.setMarker(state === 'match' && this.hero.alive ? this.hero.aim : null);
     if (state === 'match') this.rig.lead.set(this.hero.dirx * this.hero.moveAmt, 0, this.hero.dirz * this.hero.moveAmt);
 
-    if (this.over && this.win) { // fireworks + confetti over the shattered enemy Core
+    if (this.over && this.win === (this.myTeam === 0)) { // fireworks + confetti over the shattered enemy Core
       this.fw -= dt;
-      const c = this.cores[1];
+      const c = this.cores[1 - this.myTeam];
       if (this.fw <= 0) {
         this.fw = 0.3;
         const x = c.x + rand(-8, 8), y = rand(5, 10), z = rand(-6, 6);
