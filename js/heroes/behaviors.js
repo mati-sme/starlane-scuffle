@@ -44,7 +44,10 @@ export function fireBolt(h, ctx, x, z, dx, dz, p, color) {
   const used = p.pierce ? hits : hits.slice(0, 1);
   const len = !p.pierce && used.length ? used[0].along : p.range, ex = x + dx * len, ez = z + dz * len;
   vfx.streak(x, 1.3, z, ex, 1.3, ez, color, 0.2, Math.min(len, 4));
-  for (let k = 0; k < len; k += 1.2) particles.emit(x + dx * k, 1.2, z + dz * k, 0, 0.2, 0, color, 0.5, 0.3, FRAME.sparkle);
+  vfx.beam(x + dx * 0.6, 1.3, z + dz * 0.6, ex, 1.3, ez, color, p.width ? Math.min(0.5, p.width * 0.3) : 0.3, 0.3); // the whole line flares so the shot is never missed
+  vfx.flash(x + dx * 1.2, 1.4, z + dz * 1.2, color, 1.3, 0.14); // muzzle
+  for (let k = 0; k < len; k += 0.8) particles.emit(x + dx * k, 1.2 + (Math.random() - 0.5) * 0.3, z + dz * k, (Math.random() - 0.5), 0.4, (Math.random() - 0.5), color, 0.6, 0.4, FRAME.sparkle);
+  if (used.length) { vfx.flash(ex, 1.3, ez, color, 1.8, 0.18); vfx.ring(ex, 0.3, ez, color, 1.8, 0.25); }
   for (const { e } of used) affect(h, e, p, { x, z });
   if (p.explode && used.length) {
     sparks(ex, 0.8, ez, 12, [color, 0xffffff], 4);
@@ -56,6 +59,8 @@ export function fireBolt(h, ctx, x, z, dx, dz, p, color) {
 
 function explodeAt(h, ctx, x, z, R, ab, col, acc, o = {}) {
   vfx.ring(x, 0.25, z, acc, R * 1.3, 0.4);
+  vfx.ring(x, 0.3, z, 0xffffff, R * 0.7, 0.22);
+  vfx.flash(x, 1, z, col, R * 1.1, 0.25);
   vfx.decal(x, z, col, R, 0.8);
   sparks(x, 0.5, z, 16, [col, acc, 0xffffff], 5);
   forEachEnemy(ctx, h.team, x, z, R, (e) => affect(h, e, ab, { x, z, ...o }));
@@ -417,6 +422,8 @@ const BASICS = {
   melee(h, ctx, t, b, dmg) {
     const dx = t.x - h.x, dz = t.z - h.z, d = Math.hypot(dx, dz) || 1, col = b.color ?? fx(h).accent;
     vfx.arc(h.x, GROUND + 0.9, h.z, dx, dz, col, h.basicRange, 0.2);
+    vfx.arc(h.x, GROUND + 1.3, h.z, dx, dz, 0xffffff, h.basicRange * 0.75, 0.14);
+    vfx.flash(t.x, (t.hitY ?? 1) + 0.2, t.z, col, 1.2, 0.14);
     const strike = (e, m = 1) => {
       let k = dmg * m;
       if (b.lowBonus && e.type === 'hero' && e.hp < e.maxHp * 0.5) k *= 1 + b.lowBonus;

@@ -8,6 +8,7 @@ import { rand, clamp } from '../core/math.js';
 import { toonMat, toonMesh, mergeParts, terrainMat } from '../render/toon.js';
 import { radialTexture, grassDetail, paverDetail, rockDetail } from '../render/atlas.js';
 import { particles, FRAME } from '../render/particles.js';
+import { HI } from '../render/quality.js';
 
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _c = new THREE.Color();
 const UP = new THREE.Vector3(0, 1, 0);
@@ -400,6 +401,146 @@ function buildProps(group) {
   return { rocks, rockData };
 }
 
+// Animated shallow water: world-space ripples, drifting caustic lines and a lighter shallow band.
+function waterMat() {
+  return new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uDeep: { value: new THREE.Color(0x1C5E7A) }, uShallow: { value: new THREE.Color(0x4FB6C8) } },
+    transparent: true, depthWrite: false,
+    vertexShader: /* glsl */ `varying vec3 vW; void main() { vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
+    fragmentShader: /* glsl */ `
+      uniform float uTime; uniform vec3 uDeep; uniform vec3 uShallow; varying vec3 vW;
+      void main() {
+        vec2 p = vW.xz;
+        float w = sin(p.x * 1.3 + uTime * 1.4) * sin(p.y * 1.1 - uTime * 1.1) + 0.5 * sin((p.x + p.y) * 2.3 + uTime * 2.0);
+        float c1 = pow(1.0 - abs(sin(p.x * 0.9 + sin(p.y * 0.7 + uTime * 0.8) * 1.6 + uTime * 0.5)), 14.0);
+        float c2 = pow(1.0 - abs(sin(p.y * 1.1 + sin(p.x * 0.6 - uTime * 0.7) * 1.4 - uTime * 0.4)), 14.0);
+        vec3 col = mix(uDeep, uShallow, 0.45 + 0.2 * w) + vec3(0.75, 0.95, 1.0) * (c1 + c2) * 0.22;
+        gl_FragColor = vec4(col, 0.86);
+        #include <colorspace_fragment>
+      }`,
+  });
+}
+
+// Open grass away from lanes, cover, the river, pits, camps and bases.
+function openSpot(minPit = 9) {
+  for (let k = 0; k < 40; k++) {
+    const x = rand(-ISLAND.w / 2 + 8, ISLAND.w / 2 - 8), z = rand(-ISLAND.d / 2 + 6, ISLAND.d / 2 - 6);
+    if (inCover(x, z) || Math.abs(x) < 6.5 || fountainNear(x, z)) continue;
+    if (ARENA.pits.some(([px, pz]) => Math.hypot(x - px, z - pz) < minPit)) continue;
+    if (CAMP_SPOTS.some((c) => Math.hypot(c.x - x, c.z - z) < 4)) continue;
+    if (ARENA.lanes.some((lane) => lane.some(([lx, lz], j) => j && segDist(x, z, lane[j - 1], [lx, lz]) < MAP.laneW / 2 + 1.2))) continue;
+    return [x, z];
+  }
+  return null;
+}
+
+// v5 detail pass: river + pit pools, reeds and lily pads, flower beds, ferns, ruined colonnades around the boss pits,
+// lane lanterns. All instanced; counts drop on the low tier.
+function buildDetail(group) {
+  const water = waterMat();
+  const river = new THREE.Mesh(new THREE.PlaneGeometry(9.4, 112).rotateX(-Math.PI / 2), water);
+  river.position.y = 0.022;
+  group.add(river);
+  for (const [x, z] of ARENA.pits) {
+    const pool = new THREE.Mesh(new THREE.CircleGeometry(6.3, 40).rotateX(-Math.PI / 2), water);
+    pool.position.set(x, 0.055, z);
+    group.add(pool);
+  }
+  const K = HI ? 1 : 0.5, n = (v) => Math.round(v * K);
+  const mat = toonMat({ vertexColors: true, finish: true, rim: 0.3 });
+
+  const spots = (count, minPit) => Array.from({ length: count }, () => openSpot(minPit)).filter(Boolean);
+
+  // Flower clumps: five petals around a gold eye, a few blooms per clump; tinted per instance.
+  const bloom = (x, z, y) => [
+    ...[0, 1, 2, 3, 4].map((k) => ({ g: new THREE.SphereGeometry(0.11, 5, 3), c: 0xffffff, p: [x + Math.cos(k * 1.257) * 0.12, y, z + Math.sin(k * 1.257) * 0.12], s: [1, 0.45, 1], f: 'cloth' })),
+    { g: new THREE.SphereGeometry(0.07, 5, 3), c: 0xFFD23F, p: [x, y + 0.03, z], f: 'glass' },
+  ];
+  const flowerGeo = mergeParts([...bloom(0, 0, 0.32), ...bloom(0.35, 0.2, 0.24), ...bloom(-0.25, 0.3, 0.2),
+    ...[[0, 0], [0.35, 0.2], [-0.25, 0.3]].map(([x, z]) => ({ g: new THREE.CylinderGeometry(0.02, 0.03, 0.3, 3), c: 0x8AB860, p: [x, 0.14, z], f: 'cloth' }))]);
+  const fl = spots(n(260), 8.5), flowers = instanced(flowerGeo, mat, fl.length);
+  const petals = [0xFF8FB8, 0xFFE070, 0xF4F1FF, 0xB89CFF, 0xFF9E5E, 0x8FD8FF];
+  fl.forEach(([x, z], i) => { place(flowers, i, x, 0, z, rand(0, 6), rand(0.9, 1.5)); flowers.setColorAt(i, _c.set(petals[i % petals.length])); });
+
+  // Ferns: arched fronds radiating from a root.
+  const fernGeo = mergeParts(Array.from({ length: 7 }, (_, k) => {
+    const a = (k / 7) * Math.PI * 2;
+    return { g: new THREE.ConeGeometry(0.16, 1.1, 3).translate(0, 0.55, 0), c: k % 2 ? 0x3E7A36 : 0x4E8E3E, p: [Math.cos(a) * 0.05, 0, Math.sin(a) * 0.05], s: [1, 1, 0.35], r: [Math.sin(a) * 1.0, 0, -Math.cos(a) * 1.0], f: 'cloth' };
+  }));
+  const fe = spots(n(150), 8.5), ferns = instanced(fernGeo, mat, fe.length);
+  fe.forEach(([x, z], i) => { place(ferns, i, x, 0, z, rand(0, 6), rand(0.8, 1.4)); ferns.setColorAt(i, _c.setScalar(rand(0.8, 1.15))); });
+
+  // Ruined colonnade: plinth, fluted drums, a broken top with moss; plus fallen drums.
+  const stone = 0xA49C8C, moss = 0x557F3A;
+  const pillarGeo = mergeParts([
+    { g: new THREE.BoxGeometry(1.5, 0.35, 1.5), c: 0x7A7366, p: [0, 0.17, 0], f: 'stone' },
+    { g: new THREE.CylinderGeometry(0.55, 0.6, 0.25, 10), c: 0x8E8676, p: [0, 0.47, 0], f: 'stone' },
+    { g: new THREE.CylinderGeometry(0.46, 0.5, 1.2, 10), c: stone, p: [0, 1.2, 0], f: 'stone' },
+    { g: new THREE.CylinderGeometry(0.44, 0.46, 1.0, 10), c: 0x9A9282, p: [0.02, 2.3, 0], r: [0.04, 0, 0.05], f: 'stone' },
+    { g: new THREE.CylinderGeometry(0.3, 0.44, 0.45, 7), c: 0x8E8676, p: [0.06, 3.0, 0.02], r: [0.2, 0, -0.25], f: 'stone' },
+    { g: rockGeo(4, 0), c: moss, p: [0.05, 3.15, 0], s: [0.55, 0.22, 0.55], f: 'cloth' },
+    { g: rockGeo(7, 0), c: moss, p: [0.4, 0.42, 0.3], s: [0.4, 0.25, 0.4], f: 'cloth' },
+    { g: rockGeo(8, 0), c: 0x7A7366, p: [-0.7, 0.18, 0.5], s: [0.35, 0.25, 0.3], f: 'stone' },
+  ]);
+  const drumGeo = mergeParts([
+    { g: new THREE.CylinderGeometry(0.46, 0.46, 1.1, 10), c: stone, p: [0, 0.46, 0], r: [0, 0, Math.PI / 2], f: 'stone' },
+    { g: new THREE.CylinderGeometry(0.44, 0.48, 0.9, 10), c: 0x9A9282, p: [1.15, 0.45, 0.25], r: [0.3, 0, Math.PI / 2], f: 'stone' },
+    { g: rockGeo(11, 0), c: moss, p: [0.2, 0.86, 0], s: [0.5, 0.15, 0.4], f: 'cloth' },
+  ]);
+  const ruinSpots = [];
+  for (const [px, pz] of ARENA.pits) for (let k = 0; k < 10; k++) { // colosseum ring around each pit
+    const a = (k / 10) * Math.PI * 2 + 0.3, x = px + Math.cos(a) * 9, z = pz + Math.sin(a) * 9;
+    if (Math.abs(x) > 6 && !inCover(x, z) && !ARENA.lanes.some((lane) => lane.some(([lx, lz], j) => j && segDist(x, z, lane[j - 1], [lx, lz]) < MAP.laneW / 2 + 1))) ruinSpots.push([x, z, k % 3 === 2]);
+  }
+  for (const p of spots(n(16), 10)) ruinSpots.push([...p, Math.random() < 0.45]);
+  const pil = ruinSpots.filter((r) => !r[2]), fal = ruinSpots.filter((r) => r[2]);
+  const pillars = instanced(pillarGeo, mat, pil.length), drums = instanced(drumGeo, mat, fal.length);
+  pillars.castShadow = drums.castShadow = true;
+  pil.forEach(([x, z], i) => { place(pillars, i, x, 0, z, rand(0, 6), rand(0.85, 1.15), rand(0.7, 1.25), rand(0.85, 1.15)); pillars.setColorAt(i, _c.setScalar(rand(0.85, 1.1))); });
+  fal.forEach(([x, z], i) => { place(drums, i, x, 0, z, rand(0, 6), rand(0.9, 1.2)); drums.setColorAt(i, _c.setScalar(rand(0.85, 1.1))); });
+
+  // Reeds on the river banks and pit rims, lily pads on the water.
+  const reedGeo = mergeParts([0, 1, 2, 3, 4, 5].map((k) => ({ g: new THREE.ConeGeometry(0.04, 1.2 + (k % 3) * 0.3, 3).translate(0, 0.6, 0), c: k % 2 ? 0x6F9A48 : 0x88A858, p: [Math.cos(k * 2.4) * 0.18, 0, Math.sin(k * 2.4) * 0.18], r: [Math.sin(k) * 0.2, 0, Math.cos(k) * 0.2], f: 'cloth' })));
+  const reedSpots = [];
+  for (let z = -54; z < 54; z += HI ? 3.2 : 5.5) for (const sx of [-1, 1]) { const x = sx * rand(4.8, 5.6), zz = z + rand(-1, 1); if (!ARENA.lanes.some((lane) => lane.some(([lx, lz], j) => j && segDist(x, zz, lane[j - 1], [lx, lz]) < MAP.laneW / 2 + 0.8)) && !ARENA.pits.some(([px, pz]) => Math.hypot(x - px, zz - pz) < 7.6)) reedSpots.push([x, zz]); }
+  for (const [px, pz] of ARENA.pits) for (let k = 0; k < (HI ? 16 : 8); k++) { const a = rand(0, 6.28); reedSpots.push([px + Math.cos(a) * 6.9, pz + Math.sin(a) * 6.9]); }
+  const reeds = instanced(reedGeo, mat, reedSpots.length);
+  reedSpots.forEach(([x, z], i) => { place(reeds, i, x, 0, z, rand(0, 6), rand(0.7, 1.2)); reeds.setColorAt(i, _c.setScalar(rand(0.85, 1.15))); });
+  const padGeo = mergeParts([{ g: new THREE.CircleGeometry(0.45, 10, 0.3, Math.PI * 1.8).rotateX(-Math.PI / 2), c: 0x4E8E3E, p: [0, 0, 0], f: 'cloth' }, { g: new THREE.SphereGeometry(0.1, 5, 3), c: 0xFFB6D0, p: [0.12, 0.06, 0.1], f: 'cloth' }]);
+  const padSpots = [];
+  for (let k = 0; k < (HI ? 40 : 18); k++) padSpots.push([rand(-3.8, 3.8), rand(-54, 54), 0.04]);
+  for (const [px, pz] of ARENA.pits) for (let k = 0; k < 6; k++) { const a = rand(0, 6.28), r = rand(4.2, 5.6); padSpots.push([px + Math.cos(a) * r, pz + Math.sin(a) * r, 0.07]); }
+  const pads = instanced(padGeo, mat, padSpots.length);
+  padSpots.forEach(([x, z, y], i) => { place(pads, i, x, y, z, rand(0, 6), rand(0.8, 1.5)); pads.setColorAt(i, _c.setScalar(rand(0.85, 1.15))); });
+
+  // Lane lanterns: dark iron post, crossbar, a warm glowing cage. Team-tinted near each base.
+  const postGeo = mergeParts([
+    { g: new THREE.BoxGeometry(0.5, 0.2, 0.5), c: 0x3A3632, p: [0, 0.1, 0], f: 'stone' },
+    { g: new THREE.CylinderGeometry(0.07, 0.09, 2.4, 6), c: 0x2C2F38, p: [0, 1.3, 0], f: 'metal' },
+    { g: new THREE.BoxGeometry(0.7, 0.06, 0.06), c: 0x2C2F38, p: [0.25, 2.45, 0], f: 'metal' },
+    { g: new THREE.ConeGeometry(0.22, 0.2, 4), c: 0x2C2F38, p: [0.55, 2.42, 0], r: [0, Math.PI / 4, 0], f: 'metal' },
+  ]);
+  const lampSpots = [];
+  for (const lane of ARENA.lanes) for (let j = 1; j < lane.length; j++) {
+    const [x0, z0] = lane[j - 1], [x1, z1] = lane[j], len = Math.hypot(x1 - x0, z1 - z0), ux = (x1 - x0) / len, uz = (z1 - z0) / len;
+    for (let d = 5; d < len - 3; d += HI ? 11 : 18) for (const side of [-1, 1]) {
+      const o = side * (MAP.laneW / 2 + 0.9), x = x0 + ux * d - uz * o, z = z0 + uz * d + ux * o;
+      if (Math.abs(x) < 6 || inCover(x, z) || fountainNear(x, z) || Math.abs(z) > ISLAND.d / 2 - 3) continue;
+      if (ARENA.lanes.some((ln) => ln.some(([lx, lz], k) => k && segDist(x, z, ln[k - 1], [lx, lz]) < MAP.laneW / 2 + 0.5))) continue;
+      lampSpots.push([x, z, Math.atan2(ux * side, uz * side)]); // crossbar leans out over the lane
+    }
+  }
+  const posts = instanced(postGeo, mat, lampSpots.length);
+  const lamps = instanced(new THREE.OctahedronGeometry(0.2).scale(1, 1.4, 1), new THREE.MeshBasicMaterial({ toneMapped: false }), lampSpots.length);
+  lampSpots.forEach(([x, z, yaw], i) => {
+    place(posts, i, x, 0, z, yaw, 1);
+    place(lamps, i, x + Math.cos(yaw) * 0.55, 2.15, z - Math.sin(yaw) * 0.55, 0, 1);
+    lamps.setColorAt(i, _c.set(Math.abs(x) > 50 ? TEAM[x < 0 ? 0 : 1].main : 0xFFC86A).multiplyScalar(1.6));
+  });
+  group.add(flowers, ferns, pillars, drums, reeds, pads, posts, lamps);
+  return { water, lamps: lampSpots };
+}
+
 export function createMap(scene, camera) {
   const group = new THREE.Group();
   scene.add(group);
@@ -409,6 +550,8 @@ export function createMap(scene, camera) {
   const glow = buildGround(group);
   buildCover(group);
   const { rocks, rockData } = buildProps(group);
+  const detail = buildDetail(group);
+  let dust = 0;
   const glowBase = new THREE.Color(PAL.laneGlow);
   const axis = new THREE.Vector3(0.3, 1, 0.2).normalize();
   const xs = glow.userData.xs;
@@ -433,6 +576,16 @@ export function createMap(scene, camera) {
 
       for (const q of nebula) q.quaternion.copy(camera.quaternion);
 
+      detail.water.uniforms.uTime.value = t;
+      dust -= dt; // ambient: warm dust motes drifting in the light, sparks rising off the lanterns, glints on the water
+      if (dust <= 0) {
+        dust = HI ? 0.05 : 0.12;
+        const cx = camera.position.x, cz = camera.position.z - 16;
+        particles.emit(cx + rand(-26, 26), rand(0.5, 4), cz + rand(-15, 15), rand(0.2, 0.6), rand(-0.05, 0.15), rand(-0.1, 0.1), 0xFFE7B0, 0.22, 4, FRAME.dot);
+        const L = detail.lamps[(Math.random() * detail.lamps.length) | 0];
+        if (L && Math.abs(L[0] - cx) < 30 && Math.abs(L[1] - cz) < 20) particles.emit(L[0] + rand(-0.6, 0.6), 2.3, L[1] + rand(-0.6, 0.6), 0, rand(0.6, 1.2), 0, 0xFFC86A, 0.3, 1.2, FRAME.sparkle);
+        if (Math.abs(cx) < 30) particles.emit(rand(-4, 4), 0.12, cz + rand(-15, 15), 0, 0.05, 0, 0xCFF4FF, 0.4, 0.5, FRAME.sparkle);
+      }
       fly -= dt; // fireflies over the grass
       if (fly <= 0) {
         fly = 0.12;

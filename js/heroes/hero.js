@@ -24,6 +24,12 @@ const ASSIST_RANGE = 7; // holding Attack with no stick steps toward a nearby en
 const WINDUP = 0.15;    // anticipation crouch before a skill fires
 const BOOST = { t: 4, mul: 1.6 }; // launch boost after leaving the fountain
 export const RECALL_T = 4; // seconds of channel before the teleport home
+const _hand = new THREE.Vector3();
+const ease = (u) => u * u * (3 - 2 * u);
+
+// Animation triggers come off the bus so online guests (which only see the events) animate the same way.
+bus.on('cast', ({ hero, slot }) => { hero.castT = 1; hero.castSlot = slot; hero._castFx = true; });
+bus.on('swing', (h) => { if (h.type === 'hero') h.atkT = 1; });
 
 export class Hero {
   // brain: optional (hero) => controller with think(dt, ctx) -> intent. No brain = the human player.
@@ -84,6 +90,8 @@ export class Hero {
     this.respawn = 0;
     this.respawnTotal = 1;
     this.flash = this.squash = this.lunge = this.faceHold = this.sinceHit = 0;
+    this.atkT = this.castT = this.charge = 0;
+    this.castSlot = 0;
     this.cd = 0;
     this.cds = [0, 0, 0];
     this.cdTotal = [1, 1, 1];
@@ -453,6 +461,76 @@ export class Hero {
     bus.emit('heroRespawn', this);
   }
 
+  // Limb animation: idle breathing, arm swing while running, weapon strike / aimed shot on basics, and a two-beat
+  // cast (arms raised with a charging orb + ground rune during the wind-up, then a forward thrust and burst on release).
+  _pose(m, t, dt, run) {
+    const A = m.arms[0], B = m.arms[1], melee = this.basic.kind === 'melee';
+    const fxc = this.def.fx?.color ?? this.def.basic?.color ?? this.def.accent, fxa = this.def.fx?.accent ?? this.def.accent;
+    this.charge = this.windup > 0 ? Math.min(1, this.charge + dt / 0.12) : Math.max(0, this.charge - dt * 5);
+    this.atkT = Math.max(0, this.atkT - dt * 3.2);
+    this.castT = Math.max(0, this.castT - dt * 2.2);
+    const br = Math.sin(t * 2.2 + this.slot * 1.3) * 0.06;
+    let ax = -0.12 + br - run * 0.8, az = -0.14, bx = -0.08 - br + run * 0.8, bz = 0.14, twist = 0;
+    if (this.atkT > 0) {
+      const p = 1 - this.atkT;
+      if (melee) { // overhead wind, slam across the body, settle
+        const up = p < 0.18 ? ease(p / 0.18) : 1 - ease(Math.min(1, (p - 0.18) / 0.32));
+        ax = lerp(ax, -2.7, up) + (p >= 0.18 ? -0.5 * (1 - ease(Math.min(1, (p - 0.18) / 0.6))) : 0);
+        az = lerp(az, 0.5, p >= 0.18 ? Math.sin(Math.PI * Math.min(1, (p - 0.18) / 0.5)) : 0);
+        twist = (p < 0.18 ? -0.35 * ease(p / 0.18) : 0.45 * Math.sin(Math.PI * Math.min(1, (p - 0.18) / 0.6)));
+      } else { // level the weapon, kick on the shot, brace with the off hand
+        const hold = ease(Math.min(1, this.atkT * 2.5));
+        ax = lerp(ax, -1.5 + 0.45 * this.atkT ** 4, hold);
+        bx = lerp(bx, -1.1, hold); bz = lerp(bz, -0.35, hold);
+        twist = -0.2 * hold;
+      }
+    }
+    if (this.charge > 0) { // wind-up: both arms rise, body leans back
+      const c = ease(this.charge);
+      ax = lerp(ax, -2.8, c); az = lerp(az, -0.35, c); bx = lerp(bx, -2.3, c); bz = lerp(bz, 0.45, c);
+      m.lean.rotation.x -= 0.22 * c;
+    }
+    if (this.castT > 0) { // release: thrust both arms toward the target
+      const k = ease(Math.min(1, this.castT * 1.6));
+      ax = lerp(ax, -1.7, k); az = lerp(az, 0.1, k); bx = lerp(bx, -1.45, k); bz = lerp(bz, -0.1, k);
+      twist += (this.castSlot === 2 ? 0.6 : 0.3) * Math.sin(Math.PI * this.castT);
+    }
+    A.rotation.set(ax, 0, az);
+    B.rotation.set(bx, 0, bz);
+    m.lean.rotation.y = twist;
+    m.skirt.rotation.x = -(0.12 * this.moveAmt + Math.abs(run) * 0.3) - 0.25 * this.castT;
+
+    const orb = m.orb, show = this.charge > 0 || this.castT > 0.55;
+    orb.visible = show;
+    if (show) {
+      const burst = this.castT > 0 && this.charge <= 0;
+      const s = burst ? 0.7 + (1 - this.castT) * 3.2 : 0.25 + 0.65 * ease(this.charge) + Math.sin(t * 40) * 0.06;
+      orb.scale.setScalar(s / HERO_SCALE);
+      orb.material.opacity = burst ? Math.min(1, (this.castT - 0.55) * 3) : 0.95;
+      orb.material.color.set(fxc).multiplyScalar(1.7);
+    }
+    if (this.charge > 0 || this._castFx) m.hand.getWorldPosition(_hand);
+    if (this.charge > 0) {
+      if (!this._wuFx) { // wind-up start: rune under the feet
+        this._wuFx = true;
+        vfx.rune(this.rx, this.rz, fxc, 2.4, 0.75);
+      }
+      for (let k = 0; k < 2; k++) { // motes spiral into the hand
+        const a = Math.random() * Math.PI * 2, r = 1.2 + Math.random() * 0.6;
+        particles.emit(_hand.x + Math.cos(a) * r, _hand.y + (Math.random() - 0.3) * 1.2, _hand.z + Math.sin(a) * r, -Math.cos(a) * r * 6, 0, -Math.sin(a) * r * 6, k ? fxa : fxc, 0.5, 0.16, FRAME.sparkle);
+      }
+    } else this._wuFx = false;
+    if (this._castFx) { // release burst at the hand; the ult also throws a light pillar and a big rune
+      this._castFx = false;
+      const ult = this.castSlot === 2;
+      particles.burst(_hand.x, _hand.y, _hand.z, ult ? 26 : 14, { color: [fxc, fxa, 0xffffff], speed: ult ? 7 : 5, up: 2, size: 0.7, life: 0.45, frame: FRAME.sparkle, grav: 1 });
+      vfx.flash(_hand.x, _hand.y, _hand.z, fxc, ult ? 2.4 : 1.5, 0.22);
+      vfx.ring(this.rx, 0.25, this.rz, fxa, ult ? 5 : 3, 0.35);
+      if (!this._wuFx) vfx.rune(this.rx, this.rz, fxc, 2.4, 0.6); // online guests never see the wind-up
+      if (ult) { vfx.column(this.rx, this.rz, fxc, 0.7); vfx.rune(this.rx, this.rz, fxa, 4.2, 0.9); }
+    }
+  }
+
   render(alpha, t, dt, myTeam = 0) {
     const show = (this.alive || this.dying > 0) && !(this.hidden && this.team !== myTeam); // stealth: only the viewer's team sees it
     this.holder.scale.setScalar((this.hidden ? 0.92 : 1) * HERO_SCALE);
@@ -485,6 +563,7 @@ export class Hero {
     const swing = Math.sin(this.phase) * 0.9 * mv;
     m.legs[0].rotation.x = swing;
     m.legs[1].rotation.x = -swing;
+    this._pose(m, t, dt, swing);
 
     this.blink -= dt;
     m.eyes.scale.y = this.blink < 0.12 && this.blink > 0 ? 0.1 : 1;

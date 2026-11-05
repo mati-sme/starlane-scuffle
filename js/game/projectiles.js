@@ -23,7 +23,7 @@ export class Projectiles {
       const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ toneMapped: false }));
       glowTex ??= radialTexture();
       const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, toneMapped: false }));
-      halo.scale.setScalar(1.6);
+      halo.scale.setScalar(2.3);
       mesh.add(halo);
       mesh.visible = false;
       scene.add(mesh);
@@ -57,6 +57,7 @@ export class Projectiles {
     p.tail.position.set(p.sx, p.sy, p.sz);
     p.tail.quaternion.setFromUnitVectors(UP, _back.set(-fx / fd, 0, -fz / fd));
     p.tail.visible = true;
+    if (src.type === 'hero') vfx.flash(src.x, fromY, src.z, p.color, 1.2, 0.12); // muzzle flash
   }
 
   reset() { for (const p of this.list) { p.on = false; p.mesh.visible = false; p.tail.visible = false; } }
@@ -75,6 +76,7 @@ export class Projectiles {
           particles.burst(m.x, m.y, m.z, 10, { color: [p.color, 0xffffff], speed: 4, up: 1.5, size: 0.55, life: 0.35, frame: FRAME.sparkle, grav: 2 });
           vfx.ring(m.x, m.y, m.z, p.color, 1.5, 0.22);
           vfx.ring(m.x, m.y, m.z, 0xffffff, 0.8, 0.12);
+          vfx.flash(m.x, m.y, m.z, p.color, 1.4 * p.mesh.scale.x, 0.16);
         } else particles.emit(m.x, m.y, m.z, 0, 0, 0, p.color, 0.6, 0.25, FRAME.sparkle);
         p.on = false;
         p.mesh.visible = false;
@@ -93,7 +95,8 @@ export class Projectiles {
       p.prog = Math.min(1, 1 - d / p.total);
       const ty = (tg.hitY ?? 1) + GROUND;
       m.y = p.sy + (ty - p.sy) * p.prog + Math.sin(Math.PI * p.prog) * p.arc;
-      particles.emit(m.x, m.y, m.z, 0, 0, 0, p.color, 0.6, 0.3, p.frame);
+      particles.emit(m.x, m.y, m.z, 0, 0, 0, p.color, 0.75, 0.35, p.frame);
+      particles.emit(m.x + (Math.random() - 0.5) * 0.3, m.y + (Math.random() - 0.5) * 0.3, m.z + (Math.random() - 0.5) * 0.3, 0, 0.3, 0, 0xffffff, 0.35, 0.2, FRAME.sparkle);
       p.tail.position.copy(m);
       p.tail.quaternion.setFromUnitVectors(UP, _back.set(-dx / d, 0, -dz / d));
     }

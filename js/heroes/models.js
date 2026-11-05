@@ -162,7 +162,45 @@ function legGeo(main, acc, gl) {
   ]);
 }
 
-// -> { root, lean, eyes, tail, legs, mats } — hero.js animates lean / eyes / tail / legs and flashes mats.
+// Hip armor: overlapping fauld plates for heavy frames, a plate + cloth tabard for medium, long cloth tabards for slim.
+// Authored in the skirt group's space (origin = belt front), so the flaps can swing with the stride.
+function skirt(torso, T, main, acc, gl) {
+  const w = T.w, d = T.d;
+  if (torso === 'heavy') return [
+    ...[-1, 0, 1].map((k) => part(RBOX, k ? shade(main, 0.88) : main, [k * w * 0.26, -0.2, 0.02 - Math.abs(k) * 0.06], [w * 0.28, 0.36, 0.08], [0.12, k * -0.3, k * 0.08])),
+    ...[-1, 0, 1].map((k) => metal(BOX, TRIM, [k * w * 0.26, -0.37, 0.05 - Math.abs(k) * 0.06], [w * 0.27, 0.04, 0.06], [0.12, k * -0.3, k * 0.08])),
+    ...both((sx) => [part(RBOX, shade(main, 0.8), [sx * w * 0.46, -0.16, -d * 0.45], [0.12, 0.34, d * 0.7], [0, 0, sx * 0.18])]),
+    glow(OCT, gl, [0, -0.18, 0.08], [0.1, 0.14, 0.04])];
+  if (torso === 'medium') return [
+    cloth(RBOX, shade(acc, 0.75), [0, -0.3, 0.02], [w * 0.36, 0.58, 0.04], [0.1, 0, 0]),
+    metal(BOX, TRIM, [0, -0.58, 0.05], [w * 0.36, 0.05, 0.05], [0.1, 0, 0]),
+    ...both((sx) => [part(RBOX, shade(main, 0.85), [sx * w * 0.32, -0.14, -0.04], [w * 0.26, 0.26, 0.08], [0.12, sx * -0.4, sx * 0.12])]),
+    cloth(RBOX, shade(acc, 0.6), [0, -0.3, -d - 0.02], [w * 0.5, 0.56, 0.04], [-0.1, 0, 0])];
+  return [
+    cloth(RBOX, shade(main, 0.62), [0, -0.38, 0.02], [w * 0.4, 0.74, 0.035], [0.08, 0, 0]),
+    glow(BOX, gl, [0, -0.38, 0.045], [0.03, 0.6, 0.01], [0.08, 0, 0]),
+    metal(BOX, acc, [0, -0.74, 0.05], [w * 0.4, 0.05, 0.04], [0.08, 0, 0]),
+    cloth(RBOX, shade(main, 0.5), [0, -0.42, -d - 0.02], [w * 0.62, 0.84, 0.035], [-0.08, 0, 0])];
+}
+
+// Small layered details that make the silhouette read at phone size: belt pouches, chest vents, rivets, spine ridge, antennae.
+function trim(spec, T, hy, hunch, main, acc, gl) {
+  const P = [], mid = HIP + T.h * 0.5, z = T.d / 2 + hunch * 0.4;
+  for (const sx of [-1, 1]) {
+    P.push(rubber(RBOX, shade(acc, 0.55), [sx * T.w * 0.36, HIP + 0.02, T.d * 0.18], [0.16, 0.18, 0.14])); // pouches
+    P.push(metal(BOX, TRIM, [sx * T.w * 0.36, HIP + 0.1, T.d * 0.26], [0.16, 0.03, 0.02]));
+    for (const k of [0, 1, 2]) P.push(rubber(BOX, DARK, [sx * T.w * 0.44, mid + 0.02 + k * 0.1, z * 0.2], [0.04, 0.035, T.d * 0.5])); // side vents
+    P.push(metal(OCT, TRIM, [sx * T.w * 0.36, mid + 0.42, z - 0.04], 0.06), metal(OCT, TRIM, [sx * T.w * 0.12, mid + 0.42, z + 0.02], 0.06)); // rivets
+  }
+  for (const k of [0, 1, 2]) P.push(metal(RBOX, STEEL, [0, mid - 0.1 + k * 0.2, -T.d / 2 - 0.04 + hunch * 0.3], [0.2 - k * 0.03, 0.12, 0.08])); // spine ridge
+  if (spec.helmet === 'dome' || spec.helmet === 'fin') P.push( // antenna with a glowing tip
+    metal(CYL, STEEL, [0.24, hy + 0.36, hunch - 0.1], [0.03, 0.5, 0.03], [-0.3, 0, -0.2]), glow(SPH, gl, [0.3, hy + 0.6, hunch - 0.18], 0.08));
+  if (spec.helmet === 'flat' || spec.helmet === 'crest') P.push(...both((sx) => [metal(CONE, TRIM, [sx * 0.28, hy + 0.3, hunch], [0.07, 0.26, 0.07], [0, 0, sx * -0.6])])); // helm spikes
+  return P;
+}
+
+// -> { root, lean, eyes, tail, legs, arms, skirt, hand, orb, mats } — hero.js animates the groups and flashes mats.
+// Arms are separate groups pivoting at the shoulder (arms[0] = weapon side, arms[1] = off hand) so attacks and casts move limbs.
 export function buildChampion(spec, def, team = 0) {
   const T = TORSO[spec.torso], main = ground(def.color, 0.08), acc = ground(def.accent, 0.05);
   const gl = tint(def.basic?.color ?? def.accent, 0xffffff, 0.1); // emissive accents match the champion's attacks
@@ -182,7 +220,7 @@ export function buildChampion(spec, def, team = 0) {
     cloth(CYL, CLOTH, [0, HIP + T.h + 0.08, hunch * 0.5], [0.24, 0.18, 0.24]), // neck
     ...scaleAbout(helmet(spec.helmet, hy, hunch, main, acc, gl), [0, hy - 0.2, hunch], HEAD),
     ...pauldrons(spec.paul, T.w, HIP + T.h - 0.02, main, acc, gl),
-    ...lift(arms(spec.arm, ax, main, acc, gl), T.h - 0.95),
+    ...trim(spec, T, hy, hunch, main, acc, gl),
   ];
   if (spec.emblem) body.push(glow(OCT, gl, [0, mid + 0.18, chestZ + 0.06], [0.26, 0.34, 0.08]));
   if (spec.cracks) for (const [x, r] of [[-0.18, 0.5], [0.12, -0.4], [0.28, 0.2]]) body.push(glow(BOX, gl, [x, mid + 0.1, chestZ + 0.01], [0.04, 0.5, 0.04], [0, 0, r]));
@@ -195,6 +233,29 @@ export function buildChampion(spec, def, team = 0) {
   const eyes = new THREE.Mesh(mergeParts(scaleAbout(visor(spec.visor, 0, hunch, vc), [0, -0.2, hunch], HEAD)), new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false }));
   eyes.position.y = hy;
   lean.add(eyes);
+
+  // Arms: split the authored parts by side, re-centre them on the shoulder pivot.
+  const shY = HIP + 0.86 + (T.h - 0.95), armParts = lift(arms(spec.arm, ax, main, acc, gl), T.h - 0.95);
+  const armGroups = [-1, 1].map((sx) => {
+    const g = new THREE.Group();
+    g.position.set(sx * ax, shY, 0);
+    const P = armParts.filter((q) => Math.sign(q.p[0] || 1) === sx).map((q) => ({ ...q, p: [q.p[0] - sx * ax, q.p[1] - shY, q.p[2]] }));
+    g.add(toonMesh(mergeParts(P), mat, 0.03));
+    lean.add(g);
+    return g;
+  });
+  // Charge orb in the weapon hand: grows while a skill winds up, bursts on release.
+  const hand = new THREE.Object3D();
+  hand.position.set(0, -1.0, 0.4);
+  armGroups[0].add(hand);
+  const orb = new THREE.Mesh(SPH, new THREE.MeshBasicMaterial({ color: new THREE.Color(gl).multiplyScalar(1.6), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+  orb.visible = false;
+  hand.add(orb);
+
+  const sk = new THREE.Group();
+  sk.position.set(0, HIP + 0.02, T.d * 0.42);
+  sk.add(toonMesh(mergeParts(skirt(spec.torso, T, main, acc, gl)), mat, 0.02));
+  lean.add(sk);
 
   const tail = new THREE.Group();
   tail.position.set(0, HIP + T.h - 0.62, -T.d / 2 - 0.05);
@@ -214,5 +275,5 @@ export function buildChampion(spec, def, team = 0) {
   rig.add(lean, ...legs);
   const root = new THREE.Group();
   root.add(rig);
-  return { root, lean, eyes, tail, legs, mats: [mat] };
+  return { root, lean, eyes, tail, legs, arms: armGroups, skirt: sk, hand, orb, mats: [mat] };
 }

@@ -43,6 +43,11 @@ export function dealDamage(t, amount, src, skill = false) {
   t.flash = 0.08;
   t.squash = 1;
   if (src?.type === 'hero') vfx.ring(t.x, t.hitY ?? 1, t.z, SPARK.color, 1.2, 0.15); // every hero hit gets a visible flash
+  if (skill && src?.def) { // skill hits: a white-hot burst in the caster's ability color
+    const c = src.def.fx?.color ?? src.def.accent;
+    vfx.flash(t.x, (t.hitY ?? 1) + 0.3, t.z, c, 1.6, 0.18);
+    particles.burst(t.x, t.hitY ?? 1, t.z, 8, { color: [c, 0xffffff], speed: 5, up: 2.5, size: 0.6, life: 0.4, frame: 2, grav: 4 });
+  }
   particles.burst(t.x, t.hitY ?? 1, t.z, 6, SPARK);
   if (t.type === 'minion' && src) {
     const dx = t.x - src.x, dz = t.z - src.z, d = Math.hypot(dx, dz) || 1;

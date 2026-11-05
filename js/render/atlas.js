@@ -142,3 +142,27 @@ export const shockTexture = () => canvasTex(128, 128, (g) => {
   g.fillStyle = gr;
   g.fillRect(0, 0, 128, 128);
 });
+
+// Cast rune: two concentric bands of glyph ticks, an inner hexagram and a soft core (white; tinted by the material).
+export const runeTexture = () => canvasTex(256, 256, (g) => {
+  g.translate(128, 128);
+  g.strokeStyle = 'rgba(255,255,255,1)';
+  g.fillStyle = 'rgba(255,255,255,1)';
+  g.shadowColor = 'white'; g.shadowBlur = 6;
+  for (const [r, w] of [[122, 5], [104, 2.5], [70, 3]]) { g.lineWidth = w; g.beginPath(); g.arc(0, 0, r, 0, Math.PI * 2); g.stroke(); }
+  for (let i = 0; i < 24; i++) { // glyph ticks between the outer bands
+    g.save(); g.rotate((i / 24) * Math.PI * 2);
+    if (i % 3 === 0) g.fillRect(-2, -118, 4, 12); else { g.beginPath(); g.arc(0, -113, 3, 0, Math.PI * 2); g.fill(); }
+    g.restore();
+  }
+  g.lineWidth = 3;
+  for (const off of [0, Math.PI]) { // hexagram
+    g.beginPath();
+    for (let k = 0; k <= 3; k++) { const a = off + (k / 3) * Math.PI * 2 - Math.PI / 2; g[k ? 'lineTo' : 'moveTo'](Math.cos(a) * 100, Math.sin(a) * 100); }
+    g.stroke();
+  }
+  const gr = g.createRadialGradient(0, 0, 0, 0, 0, 60);
+  gr.addColorStop(0, 'rgba(255,255,255,0.5)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.shadowBlur = 0;
+  g.beginPath(); g.arc(0, 0, 60, 0, Math.PI * 2); g.fill();
+});

@@ -28,6 +28,7 @@ const canvas = $('c');
 const gfx = createRenderer(canvas);
 particles.attach(gfx.scene);
 vfx.attach(gfx.scene);
+vfx.camera = gfx.camera;
 gfx.onResize = () => particles.setViewport(canvas.height, gfx.camera.fov);
 gfx.resize();
 
