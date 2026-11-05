@@ -10,6 +10,7 @@ const geo = new THREE.SphereGeometry(0.25, 8, 6);
 export class Projectiles {
   constructor(scene) {
     this.list = [];
+    this.blocker = null; // Zones: walls that eat enemy shots
     for (let i = 0; i < POOL; i++) {
       const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial());
       mesh.visible = false;
@@ -55,6 +56,12 @@ export class Projectiles {
       }
       m.x += (dx / d) * step;
       m.z += (dz / d) * step;
+      if (this.blocker?.blocks(p.src.team, m.x, m.z)) {
+        particles.burst(m.x, m.y, m.z, 5, { color: p.color, speed: 2, up: 1, size: 0.4, life: 0.3, frame: FRAME.sparkle, grav: 0 });
+        p.on = false;
+        p.mesh.visible = false;
+        continue;
+      }
       p.prog = Math.min(1, 1 - d / p.total);
       const ty = (tg.hitY ?? 1) + GROUND;
       m.y = p.sy + (ty - p.sy) * p.prog + Math.sin(Math.PI * p.prog) * p.arc;

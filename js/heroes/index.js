@@ -1,8 +1,15 @@
-// Hero registry. ROSTER order decides which heroes the bots take (the ones the player didn't).
-import { zip } from './zip.js';
-import { moss } from './moss.js';
-import { luma } from './luma.js';
-import { clink } from './clink.js';
+// Hero registry: roster data + shared behaviors + the model builder. ROSTER order = select-screen order.
+import { ROSTER_DEFS, ROLES } from './roster.js';
+import { buildChampion } from './models.js';
 
-export const HEROES = { zip, moss, luma, clink };
-export const ROSTER = ['zip', 'moss', 'luma', 'clink'];
+const css = (n) => '#' + n.toString(16).padStart(6, '0');
+
+export const HEROES = Object.fromEntries(ROSTER_DEFS.map((d) => [d.id, {
+  ...d,
+  css: css(d.color),
+  accentCss: css(d.accent),
+  abilities: { basic: d.basic, s1: d.s1, s2: d.s2, ult: d.ult },
+  buildModel: (team) => buildChampion(d.model, d, team),
+}]));
+export const ROSTER = ROSTER_DEFS.map((d) => d.id);
+export { ROLES };

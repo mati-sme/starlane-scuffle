@@ -1,11 +1,28 @@
-// Title, hero select, pause and results screens (DOM overlays).
+// Title, champion select, pause and results screens (DOM overlays).
 import { icons } from './icons.js';
 import { audio } from '../audio.js';
 import { PAL } from '../config.js';
 import { HEROES, ROSTER } from '../heroes/index.js';
 
 const hex = (n) => '#' + n.toString(16).padStart(6, '0');
-const cap = (s) => s[0].toUpperCase() + s.slice(1);
+const mmss = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+const upper = (s) => s.toUpperCase();
+
+const maxHp = Math.max(...ROSTER.map((id) => HEROES[id].stats.hp));
+const maxSpeed = Math.max(...ROSTER.map((id) => HEROES[id].stats.speed));
+const maxRange = Math.max(...ROSTER.map((id) => HEROES[id].basic.range));
+
+const bar = (label, v) => `<div class="stat"><span>${label}</span><i><b style="width:${Math.round(v * 100)}%"></b></i></div>`;
+
+// Basic + Q / E / R rows of the detail strip.
+function skillRows(def) {
+  const row = (key, ab, icon, test) =>
+    `<li data-testid="${test}"><span class="si">${icon}</span><span class="sk-key">${key}</span><span class="sk-name">${ab.name}</span><small>${ab.tag ?? ab.kind}</small></li>`;
+  return row('', def.basic, icons[`basic_${def.basic.kind}`], 'detail-basic')
+    + row('Q', def.s1, icons[def.s1.kind], 'detail-q')
+    + row('E', def.s2, icons[def.s2.kind], 'detail-e')
+    + row('R', def.ult, icons[def.ult.kind], 'detail-r');
+}
 
 export function createMenus(root) {
   const show = (cls, html, wire) => {
@@ -19,65 +36,81 @@ export function createMenus(root) {
     hideAll() { root.innerHTML = ''; },
 
     showTitle(onPlay) {
-      const row = ROSTER.map((id, i) => `<i style="--i:${i}">${icons[HEROES[id].portrait]}</i>`).join('');
+      const row = ROSTER.map((id, i) => `<i style="--i:${i}">${icons.champ(HEROES[id])}</i>`).join('');
       show('title modal', `
+        <div class="kicker">TEAM ARENA · 2 v 2</div>
         <h1><span>Starlane</span><span>Scuffle</span></h1>
         <div class="parade">${row}</div>
-        <button class="big play" type="button" aria-label="Play">${icons.play}</button>
-        <p class="hint"><span class="mouse">WASD move · Space attack</span><span class="touchhint">Left thumb move · Right thumb attack</span></p>`,
+        <button class="btn primary play" type="button" data-testid="play-btn">PLAY</button>
+        <p class="hint"><span class="mouse">WASD move · Space attack · Q E R skills · U upgrades</span><span class="touchhint">Left thumb move · Right thumb attack · tab on the right: upgrades</span></p>`,
       (el) => on(el, '.play', onPlay));
     },
 
-    // unlocked: how many heroes (in ROSTER order) the player owns.
-    showSelect({ unlocked, picked, onPlay, onHome }) {
-      let sel = ROSTER.indexOf(picked) < unlocked ? picked : ROSTER[0];
-      const cards = ROSTER.map((id, i) => {
-        const def = HEROES[id], locked = i >= unlocked, ab = ['s1', 's2', 'ult'];
-        return `<button type="button" class="hcard${locked ? ' locked' : ''}" data-id="${id}" style="--c:${def.color}">
-          <span class="pic">${icons[def.portrait]}</span><b>${cap(id)}</b>
-          <span class="abs">${ab.map((k) => `<i>${icons[def.abilities[k].icon]}</i>`).join('')}</span>
-          ${locked ? `<span class="lock">${icons.lock}</span>` : ''}</button>`;
+    // All 12 champions are always selectable.
+    showSelect({ picked, onPlay, onHome }) {
+      let sel = ROSTER.includes(picked) ? picked : ROSTER[0];
+      const cards = ROSTER.map((id) => {
+        const def = HEROES[id];
+        return `<button type="button" class="hcard" data-id="${id}" data-testid="champion-card-${id}" aria-pressed="false" style="--c:${def.css}">
+          <span class="pic">${icons.champ(def)}</span><b>${def.name}</b>
+          <span class="role"><i>${icons.role(def.role)}</i>${upper(def.role)}</span></button>`;
       }).join('');
       show('select modal', `
-        <button class="small home" type="button" aria-label="Back">${icons.home}</button>
-        <div class="cards">${cards}</div>
-        <button class="big go" type="button" aria-label="Go">${icons.check}</button>
-        ${unlocked < ROSTER.length ? `<p class="hint">${icons.lock}<span>Win to unlock!</span></p>` : ''}`,
+        <button class="small home" type="button" aria-label="Back" data-testid="select-back">${icons.home}</button>
+        <h2 class="sel-title">Choose your champion</h2>
+        <div class="selwrap">
+          <div class="grid" data-testid="champion-grid">${cards}</div>
+          <aside class="detail" data-testid="champion-detail"></aside>
+        </div>`,
       (el) => {
-        const list = [...el.querySelectorAll('.hcard')];
-        const mark = () => list.forEach((c) => c.classList.toggle('sel', c.dataset.id === sel));
-        mark();
+        const list = [...el.querySelectorAll('.hcard')], detail = el.querySelector('.detail');
+        const fill = () => {
+          const def = HEROES[sel];
+          el.style.setProperty('--sel', def.css);
+          detail.innerHTML = `
+            <div class="dhead"><i class="dport">${icons.champ(def)}</i>
+              <div><h3 data-testid="detail-name">${def.name}</h3><p class="dtitle" data-testid="detail-title">${def.title}</p>
+              <span class="drole" data-testid="detail-role">${upper(def.role)}</span></div></div>
+            <div class="stats">${bar('HP', def.stats.hp / maxHp)}${bar('SPD', def.stats.speed / maxSpeed)}${bar('RNG', def.basic.range / maxRange)}</div>
+            <ul class="skills">${skillRows(def)}</ul>
+            <button class="btn primary go" type="button" data-testid="go-btn">GO</button>`;
+          on(detail, '.go', () => onPlay(sel));
+        };
+        const mark = () => list.forEach((c) => {
+          const on = c.dataset.id === sel;
+          c.classList.toggle('sel', on);
+          c.setAttribute('aria-pressed', String(on));
+        });
+        mark(); fill();
         for (const c of list) {
           c.addEventListener('click', () => {
-            if (c.classList.contains('locked')) { c.classList.remove('nope'); void c.offsetWidth; c.classList.add('nope'); return; }
             sel = c.dataset.id;
-            mark();
+            mark(); fill();
             c.classList.remove('jump');
             void c.offsetWidth;
             c.classList.add('jump');
             audio.sfx('skill', { def: HEROES[sel], isPlayer: true });
           });
         }
-        on(el, '.go', () => onPlay(sel));
         on(el, '.home', onHome);
       });
     },
 
     showPause({ onResume, onHome }) {
       show('pause modal', `
-        <button class="big resume" type="button" aria-label="Resume">${icons.play}</button>
-        <button class="small home" type="button" aria-label="Home">${icons.home}</button>`,
+        <h2>Paused</h2>
+        <div class="row"><button class="btn primary resume" type="button" data-testid="resume-btn">RESUME</button>
+        <button class="btn home" type="button" data-testid="pause-home">CHAMPIONS</button></div>`,
       (el) => { on(el, '.resume', onResume); on(el, '.home', onHome); });
     },
 
-    // unlock: hero id earned by this win (or null).
-    showResult({ win, stars }, { unlock, onAgain, onHome }) {
-      const row = [0, 1, 2].map((i) => `<i class="${i < stars ? 'on' : ''}" style="--i:${i}">${icons.star(i < stars ? hex(PAL.gold) : '#5B3F8C')}</i>`).join('');
-      const gift = unlock ? `<div class="gift" style="--c:${HEROES[unlock].color}">${icons[HEROES[unlock].portrait]}</div>` : '';
-      const btns = `<div class="row"><button class="big again" type="button" aria-label="Play again">${icons.retry}</button><button class="small home" type="button" aria-label="Heroes">${icons.home}</button></div>`;
-      show(win ? 'result win modal' : 'result lose modal', win
-        ? `<h2>Victory!</h2><div class="stars">${row}</div>${gift}${btns}`
-        : `<div class="smile">${icons.smile}</div><h2>Good try!</h2>${btns}`,
+    showResult({ win, stars, time }, { onAgain, onHome }) {
+      const row = [0, 1, 2].map((i) => `<i class="${i < stars ? 'on' : ''}" style="--i:${i}">${icons.star(i < stars ? hex(PAL.gold) : '#2B3550')}</i>`).join('');
+      const btns = `<div class="row"><button class="btn primary again" type="button" data-testid="again-btn">PLAY AGAIN</button><button class="btn home" type="button" data-testid="champions-btn">CHAMPIONS</button></div>`;
+      show(win ? 'result win modal' : 'result lose modal', `
+        <h2 data-testid="result-title">${win ? 'Victory' : 'Defeat'}</h2>
+        <p class="reason">${win ? 'Enemy core destroyed' : 'Your core fell'} · ${mmss(time)}</p>
+        ${win ? `<div class="stars">${row}</div>` : ''}${btns}`,
       (el) => { on(el, '.again', onAgain); on(el, '.home', onHome); });
     },
   };

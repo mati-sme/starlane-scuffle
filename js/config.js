@@ -1,17 +1,16 @@
 // Single source of truth: palette, tuning numbers, budgets.
 
 export const PAL = {
-  voidTop: 0x140F3A, voidBottom: 0x3B2A7A,
-  nebulaA: 0x7A4FD1, nebulaB: 0xC25BD6,
-  star: 0xFFF4C2, gold: 0xFFD23F,
-  grassLight: 0x8EE36A, grassDark: 0x4FB35A,
-  lane: 0xF2D9A6, laneGlow: 0xFFE98A,
-  cliffLight: 0x9C7FD0, cliffDark: 0x5B3F8C,
-  sunny: 0x36C5F0, sunnyDeep: 0x1A6FB0,
-  gloom: 0xFF5D73, gloomDeep: 0xB0284A,
-  heal: 0x5BE584, shield: 0x9FE8FF,
-  ink: 0x23163A, fog: 0x2A1F5E,
-  zip: 0xFF8A3D, moss: 0x6BBF59, luma: 0xC9A7FF, clink: 0x3DE0D0,
+  voidTop: 0x060A16, voidBottom: 0x1A2748,
+  nebulaA: 0x2E5BD6, nebulaB: 0x16C7B8,
+  star: 0xE6F4FF, gold: 0xFFC83D,
+  grassLight: 0x3F5A68, grassDark: 0x2A3F4D,
+  lane: 0x6D7C8E, laneGlow: 0x7FE0FF,
+  cliffLight: 0x56658A, cliffDark: 0x2B3550,
+  sunny: 0x3DA5FF, sunnyDeep: 0x1B5FB8,
+  gloom: 0xFF4D5E, gloomDeep: 0xB02338,
+  heal: 0x3EE89A, shield: 0x8FE3FF,
+  ink: 0x0B1020, fog: 0x101A33,
 };
 
 // Team 0 = Sunny (player side, marches +x), team 1 = Gloom (marches -x).
@@ -39,10 +38,11 @@ export const UNITS = {
 };
 
 export const HERO = {
-  maxLevel: 8, ultLevel: 3, hpPerLevel: 0.12, dmgPerLevel: 0.06, maxUp: 3,
-  xpNeed: (lv) => 30 + 12 * (lv - 1),
+  maxLevel: 9, ultLevel: 3, dmgPerLevel: 0.05, maxRank: [4, 4, 3],
+  // Q/E rank r needs level 2r-2; R rank 1 is free at level 3, R2 needs level 5, R3 level 8.
+  gate: (slot, rank) => (slot < 2 ? 2 * rank - 2 : [0, 3, 5, 8][rank]),
+  xpNeed: (lv) => 40 + 20 * (lv - 1),
   xpRange: 6, xpHeroRange: 14, xp: { blobling: 10, zapper: 10, bigblob: 30, hero: 50, heroPerLevel: 10 },
-  pickSlow: 0.2, pickTime: 6,
   baseHeal: { radius: 6, rate: 0.2 },
 };
 

@@ -7,7 +7,7 @@ export const input = {
   attackMouse: false,
   walkClick: null, // {x, y} in NDC, consumed by the match
   cast: [false, false, false], // skill 1 / skill 2 / ult pressed since the last sim step (consumed by the match)
-  pick: -1,        // level-up card chosen with the 1 / 2 keys
+  spend: [false, false, false], // 1 / 2 / 3 pressed: rank up Q / E / R (consumed by the match)
   keys: new Set(),
   get attack() { return this.attackTouch || this.attackKey || this.attackMouse; },
 };
@@ -40,8 +40,9 @@ export function initInput(canvas) {
     if (e.repeat) return;
     const slot = CAST_KEYS[e.code];
     if (slot !== undefined) input.cast[slot] = true;
-    else if (e.code === 'Digit1' || e.code === 'Numpad1') input.pick = 0;
-    else if (e.code === 'Digit2' || e.code === 'Numpad2') input.pick = 1;
+    else if (e.code === 'Digit1' || e.code === 'Numpad1') input.spend[0] = true;
+    else if (e.code === 'Digit2' || e.code === 'Numpad2') input.spend[1] = true;
+    else if (e.code === 'Digit3' || e.code === 'Numpad3') input.spend[2] = true;
   });
   window.addEventListener('keyup', (e) => {
     input.keys.delete(e.code);

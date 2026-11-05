@@ -1,8 +1,7 @@
-// Skill 1 / Skill 2 / Ult buttons on an arc around Attack: radial cooldown wipe, last-3-seconds digit,
-// ready bounce, gold glow + slam when the ult unlocks. Desktop: same buttons with Q / E / R hints.
+// Q / E / R buttons on an arc around Attack: radial cooldown wipe, last-3-seconds digit,
+// ready bounce, gold glow + slam when R unlocks. Desktop: same buttons with Q / E / R hints.
 import { input } from '../core/input.js';
 import { bus } from '../core/bus.js';
-import { HERO } from '../config.js';
 import { icons } from './icons.js';
 
 const SLOTS = [{ cls: 's1', key: 'Q' }, { cls: 's2', key: 'E' }, { cls: 'ult', key: 'R' }];
@@ -16,6 +15,8 @@ export class Abilities {
       const el = document.createElement('button');
       el.type = 'button';
       el.className = `sk ${s.cls} ready`;
+      el.dataset.testid = `skill-${s.key.toLowerCase()}`;
+      el.setAttribute('aria-label', `Skill ${s.key}`);
       el.innerHTML = '<i class="face"></i><i class="cd"></i><b class="num"></b><u class="key">' + s.key + '</u><i class="shock"></i>';
       el.addEventListener('pointerdown', (e) => {
         e.preventDefault();
@@ -32,8 +33,8 @@ export class Abilities {
   }
 
   setHero(hero) {
-    this.root.style.setProperty('--c', hero.def.color);
-    this.btns.forEach((b, i) => { b.face.innerHTML = icons[hero.ab[i].icon]; b.p = b.n = -1; });
+    this.root.style.setProperty('--c', hero.def.css);
+    this.btns.forEach((b, i) => { b.face.innerHTML = icons[hero.ab[i].kind]; b.p = b.n = -1; });
   }
 
   _slam() {
@@ -46,11 +47,11 @@ export class Abilities {
   update() {
     const h = this.match.hero;
     this.btns.forEach((b, i) => {
-      const locked = i === 2 && h.level < HERO.ultLevel;
+      const locked = h.ranks[i] === 0;
       const left = locked ? 0 : Math.max(0, h.cds[i]);
       const p = left > 0 ? Math.round((left / (h.cdTotal[i] || 1)) * 1000) / 10 : 0;
       if (p !== b.p) { b.cd.style.setProperty('--p', p); b.p = p; }
-      const n = left > 0 && left <= 3 ? Math.ceil(left) : '';
+      const n = locked ? 'Lv3' : left > 0 && left <= 3 ? Math.ceil(left) : '';
       if (n !== b.n) { b.num.textContent = n; b.n = n; }
       b.el.classList.toggle('locked', locked);
       b.el.classList.toggle('dead', !h.alive);

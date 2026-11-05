@@ -39,9 +39,11 @@ $('rotate').innerHTML = icons.phone;
 let state = 'title'; // title | select | match | paused | results
 let t = 0;
 let resultTimer = 0;
-let unlocked = Math.min(ROSTER.length, Math.max(2, save.get('unlocked', 2)));
-let picked = save.get('hero', 'zip');
-if (ROSTER.indexOf(picked) < 0 || ROSTER.indexOf(picked) >= unlocked) picked = ROSTER[0];
+let picked = save.get('hero', ROSTER[0]);
+if (!ROSTER.includes(picked)) picked = ROSTER[0];
+
+// Read-only debug surface for browser tests.
+window.__starlane = { match, get state() { return state; } };
 
 const muteBtn = $('mute');
 const syncMute = () => { muteBtn.innerHTML = audio.muted ? icons.mute : icons.sound; };
@@ -67,14 +69,14 @@ function toTitle() {
 
 function toSelect() {
   leave('select');
-  menus.showSelect({ unlocked, picked, onPlay: startMatch, onHome: toTitle });
+  menus.showSelect({ picked, onPlay: startMatch, onHome: toTitle });
 }
 
 function startMatch(id = picked) {
   clearTimeout(resultTimer);
   picked = id;
   save.set('hero', id);
-  if (id !== match.heroId) match.setHero(id);
+  match.setHero(id); // fresh heroes + a fresh random bot line-up each match
   menus.hideAll();
   match.reset();
   rig.follow(match.hero);
@@ -106,12 +108,7 @@ function resume() {
 bus.on('end', (res) => {
   state = 'results';
   document.body.classList.remove('playing');
-  let unlock = null;
-  if (res.win && unlocked < ROSTER.length) {
-    unlock = ROSTER[unlocked++];
-    save.set('unlocked', unlocked);
-  }
-  resultTimer = setTimeout(() => menus.showResult(res, { unlock, onAgain: () => startMatch(picked), onHome: toSelect }), 1800);
+  resultTimer = setTimeout(() => menus.showResult(res, { onAgain: () => startMatch(picked), onHome: toSelect }), 1800);
 });
 
 addEventListener('keydown', (e) => {

@@ -10,7 +10,7 @@ const lists = {
   structures: (ctx) => ctx.structures,
 };
 
-const valid = (e, team) => e.team !== team && e.alive && e.vulnerable !== false;
+const valid = (e, team) => e.team !== team && e.alive && e.vulnerable !== false && !e.hidden && !e.untarget;
 
 function nearest(list, team, x, z, range) {
   let best = null, bestD = range;

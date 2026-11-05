@@ -1,52 +1,57 @@
-// Inline SVG icons (chunky, rounded, ink-outlined).
-const INK = '#23163A';
+// Inline SVG icons: angular sci-fi glyphs. Skill glyphs are white on the champion color; icons[kind] / icons['basic_' + kind].
+const INK = '#0B1020';
 const svg = (body, vb = '0 0 64 64') =>
-  `<svg viewBox="${vb}" xmlns="http://www.w3.org/2000/svg" stroke="${INK}" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">${body}</svg>`;
+  `<svg viewBox="${vb}" xmlns="http://www.w3.org/2000/svg" stroke="${INK}" stroke-width="3" stroke-linejoin="miter" stroke-linecap="square">${body}</svg>`;
 
 const STAR_PTS = '32,6 39.5,23.5 58,25 44,37.5 48.5,56 32,46.5 15.5,56 20,37.5 6,25 24.5,23.5';
+const W = 'fill="#fff"', LINE = (w = 7, c = '#fff') => `fill="none" stroke="${c}" stroke-width="${w}"`;
+
+// Role glyphs (also the portrait emblem).
+const ROLE = {
+  tank: `<path d="M32 4L56 12V32C56 46 46 56 32 61 18 56 8 46 8 32V12Z" ${W}/><path d="M32 16V48M18 28H46" ${LINE(5, INK)}/>`,
+  bruiser: `<polygon points="32,4 56,18 56,46 32,60 8,46 8,18" ${W}/><path d="M20 24h24M20 34h24M20 44h24" ${LINE(4, INK)}/>`,
+  assassin: `<polygon points="52,6 58,12 30,40 24,34" ${W}/><polygon points="24,34 30,40 18,46 12,58 6,52 18,40" ${W}/>`,
+  blaster: `<polygon points="32,3 39,22 58,14 44,30 60,40 40,42 38,61 30,44 12,56 20,38 4,28 24,26" ${W}/>`,
+  shooter: `<circle cx="32" cy="32" r="20" ${LINE(5)}/><circle cx="32" cy="32" r="5" ${W}/><path d="M32 2v14M32 48v14M2 32h14M48 32h14" ${LINE(5)}/>`,
+  support: `<polygon points="32,4 58,32 32,60 6,32" ${W}/><path d="M32 20v24M20 32h24" ${LINE(7, INK)}/>`,
+};
 
 export const icons = {
-  star: (fill = '#FFD23F') => svg(`<polygon points="${STAR_PTS}" fill="${fill}"/>`),
+  star: (fill = '#FFC83D') => svg(`<polygon points="${STAR_PTS}" fill="${fill}"/>`),
   play: svg('<polygon points="20,10 54,32 20,54" fill="#fff"/>'),
   retry: svg('<path d="M48 22A20 20 0 1 0 52 36" fill="none" stroke="#fff" stroke-width="8"/><polygon points="52,8 54,28 34,24" fill="#fff"/>'),
-  smile: svg('<circle cx="32" cy="32" r="26" fill="#FFD23F"/><circle cx="23" cy="26" r="3.5" fill="#23163A"/><circle cx="41" cy="26" r="3.5" fill="#23163A"/><path d="M20 38Q32 52 44 38" fill="none"/>'),
-  claw: svg('<path d="M16 50L28 12M30 54L40 10M44 52L52 16" fill="none" stroke="#fff" stroke-width="8"/>'),
-  fox: svg('<polygon points="8,8 28,20 12,34" fill="#FF8A3D"/><polygon points="56,8 36,20 52,34" fill="#FF8A3D"/><ellipse cx="32" cy="36" rx="23" ry="19" fill="#FF8A3D"/><ellipse cx="32" cy="46" rx="11" ry="8" fill="#FFF1DC" stroke="none"/><circle cx="23" cy="33" r="4" fill="#23163A" stroke="none"/><circle cx="41" cy="33" r="4" fill="#23163A" stroke="none"/><circle cx="32" cy="44" r="3" fill="#23163A" stroke="none"/>'),
-  tower: (c) => svg(`<polygon points="22,56 42,56 38,24 26,24" fill="#F4EEFA"/><polygon points="20,24 44,24 32,8" fill="${c}"/><rect x="18" y="52" width="28" height="8" fill="${c}"/>`),
+  tower: (c) => svg(`<polygon points="22,56 42,56 38,24 26,24" fill="#E6ECF2"/><polygon points="20,24 44,24 32,8" fill="${c}"/><rect x="18" y="52" width="28" height="8" fill="${c}"/>`),
   core: (c) => svg(`<polygon points="32,4 56,24 46,56 18,56 8,24" fill="${c}"/><polygon points="32,14 44,26 38,44 26,44 20,26" fill="#fff" stroke="none" opacity=".45"/>`),
-  pause: svg('<rect x="14" y="10" width="14" height="44" rx="5" fill="#fff"/><rect x="36" y="10" width="14" height="44" rx="5" fill="#fff"/>'),
+  pause: svg('<rect x="14" y="10" width="14" height="44" fill="#fff"/><rect x="36" y="10" width="14" height="44" fill="#fff"/>'),
   sound: svg('<polygon points="8,26 20,26 34,14 34,50 20,38 8,38" fill="#fff"/><path d="M42 24Q50 32 42 40M48 15Q62 32 48 49" fill="none" stroke="#fff" stroke-width="5"/>'),
-  mute: svg('<polygon points="6,26 18,26 32,14 32,50 18,38 6,38" fill="#fff"/><path d="M40 24l16 16M56 24L40 40" fill="none" stroke="#FF5D73" stroke-width="7"/>'),
-  home: svg('<polygon points="32,8 58,30 50,30 50,54 14,54 14,30 6,30" fill="#fff"/><rect x="27" y="38" width="10" height="16" fill="#FFD23F"/>'),
-  lock: svg('<path d="M22 28V20a10 10 0 0 1 20 0v8" fill="none" stroke-width="6"/><rect x="14" y="28" width="36" height="28" rx="7" fill="#FFD23F"/>'),
+  mute: svg('<polygon points="6,26 18,26 32,14 32,50 18,38 6,38" fill="#fff"/><path d="M40 24l16 16M56 24L40 40" fill="none" stroke="#FF4D5E" stroke-width="7"/>'),
+  home: svg('<polygon points="32,8 58,30 50,30 50,54 14,54 14,30 6,30" fill="#fff"/><rect x="27" y="38" width="10" height="16" fill="#FFC83D"/>'),
   check: svg('<path d="M12 34L26 48L52 16" fill="none" stroke="#fff" stroke-width="10"/>'),
-  phone: svg('<rect x="10" y="20" width="44" height="26" rx="6" fill="#fff"/><path d="M32 8v8M26 12l6-6 6 6" fill="none" stroke="#FFD23F"/>'),
+  phone: svg('<rect x="10" y="20" width="44" height="26" fill="#fff"/><path d="M32 8v8M26 12l6-6 6 6" fill="none" stroke="#FFC83D"/>'),
+  plus: svg('<path d="M32 10v44M10 32h44" fill="none" stroke="#fff" stroke-width="12"/>'),
 
-  // hero portraits
-  bear: svg('<circle cx="14" cy="16" r="9" fill="#6BBF59"/><circle cx="50" cy="16" r="9" fill="#6BBF59"/><ellipse cx="32" cy="36" rx="24" ry="21" fill="#6BBF59"/><ellipse cx="32" cy="45" rx="11" ry="8" fill="#B4E38E" stroke="none"/><circle cx="23" cy="32" r="4" fill="#23163A" stroke="none"/><circle cx="41" cy="32" r="4" fill="#23163A" stroke="none"/><ellipse cx="32" cy="42" rx="4" ry="3" fill="#23163A" stroke="none"/>'),
-  bunny: svg('<ellipse cx="21" cy="15" rx="7" ry="15" fill="#C9A7FF"/><ellipse cx="43" cy="15" rx="7" ry="15" fill="#C9A7FF"/><ellipse cx="32" cy="42" rx="22" ry="18" fill="#C9A7FF"/><circle cx="23" cy="40" r="4" fill="#23163A" stroke="none"/><circle cx="41" cy="40" r="4" fill="#23163A" stroke="none"/><ellipse cx="32" cy="48" rx="4" ry="3" fill="#FF9AD5" stroke="none"/>'),
-  penguin: svg('<ellipse cx="32" cy="34" rx="23" ry="24" fill="#34407F"/><ellipse cx="32" cy="44" rx="14" ry="13" fill="#F4F8FF" stroke="none"/><rect x="13" y="20" width="38" height="14" rx="7" fill="#3DE0D0"/><polygon points="26,38 38,38 32,47" fill="#FFA23D"/>'),
+  // champion portrait: hex badge in the champion color with the role glyph; role glyph alone
+  champ: (def) => svg(`<polygon points="32,2 59,16 59,48 32,62 5,48 5,16" fill="${def.css}"/><g transform="translate(15 15) scale(.55)">${ROLE[def.role]}</g>`),
+  role: (r) => svg(ROLE[r]),
 
-  // upgrade cards
-  boots: svg('<path d="M18 8h16v26l16 8v12H14z" fill="#7BE0FF"/>'),
-  heart: svg('<path d="M32 56L10 32C4 22 12 8 24 10c4 1 7 4 8 8 1-4 4-7 8-8 12-2 20 12 14 22z" fill="#FF6B8B"/>'),
-  hands: svg('<circle cx="32" cy="36" r="22" fill="#fff"/><path d="M32 36V22M32 36l10 6" fill="none"/><path d="M26 8h12" fill="none"/>'),
+  // skill kinds
+  dash: svg(`<polygon points="8,20 34,20 34,10 58,32 34,54 34,44 8,44" ${W}/>`),
+  leap: svg(`<path d="M8 48Q32 -8 56 48" ${LINE()}/><polygon points="44,42 62,46 54,60" ${W}/>`),
+  blink: svg(`<polygon points="10,32 20,16 30,32 20,48" ${W}/><polygon points="32,32 44,14 56,32 44,50" ${LINE(5)}/>`),
+  nova: svg(`<circle cx="32" cy="32" r="10" ${W}/><path d="M32 4v12M32 48v12M4 32h12M48 32h12M12 12l8 8M44 44l8 8M52 12l-8 8M20 44l-8 8" ${LINE(5)}/>`),
+  cone: svg(`<polygon points="8,32 58,6 58,58" ${W}/>`),
+  blast: svg(`<circle cx="32" cy="32" r="19" ${LINE(5)}/><circle cx="32" cy="32" r="7" ${W}/><path d="M32 4v10M32 50v10M4 32h10M50 32h10" ${LINE(5)}/>`),
+  rain: svg(`<path d="M22 4l-8 26M38 4l-8 26M54 4l-8 26" ${LINE(6)}/><polygon points="6,52 26,44 58,44 58,58 6,58" ${W}/>`),
+  buff: svg(`<path d="M32 5L55 13V32C55 46 45 55 32 60 19 55 9 46 9 32V13Z" ${W}/><path d="M20 36l12-12 12 12" ${LINE(6, INK)}/>`),
+  hook: svg(`<path d="M42 6v28a12 12 0 0 1-24 0" ${LINE(8)}/><polygon points="8,30 28,30 18,46" ${W}/>`),
+  field: svg(`<circle cx="32" cy="32" r="23" fill="none" stroke="#fff" stroke-width="6" stroke-dasharray="10 6"/><circle cx="32" cy="32" r="8" ${W}/>`),
+  turret: svg(`<polygon points="10,56 54,56 48,44 16,44" ${W}/><rect x="20" y="26" width="24" height="18" ${W}/><rect x="40" y="14" width="20" height="9" transform="rotate(20 40 14)" ${W}/>`),
+  beam: svg(`<rect x="4" y="25" width="34" height="14" ${W}/><polygon points="38,32 60,8 60,56" ${W}/>`),
+  bolt: svg(`<path d="M4 32h40" ${LINE(8)}/><polygon points="42,16 62,32 42,48" ${W}/>`),
 
-  // skills (white glyphs on a hero-colored button)
-  zip_tail: svg('<path d="M10 48Q30 6 56 20" fill="none" stroke="#fff" stroke-width="10"/><circle cx="54" cy="20" r="6" fill="#FFD23F"/>'),
-  zip_dash: svg('<polygon points="10,22 38,22 38,10 58,32 38,54 38,42 10,42" fill="#fff"/>'),
-  zip_spin: svg('<circle cx="32" cy="32" r="18" fill="none" stroke="#fff" stroke-width="9"/><polygon points="40,6 58,14 44,26" fill="#FFD23F"/>'),
-  zip_meteor: svg('<path d="M6 10L34 34" fill="none" stroke="#fff" stroke-width="8"/><polygon points="44,22 49,34 62,35 52,43 55,56 44,49 33,56 36,43 26,35 39,34" fill="#FFD23F"/>'),
-  moss_paw: svg('<ellipse cx="32" cy="42" rx="15" ry="12" fill="#fff"/><circle cx="14" cy="26" r="6" fill="#fff"/><circle cx="26" cy="16" r="6" fill="#fff"/><circle cx="38" cy="16" r="6" fill="#fff"/><circle cx="50" cy="26" r="6" fill="#fff"/>'),
-  moss_vine: svg('<path d="M10 54Q16 18 32 34T54 10" fill="none" stroke="#fff" stroke-width="9"/><ellipse cx="50" cy="42" rx="8" ry="5" transform="rotate(-30 50 42)" fill="#B4E38E"/>'),
-  moss_shield: svg('<path d="M32 6L54 14V32C54 46 44 56 32 60 20 56 10 46 10 32V14Z" fill="#fff"/><path d="M32 18V48" fill="none" stroke="#6BBF59" stroke-width="6"/>'),
-  moss_quake: svg('<circle cx="32" cy="36" r="8" fill="#fff"/><circle cx="32" cy="36" r="17" fill="none" stroke="#fff" stroke-width="6"/><circle cx="32" cy="36" r="27" fill="none" stroke="#FF8EC4" stroke-width="5"/>'),
-  luma_bolt: svg('<polygon points="32,6 38,24 56,24 42,35 47,54 32,43 17,54 22,35 8,24 26,24" fill="#fff"/>'),
-  luma_burst: svg('<polygon points="32,4 39,25 60,32 39,39 32,60 25,39 4,32 25,25" fill="#FFE680"/>'),
-  luma_blink: svg('<path d="M8 20l10 10-10 10M24 20l10 10-10 10" fill="none" stroke="#fff" stroke-width="7"/><polygon points="50,34 54,44 62,45 56,51 58,60 50,55 42,60 44,51 38,45 46,44" fill="#FF9AD5"/>'),
-  luma_shower: svg('<polygon points="18,8 21,16 30,17 23,23 25,32 18,27 11,32 13,23 6,17 15,16" fill="#fff"/><polygon points="46,22 49,30 58,31 51,37 53,46 46,41 39,46 41,37 34,31 43,30" fill="#FFE680"/><polygon points="22,42 25,50 33,51 27,56 29,63 22,59 15,63 17,56 11,51 19,50" fill="#FF9AD5"/>'),
-  clink_snowball: svg('<circle cx="38" cy="30" r="18" fill="#fff"/><path d="M6 52L20 42M8 38L18 34" fill="none" stroke="#BFF4FF" stroke-width="6"/>'),
-  clink_turret: svg('<rect x="14" y="46" width="36" height="10" rx="4" fill="#fff"/><ellipse cx="32" cy="38" rx="14" ry="12" fill="#fff"/><rect x="30" y="12" width="24" height="12" rx="5" transform="rotate(25 30 12)" fill="#BFF4FF"/>'),
-  clink_slide: svg('<ellipse cx="40" cy="36" rx="20" ry="12" fill="#fff"/><path d="M4 28h14M2 40h18M8 50h12" fill="none" stroke="#BFF4FF" stroke-width="5"/>'),
-  clink_beam: svg('<rect x="6" y="24" width="38" height="16" rx="6" fill="#fff"/><polygon points="44,32 62,12 62,52" fill="#BFF4FF"/>'),
+  // basic attacks
+  basic_melee: svg(`<path d="M12 54L50 12" ${LINE(9)}/><path d="M8 20Q32 26 56 56" ${LINE(5)}/>`),
+  basic_line: svg(`<path d="M6 58L48 16" ${LINE(6)}/><polygon points="44,6 60,4 58,20 50,22" ${W}/>`),
+  basic_proj: svg(`<circle cx="42" cy="26" r="14" ${W}/><path d="M6 54L26 38M10 40l12-8" ${LINE(6)}/>`),
+  basic_spread: svg(`<path d="M8 32L58 10M8 32h50M8 32l50 22" ${LINE(6)}/><circle cx="8" cy="32" r="6" ${W}/>`),
 };

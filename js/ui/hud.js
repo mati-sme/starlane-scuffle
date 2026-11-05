@@ -1,5 +1,5 @@
 // In-match HUD: portrait + HP ring + XP arc + level, lane bar (minimap), match clock, respawn ring,
-// takedown banner, pooled health bars. Owns the skill buttons and the level-up cards.
+// takedown banner, pooled health bars. Owns the skill buttons and the upgrade drawer.
 import * as THREE from 'three';
 import { MAP, MATCH, HERO, TEAM, GROUND } from '../config.js';
 import { clamp } from '../core/math.js';
@@ -21,14 +21,14 @@ export class Hud {
     this.lvl = -1;
 
     root.innerHTML = `
-      <div class="portrait"><div class="xp"></div><div class="ring"></div><div class="face"></div><b class="lvl">1</b></div>
+      <div class="portrait"><div class="xp"></div><div class="ring"></div><div class="face"></div><b class="lvl" data-testid="hud-level">1</b></div>
       <div class="top">
         <div class="lane"><div class="track"></div><div class="items"></div></div>
-        <div class="clock"><i class="pie"></i><i class="storm">${icons.star('#FFD23F')}</i></div>
+        <div class="clock"><i class="pie"></i><i class="storm">${icons.star('#FFC83D')}</i></div>
       </div>
-      <div class="respawn"><div class="rring"></div><i>${icons.star('#FFD23F')}</i></div>
-      <div class="takedown"><i class="k"></i><s>${icons.star('#FFD23F')}</s><i class="v"></i></div>
-      <div class="banner">${icons.star('#FFD23F')}${icons.star('#C25BD6')}${icons.star('#FFD23F')}</div>`;
+      <div class="respawn"><div class="rring"></div><i>${icons.star('#FFC83D')}</i></div>
+      <div class="takedown"><i class="k"></i><s>${icons.star('#FFC83D')}</s><i class="v"></i></div>
+      <div class="banner">${icons.star('#FFC83D')}${icons.star('#3DA5FF')}${icons.star('#FFC83D')}</div>`;
     this.ring = root.querySelector('.ring');
     this.xp = root.querySelector('.xp');
     this.face = root.querySelector('.portrait .face');
@@ -66,8 +66,8 @@ export class Hud {
       this.banner.classList.add('pop');
     });
     bus.on('takedown', ({ killer, victim }) => {
-      this.take.querySelector('.k').innerHTML = icons[killer.def.portrait];
-      this.take.querySelector('.v').innerHTML = icons[victim.def.portrait];
+      this.take.querySelector('.k').innerHTML = icons.champ(killer.def);
+      this.take.querySelector('.v').innerHTML = icons.champ(victim.def);
       this.take.classList.remove('pop');
       void this.take.offsetWidth;
       this.take.classList.add('pop');
@@ -81,9 +81,10 @@ export class Hud {
   // (Re)build everything that depends on which heroes are in the match.
   _setup() {
     const m = this.match, hero = m.hero;
-    this.face.innerHTML = icons[hero.def.portrait];
-    this.root.style.setProperty('--hero', hero.def.color);
+    this.face.innerHTML = icons.champ(hero.def);
+    this.root.style.setProperty('--hero', hero.def.css);
     this.abilities.setHero(hero);
+    this.levelup.reset();
     for (const d of this.dots) d.remove();
     this.dots = m.heroes.map((h) => {
       const el = document.createElement('b');

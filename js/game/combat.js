@@ -11,8 +11,9 @@ const SPARK = { color: PAL.gold, speed: 2.5, up: 1.5, size: 0.35, life: 0.35, fr
 // Any entity: { type, team, x, z, hp, maxHp, alive, hitY, flash, squash, dying }
 // src.outMul scales outgoing damage (hero level / upgrades / bot difficulty); heroes may carry shieldHp.
 export function dealDamage(t, amount, src) {
-  if (!t.alive) return;
+  if (!t.alive || t.untarget) return;
   if (src?.outMul) amount *= src.outMul;
+  if (t.buf?.dr) amount *= 1 - t.buf.dr.v;
   SPARK.color = src ? TEAM[src.team].main : PAL.gold;
   if (t.shieldHp > 0) {
     const soak = Math.min(t.shieldHp, amount);
@@ -24,6 +25,8 @@ export function dealDamage(t, amount, src) {
     }
   }
   t.hp -= amount;
+  if (src?.buf?.lifesteal) heal(src, amount * src.buf.lifesteal.v);
+  if (t.buf?.undying && t.hp < 1) t.hp = 1;
   t.flash = 0.08;
   t.squash = 1;
   particles.burst(t.x, t.hitY ?? 1, t.z, 6, SPARK);
@@ -90,6 +93,25 @@ export function pullTo(e, x, z, dur) {
 export function shove(e, dx, dz, dist, dur) {
   const d = Math.hypot(dx, dz) || 1;
   pullTo(e, e.x + (dx / d) * dist, e.z + (dz / d) * dist, dur);
+}
+
+// Calls fn(h) for every living hero of `team` (including the caster) whose edge is within r of (x, z).
+export function forEachAlly(ctx, team, x, z, r, fn) {
+  for (const h of ctx.heroes) if (h.team === team && h.alive && Math.hypot(h.x - x, h.z - z) - h.radius <= r) fn(h);
+}
+
+// ---- timed hero buffs: speed / aspd / dr / lifesteal / hidden / untarget / undying (value v for t seconds) ----
+export function addBuff(e, key, v, dur) {
+  const b = e.buf[key];
+  if (!b || v >= b.v || b.t < dur) e.buf[key] = { v: Math.max(v, b?.v ?? 0), t: Math.max(dur, b?.t ?? 0) };
+}
+export const buff = (e, key) => e.buf?.[key]?.v ?? 0;
+export function tickBuffs(e, dt) {
+  for (const k in e.buf) if ((e.buf[k].t -= dt) <= 0) delete e.buf[k];
+}
+export function giveShield(e, amount, dur) {
+  e.shieldHp = Math.min(e.shieldHp + amount, amount * 1.5);
+  e.shieldT = Math.max(e.shieldT, dur);
 }
 
 export function heal(e, amount) {

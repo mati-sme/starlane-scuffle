@@ -1,4 +1,4 @@
-// Match orchestration: heroes, waves, timer, Starstorm, XP / level-up picks, structure rules, win/lose, per-frame rendering.
+// Match orchestration: heroes, waves, timer, Starstorm, XP, structure rules, win/lose, per-frame rendering.
 import * as THREE from 'three';
 import { MATCH, HERO, PAL } from '../config.js';
 import { clamp, damp, rand } from '../core/math.js';
@@ -8,11 +8,11 @@ import { particles, FRAME } from '../render/particles.js';
 import { vfx } from '../render/vfx.js';
 import { Hero, screenToWorld } from '../heroes/hero.js';
 import { HEROES, ROSTER } from '../heroes/index.js';
-import { rollChoices } from '../heroes/upgrades.js';
 import { Tower } from '../world/tower.js';
 import { Core } from '../world/core.js';
 import { MinionSystem } from '../world/minions.js';
 import { Projectiles } from './projectiles.js';
+import { Zones } from './zones.js';
 import { Bot } from './bot.js';
 
 const CONFETTI = [PAL.gold, PAL.sunny, PAL.gloom, PAL.heal, PAL.nebulaB, PAL.star];
@@ -28,9 +28,9 @@ export class Match {
     this.structures = [...this.towers, ...this.cores];
     this.minions = new MinionSystem(scene);
     this.projectiles = new Projectiles(scene);
+    this.zones = new Zones(scene);
+    this.projectiles.blocker = this.zones;
     this.timers = [];
-    this.pick = null;
-    this.picksOwed = 0;
 
     this.intent = { x: 0, z: 0, attack: false, cast: [false, false, false] };
     this._screen = { x: 0, y: 0 };
@@ -46,20 +46,26 @@ export class Match {
       if (t.type === 'minion') this._xp(t, HERO.xp[t.kind], HERO.xpRange);
       else if (t.type === 'hero') {
         this._xp(t, HERO.xp.hero + HERO.xp.heroPerLevel * t.level, HERO.xpHeroRange);
-        if (t.killer?.type === 'hero') bus.emit('takedown', { killer: t.killer, victim: t });
+        const k = t.killer;
+        if (k?.type === 'hero') {
+          bus.emit('takedown', { killer: k, victim: t });
+          const w = k.rs[0].resetOnKill; // Phase Step perk: a takedown soon after the cast refreshes it
+          if (w && this.time - k.castAt[0] <= w) k.cds[0] = 0;
+        }
       }
     });
-    bus.on('levelUp', (h) => this._levelUp(h));
     bus.on('cast', ({ hero, slot }) => { if (slot === 2) rig.shake(hero === this.hero ? 0.4 : 0.2); });
 
-    const id = new URLSearchParams(location.search).get('hero');
-    this.setHero(Object.hasOwn(HEROES, id) ? id : 'zip');
+    const q = new URLSearchParams(location.search), id = q.get('hero');
+    this.setHero(Object.hasOwn(HEROES, id) ? id : ROSTER[0], q.get('bots')?.split(','));
   }
 
-  // The player takes `id`; bots take the others in roster order (friendly first, then the two enemies).
-  setHero(id) {
+  // The player takes `id`; three bots take random other champions (friendly first, then the two enemies).
+  // `bots` (optional, from ?bots=a,b,c) forces their ids.
+  setHero(id, bots) {
     for (const h of this.heroes ?? []) h.dispose();
-    const rest = ROSTER.filter((k) => k !== id), bot = (hero) => new Bot(hero);
+    const forced = bots?.filter((k) => k !== id && Object.hasOwn(HEROES, k)) ?? [];
+    const rest = forced.length >= 3 ? forced : ROSTER.filter((k) => k !== id).sort(() => Math.random() - 0.5), bot = (hero) => new Bot(hero);
     const roster = [[id, 0, 0, null], [rest[0], 0, 1, bot], [rest[1], 1, 0, bot], [rest[2], 1, 1, bot]];
     this.heroes = roster.map(([k, team, slot, brain]) => new Hero(this.scene, HEROES[k], team, slot, brain));
     this.hero = this.heroes[0];
@@ -78,15 +84,14 @@ export class Match {
     this.fw = 0;
     this.win = false;
     this.timers.length = 0;
-    this.picksOwed = 0;
-    if (this.pick) { this.pick = null; bus.emit('pickEnd', null); }
     input.cast.fill(false);
-    input.pick = -1;
+    input.spend.fill(false);
     this.heroes.forEach((h) => h.reset());
     this.towers.forEach((t) => t.reset());
     this.cores.forEach((c) => c.reset());
     this.minions.reset();
     this.projectiles.reset();
+    this.zones.reset();
     particles.clear();
     vfx.setMarker(null);
     this.rig.lead.set(0, 0, 0);
@@ -118,29 +123,6 @@ export class Match {
     }
   }
 
-  // Level 3 unlocks the ult instead of cards. Bots pick at random; the player gets the big-icon choice.
-  _levelUp(h) {
-    if (h.level === HERO.ultLevel) return;
-    if (!h.isPlayer) { h.addUpgrade(rollChoices(h)[0].id); return; }
-    this.picksOwed++;
-    if (!this.pick) this._openPick();
-  }
-
-  _openPick() {
-    this.picksOwed--;
-    this.pick = { choices: rollChoices(this.hero), t: HERO.pickTime };
-    bus.emit('pickStart', this.pick);
-  }
-
-  choose(i) {
-    if (!this.pick) return;
-    const c = this.pick.choices[i];
-    this.hero.addUpgrade(c.id);
-    this.pick = null;
-    bus.emit('pickEnd', c);
-    if (this.picksOwed > 0) this._openPick();
-  }
-
   _rules() {
     for (const team of [0, 1]) {
       const [outer, inner] = this.towers.filter((t) => t.team === team);
@@ -159,7 +141,10 @@ export class Match {
       it.x = this._v.x;
       it.z = this._v.y;
     }
-    for (let i = 0; i < 3; i++) { it.cast[i] = input.cast[i]; input.cast[i] = false; }
+    for (let i = 0; i < 3; i++) {
+      it.cast[i] = input.cast[i]; input.cast[i] = false;
+      if (input.spend[i]) { hero.spendPoint(i); input.spend[i] = false; }
+    }
     if (input.walkClick) {
       this._ray.setFromCamera(input.walkClick, this.rig.camera);
       if (this._ray.ray.intersectPlane(this._plane, this._hit)) hero.walkTo = { x: this._hit.x, z: this._hit.z };
@@ -186,15 +171,7 @@ export class Match {
     }
   }
 
-  update(realDt) {
-    let dt = realDt;
-    if (this.pick) { // level-up choice: the world slows down while the player decides
-      dt *= HERO.pickSlow;
-      this.pick.t -= realDt;
-      if (input.pick >= 0) { const i = input.pick; input.pick = -1; this.choose(i); }
-      else if (this.pick.t <= 0) this.choose(0);
-    } else input.pick = -1;
-
+  update(dt) {
     if (!this.over) {
       this.time += dt;
       if (this.time >= this.nextWave) {
@@ -212,6 +189,7 @@ export class Match {
     }
     this._rules();
     this._timers(dt);
+    this.zones.update(dt, this);
     for (const h of this.heroes) {
       const it = this.over ? IDLE : h === this.hero ? this._intent() : h.brain.think(dt, this);
       h.update(dt, this, it);
@@ -237,7 +215,6 @@ export class Match {
     this.win = win;
     const stars = win ? 1 + (this.towersLost === 0) + (this.time < MATCH.starTime) : 0;
     for (const h of this.heroes) h.celebrate = (h.team === 0) === win;
-    if (this.pick) { this.pick = null; this.picksOwed = 0; bus.emit('pickEnd', null); }
     this.rig.follow(this.cores[win ? 1 : 0]);
     this.rig.lead.set(0, 0, 0);
     bus.emit('end', { win, stars, time: this.time });
@@ -248,6 +225,7 @@ export class Match {
     for (const h of this.heroes) h.render(alpha, t, dt);
     for (const s of this.structures) s.render(t);
     this.minions.render(alpha, t);
+    this.zones.render();
     if (state !== 'title') this.projectiles.update(dt);
     this.map.update(t, dt, this.push);
 

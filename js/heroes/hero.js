@@ -1,13 +1,16 @@
-// Hero base: stats, XP / levels, movement, auto-aim basic attack, skills, status effects, respawn and procedural animation.
+// Hero base: stats, XP / levels, skill ranks, movement, auto-aim basic attack, skills, status effects, respawn and animation.
 import * as THREE from 'three';
 import { PAL, CAM, MAP, MATCH, HERO, DIFFICULTY, settings, GROUND, TEAM, sideX } from '../config.js';
 import { clamp, lerp, damp, angleLerp } from '../core/math.js';
 import { makeShadow } from '../render/toon.js';
+import { makeDome, makeBeam } from '../render/fx.js';
 import { vfx } from '../render/vfx.js';
 import { particles, FRAME } from '../render/particles.js';
 import { bus } from '../core/bus.js';
-import { dealDamage, forEachEnemy, tickHitFx, tickStatus, airLift, dyingScale, poof } from '../game/combat.js';
+import { tickHitFx, tickStatus, tickBuffs, buff, airLift, dyingScale, poof } from '../game/combat.js';
 import { pickHeroTarget, bestCluster } from '../game/targeting.js';
+import { BEHAVIORS, BASICS } from './behaviors.js';
+import { rankStats } from './roster.js';
 
 // Screen-space axes projected onto the ground, derived from the camera offset.
 const FWD = new THREE.Vector2(-CAM.offset[0], -CAM.offset[2]).normalize();
@@ -27,7 +30,7 @@ export class Hero {
     this.type = 'hero';
     this.team = team;
     this.slot = slot;
-    Object.assign(this, def.stats);
+    Object.assign(this, { hitY: 1.2, barY: 3.4, regen: 40 }, def.stats);
     this.baseHp = def.stats.hp;
     this.basic = def.abilities.basic;
     this.ab = [def.abilities.s1, def.abilities.s2, def.abilities.ult];
@@ -44,21 +47,25 @@ export class Hero {
     this.holder.add(this.shadow, this.ring);
     scene.add(this.holder);
 
-    this.fx = def.init?.(this, scene) ?? {};
+    this.dome = makeDome(PAL.shield);
+    this.beamMesh = this.ab.some((a) => a.kind === 'beam') ? makeBeam(def.accent) : null;
+    scene.add(this.dome);
+    if (this.beamMesh) scene.add(this.beamMesh);
     this.brain = brain ? brain(this) : null;
     this.isPlayer = !brain;
     this.reset();
   }
 
   dispose() {
-    this.scene.remove(this.holder);
-    for (const o of this.fx.objs ?? []) this.scene.remove(o);
+    this.scene.remove(this.holder, this.dome);
+    if (this.beamMesh) this.scene.remove(this.beamMesh);
   }
 
   reset() {
     this.level = 1;
     this.xp = 0;
-    this.up = {};
+    this.points = 0;
+    this.ranks = [1, 1, 0];
     this.recalc(true);
     this.x = this.px = this.rx = sideX(this.team, MAP.heroX);
     this.z = this.pz = this.rz = (this.slot ? 1 : -1) * SLOT_Z;
@@ -86,26 +93,25 @@ export class Hero {
     this.spinAng = 0;
     this._starT = 0;
     this._clear();
-    this.def.reset?.(this);
     this.brain?.reset?.();
   }
 
-  // Derived numbers from level + upgrades. `full` refills HP, otherwise HP grows with the new max.
+  // Derived numbers from level + skill ranks. `full` refills HP, otherwise HP grows with the new max.
   recalc(full) {
-    const L = this.level - 1, u = this.up;
-    this.dmgMul = (1 + HERO.dmgPerLevel * L) * (1 + 0.12 * (u.claws ?? 0));
-    this.cdMul = 0.85 ** (u.hands ?? 0);
-    this.speedMul = 1 + 0.1 * (u.boots ?? 0);
+    const L = this.level - 1;
+    this.dmgMul = 1 + HERO.dmgPerLevel * L;
     this.outMul = this.dmgMul * (this.brain ? DIFFICULTY.dmg[settings.stars - 1] : 1);
-    this.basicRange = this.basic.range + (this.basic.rangeUp ?? 0) * (u.basic ?? 0);
-    const max = Math.round(this.baseHp * (1 + HERO.hpPerLevel * L) * (1 + 0.15 * (u.heart ?? 0)));
-    this.hp = full ? max : this.hp + (max - this.maxHp);
+    this.basicRange = this.basic.range + (this.nextBasic?.range ?? 0);
+    this.rs = this.ab.map((a, i) => rankStats(a, this.ranks[i]));
+    const max = Math.round(this.baseHp + this.hpLv * L);
+    this.hp = full ? max : this.hp + (max - (this.maxHp ?? max));
     this.maxHp = max;
   }
 
   gainXp(n) {
     if (this.level >= HERO.maxLevel || !this.alive) return;
     this.xp += n;
+    bus.emit('xp', { hero: this, amount: n });
     particles.emit(this.x, 2.4, this.z, 0, 1.5, 0, PAL.gold, 0.5, 0.5, FRAME.sparkle);
     while (this.level < HERO.maxLevel && this.xp >= HERO.xpNeed(this.level)) {
       this.xp -= HERO.xpNeed(this.level);
@@ -114,18 +120,31 @@ export class Hero {
     if (this.level >= HERO.maxLevel) this.xp = 0;
   }
 
+  // Every level gives a skill point; level 3 also unlocks R rank 1 for free.
   levelUp() {
     this.level++;
+    this.points++;
+    if (this.level === HERO.ultLevel && this.ranks[2] === 0) this.ranks[2] = 1;
     this.recalc(false);
     vfx.ring(this.x, 0.2, this.z, PAL.gold, 3.5, 0.5);
-    particles.burst(this.x, 1, this.z, 14, { color: [PAL.gold, PAL.star], speed: 3, up: 4, size: 0.6, life: 0.8, frame: FRAME.star, grav: 4 });
+    particles.burst(this.x, 1, this.z, 14, { color: [PAL.gold, PAL.star], speed: 3, up: 4, size: 0.6, life: 0.8, frame: FRAME.sparkle, grav: 4 });
     bus.emit('levelUp', this);
     if (this.level === HERO.ultLevel) bus.emit('ultUnlock', this);
   }
 
-  addUpgrade(id) {
-    this.up[id] = (this.up[id] ?? 0) + 1;
+  // Can slot (0 Q, 1 E, 2 R) take a point right now? R rank 1 is only granted by level 3.
+  canSpend(slot) {
+    const r = this.ranks[slot];
+    return this.points > 0 && r < HERO.maxRank[slot] && (slot < 2 || r > 0) && this.level >= HERO.gate(slot, r + 1);
+  }
+
+  spendPoint(slot) {
+    if (!this.canSpend(slot)) return false;
+    this.ranks[slot]++;
+    this.points--;
     this.recalc(false);
+    bus.emit('rankUp', { hero: this, slot });
+    return true;
   }
 
   // Scripted motion (dash, leap, blink, slide): s = { dur, x1, z1, h, tilt, tick(h, ctx, u, dt), done(h, ctx) }.
@@ -145,7 +164,13 @@ export class Hero {
     this.shieldHp = this.shieldT = 0;
     this.moveMul = 1;
     this.noAttack = false;
-    this.def.clear?.(this);
+    this.buf = {};
+    this.hidden = this.untarget = false;
+    this.nextBasic = null;
+    this.beam = null;
+    this.chg = [0, 0, 0]; this.chgT = [0, 0, 0]; this.chgFull = [0, 0, 0];
+    this.castAt = [-99, -99, -99];
+    this.swings = 0;
   }
 
   // it: { x, z (world move dir, |v| <= 1), attack, cast: [bool, bool, bool] }
@@ -177,6 +202,14 @@ export class Hero {
     this.lunge = Math.max(0, this.lunge - dt * 5);
     this.faceHold = Math.max(0, this.faceHold - dt);
     tickStatus(this, dt);
+    tickBuffs(this, dt);
+    this.hidden = !!this.buf.hidden;
+    this.untarget = !!this.buf.untarget;
+    if (this.nextBasic && (this.nextBasic.t -= dt) <= 0) this.nextBasic = null;
+    this.basicRange = this.basic.range + (this.nextBasic?.range ?? 0);
+    for (let i = 0; i < 3; i++) {
+      if (this.chg[i] > 0 && (this.chgT[i] -= dt) <= 0) { this.chg[i] = 0; this.cds[i] = Math.max(this.cds[i], this.chgFull[i] - 3); }
+    }
     if (this.shieldT > 0 && (this.shieldT -= dt) <= 0) this.shieldHp = 0;
 
     if (this.sinceHit > 3 && this.hp < this.maxHp) this.hp = Math.min(this.maxHp, this.hp + this.regen * dt);
@@ -191,7 +224,6 @@ export class Hero {
       e.update?.(this, dt, ctx, e);
       if (e.t >= e.dur) { e.end?.(this, ctx, e); this.effects.splice(i, 1); }
     }
-    this.def.tick?.(this, dt, ctx);
 
     if (this.script) { this._runScript(dt, ctx); return; }
 
@@ -221,7 +253,7 @@ export class Hero {
     const locked = stunned || this.root > 0 || this.windup > 0;
     const mag = locked ? 0 : Math.min(1, Math.hypot(mx, mz));
     if (mag > 0.01) {
-      const sp = this.speed * this.speedMul * this.moveMul * (this.slow > 0 ? 0.55 : 1);
+      const sp = this.speed * (1 + buff(this, 'speed')) * this.moveMul * (this.slow > 0 ? 0.55 : 1);
       this.dirx = mx / mag; this.dirz = mz / mag;
       this.x += this.dirx * sp * mag * dt;
       this.z += this.dirz * sp * mag * dt;
@@ -260,11 +292,12 @@ export class Hero {
     }
   }
 
-  _canCast(i) { return this.cds[i] <= 0 && (i < 2 || this.level >= HERO.ultLevel); }
+  _canCast(i) { return this.ranks[i] > 0 && this.cds[i] <= 0; }
 
   // Skills auto-aim at the best cluster; with nothing in range they go toward the stick or facing direction.
   _aim(ctx, ab) {
-    const c = bestCluster(ctx, this.team, this.x, this.z, ab.range, ab.radius ?? 3);
+    const range = ab.range ?? 6;
+    const c = ab.aim === 'move' ? null : bestCluster(ctx, this.team, this.x, this.z, range, ab.radius ?? 3);
     let dx, dz;
     if (c) { dx = c.x - this.x; dz = c.z - this.z; }
     if (!c || Math.hypot(dx, dz) < 0.05) {
@@ -273,49 +306,49 @@ export class Hero {
     const d = Math.hypot(dx, dz) || 1;
     dx /= d; dz /= d;
     if (c) return { ...c, dx, dz, dist: d, has: true };
-    return { x: this.x + dx * ab.range * 0.6, z: this.z + dz * ab.range * 0.6, dx, dz, dist: ab.range * 0.6, has: false, n: 0, hero: false, target: null };
+    return { x: this.x + dx * range * 0.6, z: this.z + dz * range * 0.6, dx, dz, dist: range * 0.6, has: false, n: 0, hero: false, target: null };
   }
 
   _begin(i, ctx) {
     this.pend = i;
     this.windup = WINDUP;
-    const a = this._aim(ctx, this.ab[i]);
+    const a = this._aim(ctx, this.rs[i]);
     this.face = Math.atan2(a.dx, a.dz);
     this.faceHold = 0.4;
   }
 
   _fire(ctx) {
-    const i = this.pend, ab = this.ab[i];
+    const i = this.pend, ab = this.rs[i];
     this.pend = -1;
     if (!this.alive || this.stun > 0 || this.air > 0) return;
     const aim = this._aim(ctx, ab);
     this.face = Math.atan2(aim.dx, aim.dz);
     this.faceHold = 0.4;
-    const r = ab.cast(this, ctx, aim);
-    if (r === false) { this.cds[i] = 0.3; return; } // nothing to hit: try again soon
-    const cd = (typeof r === 'number' ? r : ab.cd) * this.cdMul;
+    if (!ab.hide) delete this.buf.hidden; // attacking breaks stealth
+    if (BEHAVIORS[ab.kind](this, ab, ctx, aim) === false) { this.cds[i] = 0.3; return; } // nothing to hit: try again soon
+    let cd = ab.cd;
+    if (ab.charges > 1) { // extra charges: quick recast window, full cooldown after the last
+      if (this.chg[i] > 0) { this.chg[i]--; cd = this.chg[i] > 0 ? 0.5 : ab.cd; }
+      else { this.chg[i] = ab.charges - 1; this.chgT[i] = 3; this.chgFull[i] = ab.cd; cd = 0.5; }
+    }
     this.cds[i] = cd;
     this.cdTotal[i] = cd;
+    this.castAt[i] = ctx.time;
     this.lunge = 1;
     bus.emit('cast', { hero: this, slot: i });
   }
 
   _swing(ctx) {
-    const b = this.basic, t = this.aim, u = this.up.basic ?? 0;
-    const dmg = b.dmg * (1 + (b.dmgUp ?? 0) * u);
-    this.cd = b.cd;
+    const b = this.basic, t = this.aim;
+    let dmg = b.dmg;
+    if (this.nextBasic) { dmg += this.nextBasic.dmg; this.nextBasic = null; }
+    delete this.buf.hidden;
+    this.cd = b.cd / (1 + buff(this, 'aspd'));
     this.lunge = 1;
     this.faceHold = 0.3;
     bus.emit('swing', this);
     this.face = Math.atan2(t.x - this.x, t.z - this.z);
-    if (b.proj) {
-      const p = b.proj;
-      ctx.projectiles.fire(this, t, dmg, p.speed, p.arc, GROUND + p.y, { color: b.color, frame: p.frame, size: p.size });
-      return;
-    }
-    vfx.arc(this.x, GROUND + 0.9, this.z, t.x - this.x, t.z - this.z, b.color, this.basicRange, 0.2);
-    dealDamage(t, dmg, this);
-    if (b.splash) forEachEnemy(ctx, this.team, t.x, t.z, b.splash + (b.splashUp ?? 0) * u, (e) => { if (e !== t) dealDamage(e, dmg * 0.5, this); });
+    BASICS[b.kind](this, ctx, t, b, dmg);
   }
 
   _collide(ctx) {
@@ -341,9 +374,11 @@ export class Hero {
   }
 
   render(alpha, t, dt) {
-    const show = this.alive || this.dying > 0;
+    const show = (this.alive || this.dying > 0) && !(this.hidden && this.team !== 0); // stealth: only the player's team sees it
     this.holder.visible = show;
-    if (!show) { this.def.render?.(this, t, dt); return; }
+    this.dome.visible = false;
+    if (this.beamMesh) this.beamMesh.visible = false;
+    if (!show) return;
 
     this.rx = lerp(this.px, this.x, alpha);
     this.rz = lerp(this.pz, this.z, alpha);
@@ -366,6 +401,9 @@ export class Hero {
     m.root.scale.set(sx, sy, sx);
     m.lean.rotation.x = 0.25 * mv + 0.2 * this.lunge + this.tilt;
     m.tail.rotation.y = Math.sin(t * (4 + 6 * mv)) * (0.35 + 0.3 * mv);
+    const swing = Math.sin(this.phase) * 0.9 * mv;
+    m.legs[0].rotation.x = swing;
+    m.legs[1].rotation.x = -swing;
 
     this.blink -= dt;
     m.eyes.scale.y = this.blink < 0.12 && this.blink > 0 ? 0.1 : 1;
@@ -381,6 +419,27 @@ export class Hero {
     this.ring.scale.setScalar(1 + Math.sin(t * 4) * 0.05);
     const f = this.flash > 0 ? 1 : 0;
     for (const mat of m.mats) mat.userData.flash.value = f;
-    this.def.render?.(this, t, dt);
+
+    if (this.shieldT > 0 && this.shieldHp > 0) { // shield dome
+      const d = this.dome, s = 1.5 + Math.sin(t * 6) * 0.05;
+      d.visible = true;
+      d.position.set(this.rx, 1.3 + this.lift, this.rz);
+      d.scale.set(s, s * 1.15, s);
+      d.rotation.y = t;
+      d.material.uniforms.uA.value = Math.min(1, this.shieldT * 2);
+    }
+    if (this.beam && this.beamMesh) { // channelled beam
+      const B = this.beamMesh, w = this.beam.w * (0.9 + Math.sin(t * 30) * 0.1);
+      B.visible = true;
+      B.position.set(this.rx, 1.3 + this.lift, this.rz);
+      B.rotation.y = this.beam.a;
+      B.scale.set(w, w, this.beam.len);
+      B.userData.tex.repeat.set(1, 4);
+      B.userData.tex.offset.y -= dt * 3;
+    }
+    if ((this._amb = (this._amb ?? 0) - dt) <= 0) { // role-colored ambient sparks
+      this._amb = 0.16;
+      particles.emit(this.rx + (Math.random() - 0.5) * 1.2, 0.6 + Math.random() * 2, this.rz + (Math.random() - 0.5) * 1.2, 0, 0.5, 0, this.def.accent, 0.35, 0.6, FRAME.sparkle);
+    }
   }
 }

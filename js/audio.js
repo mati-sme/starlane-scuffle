@@ -86,14 +86,16 @@ function hiss(dur, vol, f0, f1, delay = 0, type = 'bandpass', dest = sfxBus) {
   s.stop(t + dur + 0.02);
 }
 
-// One timbre per hero: (freq, dur, vol, delay).
+// One timbre per role: (freq, dur, vol, delay).
 const VOICE = {
-  zip: (f, d, v, w) => tone('square', f, f * 0.7, d, v * 0.5, w),
-  moss: (f, d, v, w) => tone('sine', f * 0.5, f * 0.25, d * 1.5, v * 1.3, w),
-  luma: (f, d, v, w) => bell(f * 1.5, d * 2.5, v * 0.7, w),
-  clink: (f, d, v, w) => tone('triangle', f, f * 0.8, d, v, w, crush),
+  tank: (f, d, v, w) => tone('square', f * 0.5, f * 0.35, d * 1.2, v * 0.5, w),
+  bruiser: (f, d, v, w) => tone('sawtooth', f * 0.7, f * 0.4, d, v * 0.35, w),
+  assassin: (f, d, v, w) => tone('square', f * 1.6, f * 1.1, d * 0.7, v * 0.35, w),
+  blaster: (f, d, v, w) => tone('sawtooth', f, f * 0.3, d * 1.3, v * 0.4, w, crush),
+  shooter: (f, d, v, w) => tone('triangle', f * 1.2, f * 0.6, d, v, w, crush),
+  support: (f, d, v, w) => bell(f * 1.5, d * 2.5, v * 0.7, w),
 };
-const voice = (h) => VOICE[h?.def?.id] ?? VOICE.zip;
+const voice = (h) => VOICE[h?.def?.role] ?? VOICE.tank;
 
 const duck = () => {
   const g = musicBus.gain, t = ctx.currentTime;
@@ -179,6 +181,7 @@ bus.on('cast', ({ hero, slot }) => play(slot === 2 ? 'ult' : 'skill', hero));
 bus.on('hit', (t) => { if (t.type !== 'minion') play('tick'); });
 bus.on('down', (t) => play(t.type === 'tower' || t.type === 'core' ? 'shatter' : 'poof', t.type === 'core'));
 bus.on('levelUp', (h) => { if (h.isPlayer) play('level'); });
+bus.on('rankUp', ({ hero }) => { if (hero.isPlayer) play('level'); });
 bus.on('towerShot', () => play('tower'));
 bus.on('storm', () => { bpm = 120; });
 bus.on('end', ({ win }) => {
