@@ -1,0 +1,8 @@
+{
+  "appId": "com.matisme.starlanescuffle",
+  "appName": "Starlane Scuffle",
+  "webDir": "www",
+  "backgroundColor": "#060A16",
+  "android": { "backgroundColor": "#060A16" },
+  "ios": { "backgroundColor": "#060A16", "contentInset": "never" }
+}

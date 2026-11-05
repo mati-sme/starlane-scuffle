@@ -14,6 +14,7 @@ import { createMenus } from './ui/menus.js';
 import { initTouchControls } from './ui/joystick.js';
 import { icons } from './ui/icons.js';
 import { audio } from './audio.js';
+import { lockLandscape } from './orient.js';
 import { save } from './save.js';
 import { ROSTER } from './heroes/index.js';
 import { NetClient } from './net/client.js';
@@ -39,6 +40,7 @@ const menus = createMenus($('screens'));
 initInput(canvas);
 initTouchControls();
 $('rotate').innerHTML = icons.phone;
+if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !window.Capacitor && !window.__TAURI__) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 const net = new NetClient();
 const session = new Session(match, net);
@@ -151,6 +153,7 @@ function startOnline({ seed, picks }, role) {
   rig.follow(match.hero);
   hud.show();
   document.body.classList.add('playing');
+  lockLandscape();
   state = 'match';
   session.begin(role);
   audio.music(true);
@@ -207,6 +210,7 @@ function startMatch(id = picked) {
   rig.follow(match.hero);
   hud.show();
   document.body.classList.add('playing');
+  lockLandscape();
   state = 'match';
   audio.music(true);
 }

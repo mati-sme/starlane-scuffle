@@ -1,0 +1,11 @@
+[package]
+name = "starlane-scuffle"
+version = "4.0.0"
+description = "Starlane Scuffle"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }

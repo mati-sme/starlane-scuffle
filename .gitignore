@@ -1,0 +1,14 @@
+node_modules/
+www/
+android/app/build/
+android/.gradle/
+android/build/
+android/local.properties
+android/app/src/main/assets/public/
+android/capacitor-cordova-android-plugins/
+ios/App/App/public/
+ios/App/Pods/
+src-tauri/target/
+src-tauri/gen/
+*.log
+test-results/

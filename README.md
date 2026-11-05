@@ -24,6 +24,16 @@ Built with three.js, no build step. All art, icons and sound are procedural.
 
 PLAY ONLINE -> CREATE ROOM shows a 4-character code and a share link (`?room=CODE` opens the join flow). Each player picks Sunny / Gloom and a champion: same team = co-op vs bots, different teams = versus; bots fill every side to 5v5. The creator is the sim host (their browser runs the match); the guest sends inputs and mirrors host snapshots, predicting only their own hero. A dropped player resumes the same slot within 45 s. Server and protocol: `worker/README.md`. Local dev: `npx wrangler dev` in `worker/`, then `?ws=ws://localhost:8787`.
 
+## Install the apps
+
+- **Android:** download `starlane-scuffle.apk` from the [latest Release](https://github.com/mati-sme/starlane-scuffle/releases/latest), open it, and allow "install unknown apps" for your browser / file manager when asked. Landscape only; online play works over the internet.
+- **Mac (Apple Silicon):** download `Starlane-Scuffle-arm64.dmg` from the same Release, drag the app to Applications. It is unsigned, so the first time **right-click the app -> Open -> Open** (Gatekeeper).
+- **Web fallback:** https://mati-sme.github.io/starlane-scuffle/ works in any modern browser (landscape on phones).
+- **Online rooms:** unchanged, PLAY ONLINE -> CREATE ROOM and share the code / link (see below).
+- iOS: an optional Capacitor project lives in `ios/` (open in Xcode, free personal-team 7-day sideload).
+
+Builds run in GitHub Actions (`build-android.yml`, `build-macos.yml`) on manual dispatch and `v4*` tags. Locally: `npm ci && npm run build:www` bundles `www/` (with three.js vendored), then `npx cap sync android` or `npx tauri build`.
+
 ## Run locally
 
 ```sh
