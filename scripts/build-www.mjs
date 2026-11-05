@@ -4,7 +4,7 @@ import { cpSync, rmSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 const out = 'www';
 rmSync(out, { recursive: true, force: true });
 mkdirSync(`${out}/vendor/three/addons`, { recursive: true });
-for (const p of ['css', 'js', 'icons', 'manifest.json']) cpSync(p, `${out}/${p}`, { recursive: true });
+for (const p of ['css', 'js', 'icons', 'assets', 'manifest.json']) cpSync(p, `${out}/${p}`, { recursive: true });
 cpSync('node_modules/three/build/three.module.js', `${out}/vendor/three/three.module.js`);
 cpSync('node_modules/three/examples/jsm', `${out}/vendor/three/addons`, { recursive: true });
 const html = readFileSync('index.html', 'utf8')

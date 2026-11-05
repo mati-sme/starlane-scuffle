@@ -8,6 +8,8 @@ import { TEAM_NAME } from '../net/protocol.js';
 const hex = (n) => '#' + n.toString(16).padStart(6, '0');
 const mmss = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
 const upper = (s) => s.toUpperCase();
+// Rendered bust of the champion's model (scripts/make-portraits.mjs).
+const portrait = (id) => `<img src="assets/portraits/${id}.png" alt="" draggable="false" decoding="async">`;
 
 const maxHp = Math.max(...ROSTER.map((id) => HEROES[id].stats.hp));
 const maxSpeed = Math.max(...ROSTER.map((id) => HEROES[id].stats.speed));
@@ -54,7 +56,7 @@ export function createMenus(root) {
       const cards = ROSTER.map((id) => {
         const def = HEROES[id];
         return `<button type="button" class="hcard" data-id="${id}" data-testid="champion-card-${id}" aria-pressed="false" style="--c:${def.css}">
-          <span class="pic">${icons.champ(def)}</span><b>${def.name}</b>
+          <span class="pic">${portrait(id)}</span><b>${def.name}</b>
           <span class="role"><i>${icons.role(def.role)}</i>${upper(def.role)}</span></button>`;
       }).join('');
       show('select modal', `
@@ -70,7 +72,7 @@ export function createMenus(root) {
           const def = HEROES[sel];
           el.style.setProperty('--sel', def.css);
           detail.innerHTML = `
-            <div class="dhead"><i class="dport">${icons.champ(def)}</i>
+            <div class="dhead"><i class="dport">${portrait(sel)}</i>
               <div><h3 data-testid="detail-name">${def.name}</h3><p class="dtitle" data-testid="detail-title">${def.title}</p>
               <span class="drole" data-testid="detail-role">${upper(def.role)}</span></div></div>
             <div class="stats">${bar('HP', def.stats.hp / maxHp)}${bar('SPD', def.stats.speed / maxSpeed)}${bar('RNG', def.basic.range / maxRange)}</div>
@@ -126,9 +128,9 @@ export function createMenus(root) {
       const mode = !two ? 'Practice: you + bots' : versus ? 'Versus: you play against each other' : 'Co-op: same team vs bots';
       const taken = other && other.team === mine?.team ? other.hero : null;
       const row = (p) => `<li class="pl t${p.team} ${p.connected ? '' : 'off'}" data-testid="player-${p.slot}"><i class="dot"></i><b>${p.name}${p.slot === me ? ' (you)' : ''}</b>
-        <span class="tm">${TEAM_NAME[p.team]}</span><span class="ch">${p.hero ? `<i>${icons.champ(HEROES[p.hero])}</i>${HEROES[p.hero].name}` : '…'}</span></li>`;
+        <span class="tm">${TEAM_NAME[p.team]}</span><span class="ch">${p.hero ? `<i>${portrait(p.hero)}</i>${HEROES[p.hero].name}` : '…'}</span></li>`;
       const cards = ROSTER.map((id) => `<button type="button" class="hcard mini ${mine?.hero === id ? 'sel' : ''}" data-id="${id}" data-testid="lobby-champ-${id}" style="--c:${HEROES[id].css}" ${taken === id ? 'disabled' : ''}>
-        <span class="pic">${icons.champ(HEROES[id])}</span><b>${HEROES[id].name}</b></button>`).join('');
+        <span class="pic">${portrait(id)}</span><b>${HEROES[id].name}</b></button>`).join('');
       const canStart = isHost && phase === 'lobby' && two && players.every((p) => p.connected && p.hero);
       show('lobby modal', `
         <button class="small home" type="button" aria-label="Leave" data-testid="lobby-back">${icons.home}</button>

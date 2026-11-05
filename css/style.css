@@ -217,12 +217,19 @@ body.touch .mouse { display: none; }
 .hcard .pic { flex: 1; min-height: 0; width: 76%; max-width: 92px; }
 .hcard b { font-size: 16px; text-transform: uppercase; letter-spacing: .06em; line-height: 1; }
 .hcard .role { display: flex; align-items: center; gap: 4px; font-size: 11px; letter-spacing: .12em; color: rgba(255,255,255,.75); }
+.pic img, .dport img, .pl .ch img { width: 100%; height: 100%; display: block; object-fit: cover; object-position: 50% 30%; pointer-events: none; }
+/* select cards: the portrait fills the card, name + role badge sit on a dark fade at the bottom */
+.hcard:not(.mini) { justify-content: flex-end; padding: 0 2px 5px; }
+.hcard:not(.mini) .pic { position: absolute; inset: 0; width: 100%; max-width: none; height: 100%; }
+.hcard:not(.mini)::after { content: ''; position: absolute; inset: 45% 0 0; background: linear-gradient(180deg, rgba(7,10,20,0), rgba(7,10,20,.92) 70%); pointer-events: none; }
+.hcard:not(.mini) b, .hcard:not(.mini) .role { position: relative; z-index: 1; text-shadow: 0 1px 2px #000; }
+.hcard:not(.mini):not(.sel) .pic img { filter: saturate(.8) brightness(.85); }
 .hcard .role i { width: 14px; height: 14px; display: block; }
 .hcard.sel { background: linear-gradient(180deg, color-mix(in srgb, var(--c) 55%, #121a30), #0B1020); outline: 3px solid var(--gold); outline-offset: -3px; transform: translateY(-3px); }
 .hcard.jump { animation: jump .35s cubic-bezier(.3, 1.6, .5, 1); }
 .detail { flex: none; width: 290px; padding: 12px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; border: 2px solid var(--sel, #fff); background: linear-gradient(180deg, rgba(28,38,64,.95), rgba(11,16,32,.95)); }
 .dhead { display: flex; align-items: center; gap: 10px; }
-.dport { flex: none; width: 56px; height: 56px; display: block; }
+.dport { flex: none; width: 92px; height: 92px; display: block; overflow: hidden; border: 2px solid var(--sel, #fff); }
 .detail h3 { margin: 0; font-size: 26px; font-style: italic; text-transform: uppercase; line-height: 1; color: var(--sel, #fff); -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; }
 .dtitle { margin: 2px 0 0; font-size: 14px; color: rgba(255,255,255,.8); }
 .drole { display: inline-block; margin-top: 3px; padding: 1px 7px; font-size: 12px; font-weight: 700; letter-spacing: .14em; color: var(--ink); background: var(--sel, #fff); }
@@ -259,9 +266,8 @@ body.touch .mouse { display: none; }
   .grid { grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); grid-auto-rows: 108px; }
   .hcard { min-height: 108px; }
   .hcard b { font-size: 13px; }
-  .hcard .pic { width: 60%; }
   .detail { width: min(250px, 38vw); padding: 8px; gap: 5px; }
-  .dport { width: 40px; height: 40px; }
+  .dport { width: 64px; height: 64px; }
   .detail h3 { font-size: 20px; }
   .skills li { font-size: 12px; }
   .skills .si { width: 24px; height: 24px; }
@@ -276,10 +282,10 @@ body.touch .mouse { display: none; }
 @media (max-height: 520px) {
   .grid { grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(3, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); gap: 4px; }
   .hcard { min-height: 0; padding: 3px 2px; }
-  .hcard b { font-size: 9px; letter-spacing: 0; max-width: 100%; }
+  .hcard b { font-size: 8px; letter-spacing: 0; max-width: 100%; }
   .hcard .role { font-size: 7px; letter-spacing: .03em; gap: 2px; max-width: 100%; }
   .hcard .role i { width: 8px; height: 8px; flex: none; }
-  .hcard .pic { width: auto; height: 100%; aspect-ratio: 1; max-width: 100%; }
+  .hcard:not(.mini) { padding: 0 1px 2px; }
 }
 @media (max-height: 460px) {
   .result { gap: 6px; }
@@ -327,7 +333,7 @@ body.playing #pause { display: block; }
 .tbtn.t1.on { background: var(--gloom); border-color: var(--ink); color: var(--ink); }
 .lobbygrid { flex: none; width: min(92vw, 760px); grid-template-columns: repeat(8, 1fr); grid-auto-rows: auto; gap: 5px; overflow: visible; }
 .hcard.mini { min-height: 0; height: 64px; padding: 3px 2px; flex-direction: row; justify-content: center; gap: 4px; }
-.hcard.mini .pic { flex: none; width: 34px; height: 34px; }
+.hcard.mini .pic { flex: none; width: 34px; height: 34px; overflow: hidden; }
 .hcard.mini b { font-size: 11px; }
 .hcard.mini:disabled { opacity: .35; cursor: default; }
 @media (max-width: 700px) { .hcard.mini { flex-direction: column; height: 62px; } .hcard.mini .pic { width: 28px; height: 28px; } }
