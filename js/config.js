@@ -59,14 +59,14 @@ export const UNITS = {
   bigblob: { hp: 520, speed: 2.6, range: 6, dmg: 30, cd: 1.6, radius: 1.0, aggro: 7, structMul: 2.5, hitY: 1.1, barY: 3.0, max: 6, ranged: true },
 };
 
-export const CAMP = { hp: 900, dmg: 30, cd: 1.2, range: 5, leash: 8, xp: 90, xpRange: 12, heal: 0.25, radius: 1.3, buffT: 12 };
+export const CAMP = { hp: 900, dmg: 30, cd: 1.2, range: 5, leash: 8, xp: 75, xpRange: 12, heal: 0.25, radius: 1.3, buffT: 12 };
 
 export const HERO = {
   maxLevel: 9, ultLevel: 3, dmgPerLevel: 0.05, maxRank: [4, 4, 3],
   // Q/E rank r needs level 2r-2; R rank 1 is free at level 3, R2 needs level 5, R3 level 8.
   gate: (slot, rank) => (slot < 2 ? 2 * rank - 2 : [0, 3, 5, 8][rank]),
-  xpNeed: (lv) => 40 + 20 * (lv - 1),
-  xpRange: 9, xpHeroRange: 14, xp: { blobling: 16, zapper: 18, bigblob: 40, hero: 70, heroPerLevel: 10 },
+  xpNeed: (lv) => 80 + 30 * (lv - 1) + 8 * (lv - 1) ** 2, // ~2600 total to lv 9 (was 880)
+  xpRange: 9, xpHeroRange: 14, xp: { blobling: 14, zapper: 16, bigblob: 34, hero: 60, heroPerLevel: 10 },
   baseHeal: { rate: 0.2 },
 };
 
