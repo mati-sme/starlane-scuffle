@@ -22,8 +22,8 @@ const FRAG = /* glsl */ `
   varying vec3 vC; varying float vA; varying float vF;
   void main() {
     vec4 t = texture2D(uTex, vec2((vF + gl_PointCoord.x) / 4.0, 1.0 - gl_PointCoord.y));
-    // White-hot core: the brightest part of each sprite pushes toward white so effects glow rather than tint.
-    vec3 c = mix(vC, vec3(1.0), t.a * t.a * 0.55);
+    // Hot core: the brightest part of each sprite leans a little toward white so effects glow but keep their hue.
+    vec3 c = mix(vC, vec3(1.0), t.a * t.a * 0.22); // v7.3: was 0.55, which washed every effect to white
     gl_FragColor = vec4(c * t.rgb * 1.25, t.a * vA);
     #include <colorspace_fragment>
   }`;

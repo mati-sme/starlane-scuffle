@@ -9,6 +9,7 @@ import {
 import { pickTarget } from '../game/targeting.js';
 import { particles, FRAME } from '../render/particles.js';
 import { vfx } from '../render/vfx.js';
+import { meleeFx, lineFx, lineHit, projOpts, spreadFx, rich } from '../render/atkfx.js';
 import { inCover } from '../world/arena.js';
 import { WAVE2A_BEHAVIORS } from './wave2a_beh.js';
 import { WAVE2B_BEH } from './wave2b_beh.js';
@@ -46,11 +47,13 @@ export function fireBolt(h, ctx, x, z, dx, dz, p, color) {
   hits.sort((a, b) => a.along - b.along);
   const used = p.pierce ? hits : hits.slice(0, 1);
   const len = !p.pierce && used.length ? used[0].along : p.range, ex = x + dx * len, ez = z + dz * len;
-  vfx.streak(x, 1.3, z, ex, 1.3, ez, color, 0.2, Math.min(len, 4));
-  vfx.beam(x + dx * 0.6, 1.3, z + dz * 0.6, ex, 1.3, ez, color, p.width ? Math.min(0.5, p.width * 0.3) : 0.3, 0.3); // the whole line flares so the shot is never missed
-  vfx.flash(x + dx * 1.2, 1.4, z + dz * 1.2, color, 1.3, 0.14); // muzzle
-  for (let k = 0; k < len; k += 0.8) particles.emit(x + dx * k, 1.2 + (Math.random() - 0.5) * 0.3, z + dz * k, (Math.random() - 0.5), 0.4, (Math.random() - 0.5), color, 0.6, 0.4, FRAME.sparkle);
-  if (used.length) { vfx.flash(ex, 1.3, ez, color, 1.8, 0.18); vfx.ring(ex, 0.3, ez, color, 1.8, 0.25); }
+  if (!p.quiet) { // v7.3: line basics pass quiet and draw their own look (atkfx.lineFx)
+    vfx.streak(x, 1.3, z, ex, 1.3, ez, color, 0.2, Math.min(len, 4));
+    vfx.beam(x + dx * 0.6, 1.3, z + dz * 0.6, ex, 1.3, ez, color, p.width ? Math.min(0.5, p.width * 0.3) : 0.3, 0.3); // the whole line flares so the shot is never missed
+    vfx.flash(x + dx * 1.2, 1.4, z + dz * 1.2, color, 1.3, 0.14); // muzzle
+    for (let k = 0; k < len; k += 0.8) particles.emit(x + dx * k, 1.2 + (Math.random() - 0.5) * 0.3, z + dz * k, (Math.random() - 0.5), 0.4, (Math.random() - 0.5), color, 0.6, 0.4, FRAME.sparkle);
+    if (used.length) { vfx.flash(ex, 1.3, ez, color, 1.8, 0.18); vfx.ring(ex, 0.3, ez, color, 1.8, 0.25); }
+  }
   for (const { e } of used) { affect(h, e, p, { x, z }); p.onHit?.(e); }
   if (p.explode && used.length) {
     sparks(h, ex, 0.8, ez, 12, [color, 0xffffff], 4);
@@ -595,7 +598,7 @@ const BEHAVIORS = {
     const land = (x, z) => {
       dead = true;
       if (ab.splash) explodeAt(h, ctx, x, z, ab.splash, { ...ab, dmg: ab.splashDmg ?? ab.dmg * 0.6 }, col, acc);
-      else { vfx.flash(x, 1.2, z, col, 2, 0.2); sparks(h, x, 0.8, z, 8, [col, acc, 0xffffff], 4); }
+      else { vfx.flash(x, 1.2, z, col, 2, 0.2); sparks(h, x, 0.8, z, 8, [col, acc], 4); }
     };
     vfx.flash(ox + aim.dx * 1.2, 1.3, oz + aim.dz * 1.2, col, 1.6, 0.15);
     ctx.anim(L / sp + 0.05, (u, dt) => {
@@ -609,7 +612,7 @@ const BEHAVIORS = {
         else if (shape === 'disc') { vfx.ring(x, 0.5, z, col, 2.6, 0.22); vfx.ring(x, 1.3, z, acc, 2.0, 0.22); vfx.ring(x, 2.1, z, col, 1.4, 0.22); }
         else if (shape === 'arrow') vfx.streak(x - aim.dx * 2.2, 1.3, z - aim.dz * 2.2, x + aim.dx, 1.3, z + aim.dz, col, 0.16, 3.2);
         else if (shape === 'wave') { vfx.arc(x, 1.1, z, aim.dx, aim.dz, col, 3 + (ab.width ?? 1), 0.22); vfx.arc(x - aim.dx * 0.6, 1.1, z - aim.dz * 0.6, aim.dx, aim.dz, acc, 2.2, 0.2); }
-        else if (shape === 'spear') { vfx.beam(x - aim.dx * 1.6, 1.3, z - aim.dz * 1.6, x + aim.dx * 0.6, 1.3, z + aim.dz * 0.6, col, 0.22, 0.14); vfx.flash(x + aim.dx * 0.6, 1.3, z + aim.dz * 0.6, 0xffffff, 1.0, 0.1); }
+        else if (shape === 'spear') { vfx.beam(x - aim.dx * 1.6, 1.3, z - aim.dz * 1.6, x + aim.dx * 0.6, 1.3, z + aim.dz * 0.6, col, 0.22, 0.14); vfx.flash(x + aim.dx * 0.6, 1.3, z + aim.dz * 0.6, acc, 1.0, 0.1); } // v7.3: spearhead keeps the lance color
       }
       particles.emit(x + rand(-0.3, 0.3), 1.1 + rand(-0.3, 0.4), z + rand(-0.3, 0.3), 0, 0.3, 0, Math.random() < 0.5 ? col : acc, 0.7, 0.4, fx(h).frame ?? FRAME.sparkle);
       let stopped = false;
@@ -617,7 +620,7 @@ const BEHAVIORS = {
         if (seen.has(e) || stopped || (e.type === 'core')) return;
         seen.add(e);
         affect(h, e, ab, { x: ox, z: oz, kdx: aim.dx, kdz: aim.dz });
-        sparks(h, e.x, 1, e.z, 8, [col, acc, 0xffffff], 4);
+        sparks(h, e.x, 1, e.z, 8, [col, acc], 4);
         if (!ab.pierce) stopped = true;
       });
       if (stopped) land(x, z);
@@ -791,19 +794,18 @@ function chainStrike(h, ab, ctx) {
 const SWINGS = {
   slash: (h, t, dx, dz, col) => {
     vfx.arc(h.x, GROUND + 0.9, h.z, dx, dz, col, h.basicRange, 0.2);
-    vfx.arc(h.x, GROUND + 1.3, h.z, dx, dz, 0xffffff, h.basicRange * 0.75, 0.14);
+    vfx.arc(h.x, GROUND + 1.3, h.z, dx, dz, col, h.basicRange * 0.75, 0.14);
   },
   slam: (h, t, dx, dz, col) => { // ground-pounding tanks: ring + crater at the target
     vfx.ring(t.x, 0.25, t.z, col, 2.6, 0.3); vfx.decal(t.x, t.z, col, 1.4, 0.5);
-    vfx.arc(h.x, GROUND + 1.6, h.z, dx, dz, 0xffffff, h.basicRange * 0.6, 0.12);
-    particles.burst(t.x, 0.4, t.z, 6, { color: [col, 0xffffff], speed: 3, up: 3, size: 0.8, life: 0.5, frame: FRAME.dot, grav: 8 });
+    particles.burst(t.x, 0.4, t.z, 6, { color: col, speed: 3, up: 3, size: 0.8, life: 0.5, frame: FRAME.dot, grav: 8 });
   },
   stab: (h, t, dx, dz, col) => { // thrust: a bright lance of light
     vfx.beam(h.x + dx * 0.5, 1.2, h.z + dz * 0.5, h.x + dx * h.basicRange, 1.2, h.z + dz * h.basicRange, col, 0.18, 0.16);
-    vfx.flash(h.x + dx * h.basicRange, 1.2, h.z + dz * h.basicRange, 0xffffff, 1.1, 0.12);
+    vfx.flash(h.x + dx * h.basicRange, 1.2, h.z + dz * h.basicRange, col, 1.1, 0.12);
   },
   claw: (h, t, dx, dz, col) => { // three parallel rakes
-    for (let k = -1; k <= 1; k++) vfx.arc(h.x - dz * k * 0.45, GROUND + 0.9 + k * 0.25, h.z + dx * k * 0.45, dx, dz, k ? col : 0xffffff, h.basicRange * 0.9, 0.16);
+    for (let k = -1; k <= 1; k++) vfx.arc(h.x - dz * k * 0.45, GROUND + 0.9 + k * 0.25, h.z + dx * k * 0.45, dx, dz, col, h.basicRange * 0.9, 0.16);
   },
   spin: (h, t, dx, dz, col) => { // two opposite crescents
     vfx.arc(h.x, GROUND + 0.9, h.z, dx, dz, col, h.basicRange * 1.1, 0.2);
@@ -812,7 +814,7 @@ const SWINGS = {
   upper: (h, t, dx, dz, col) => { // uppercut: column of sparks at the target
     vfx.arc(h.x, GROUND + 0.5, h.z, dx, dz, col, h.basicRange, 0.2);
     vfx.column(t.x, t.z, col, 0.25);
-    particles.burst(t.x, 0.6, t.z, 8, { color: [col, 0xffffff], speed: 1.5, up: 7, size: 0.7, life: 0.5, frame: FRAME.star, grav: 6 });
+    particles.burst(t.x, 0.6, t.z, 8, { color: col, speed: 1.5, up: 7, size: 0.7, life: 0.5, frame: FRAME.star, grav: 6 });
   },
 };
 
@@ -820,9 +822,11 @@ const SWINGS = {
 const BASICS = {
   melee(h, ctx, t, b, dmg) {
     const dx = t.x - h.x, dz = t.z - h.z, d = Math.hypot(dx, dz) || 1, col = b.color ?? fx(h).accent;
-    SWINGS[b.style ?? 'slash'](h, t, dx / d, dz / d, col, b);
-    vfx.arc(h.x, 0.2, h.z, dx / d, dz / d, col, h.basicRange * 1.05, 0.28); // ground crescent: every swing leaves a readable sweep
-    vfx.flash(t.x, (t.hitY ?? 1) + 0.2, t.z, col, 1.4, 0.16);
+    if (!meleeFx(h, t, dx / d, dz / d, b)) { // v7.3: per-champion swing + impact (atkfx.js); generic look as fallback
+      SWINGS[b.style ?? 'slash'](h, t, dx / d, dz / d, col, b);
+      vfx.flash(t.x, (t.hitY ?? 1) + 0.2, t.z, col, 1.4, 0.16);
+    }
+    vfx.arc(h.x, 0.2, h.z, dx / d, dz / d, rich(col), h.basicRange * 1.05, 0.28); // ground crescent: every swing leaves a readable sweep
     const strike = (e, m = 1) => {
       let k = dmg * m;
       if (b.lowBonus && e.type === 'hero' && e.hp < e.maxHp * 0.5) k *= 1 + b.lowBonus;
@@ -853,13 +857,14 @@ const BASICS = {
 
   line(h, ctx, t, b, dmg) {
     const dx = t.x - h.x, dz = t.z - h.z, d = Math.hypot(dx, dz) || 1;
-    fireBolt(h, ctx, h.x, h.z, dx / d, dz / d, { range: h.basicRange, width: b.width, dmg, pierce: true }, b.color ?? fx(h).accent);
+    fireBolt(h, ctx, h.x, h.z, dx / d, dz / d, { range: h.basicRange, width: b.width, dmg, pierce: true, quiet: true, onHit: (e) => lineHit(h, e, b) }, b.color ?? fx(h).accent);
+    lineFx(h, h.x, h.z, dx / d, dz / d, h.basicRange, b);
   },
 
   proj(h, ctx, t, b, dmg) {
     const col = b.color ?? fx(h).accent;
     ctx.projectiles.fire(h, t, dmg, b.speed ?? 15, b.arc ?? 0.3, GROUND + 1.4, {
-      color: col, frame: b.frame ?? FRAME.dot, size: b.size ?? 1.1, tail: b.tail, halo: b.halo, core: b.core,
+      ...projOpts(h, b), // v7.3: per-champion shape / trail / impact (atkfx.js)
       onHit: (tg) => {
         if (b.slow && tg.alive) applyStatus(tg, 'slow', b.slow);
         if (b.splash) {
@@ -891,9 +896,11 @@ const BASICS = {
         if (along > 0 && along <= h.basicRange + e.radius && lat <= 0.45 + e.radius && along < bd) { best = e; bd = along; }
       }
       const len = best ? bd : h.basicRange;
-      for (let s = 1; s < len; s += 1.5) particles.emit(h.x + dx * s, 1.2, h.z + dz * s, dx * 6, 0, dz * 6, col, b.size ?? 0.4, 0.2, b.frame ?? FRAME.dot);
+      spreadFx(h, dx, dz, len, best, b); // v7.3: big ember pellets
       if (best) dealDamage(best, dmg, h);
     }
+    vfx.flash(h.x + Math.sin(base) * 0.9, 1.25, h.z + Math.cos(base) * 0.9, col, 1.5, 0.1); // muzzle
+    vfx.cone(h.x + Math.sin(base) * 0.7, 1.25, h.z + Math.cos(base) * 0.7, Math.sin(base), Math.cos(base), col, 1.3, 0.55, 0.1);
   },
 };
 
