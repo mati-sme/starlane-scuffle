@@ -20,7 +20,7 @@ const shieldMat = (color) => new THREE.ShaderMaterial({
   vertexShader: `varying vec3 vN; varying vec3 vV;
     void main(){ vN = normalMatrix * normal; vec4 mv = modelViewMatrix * vec4(position,1.0); vV = -mv.xyz; gl_Position = projectionMatrix * mv; }`,
   fragmentShader: `uniform vec3 uC; varying vec3 vN; varying vec3 vV;
-    void main(){ float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 2.0); gl_FragColor = vec4(uC * f, f * 0.8);
+    void main(){ float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 3.0); gl_FragColor = vec4(uC * f * 0.6, f * 0.5);
     #include <colorspace_fragment>
     }`,
 });

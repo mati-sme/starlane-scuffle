@@ -12,10 +12,10 @@ import { HI } from '../render/quality.js';
 
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _c = new THREE.Color();
 const UP = new THREE.Vector3(0, 1, 0);
-// Lush, sunlit field and warm stone: the grounded palette the champions sit on.
+// v7.2: a cooler, more weathered field and slate stone (less candy green), so the champions and team colors carry the scene.
 const G = {
-  grassLight: 0x55843A, grassDark: 0x2C5228, grassDry: 0x7E8A40, dirt: 0x7A6247, jungle: 0x234A2A,
-  stone: 0x6E685D, stoneDark: 0x4C4740, curb: 0x3E3A35, bed: 0x5C4D3A, rock: 0x8A8478, rockDark: 0x3E3B38,
+  grassLight: 0x4F6E3A, grassDark: 0x26402A, grassDry: 0x75794A, dirt: 0x66543F, jungle: 0x1E3A26,
+  stone: 0x67655F, stoneDark: 0x42413E, curb: 0x34322F, bed: 0x4E4334, rock: 0x7E7A72, rockDark: 0x363533,
 };
 let TEX;
 const tex = () => (TEX ??= { grass: grassDetail(HI), paver: paverDetail(), rock: rockDetail() });
@@ -174,7 +174,7 @@ function buildGrass(group) {
   const geo = new THREE.PlaneGeometry(w, d, nx, nz).rotateX(-Math.PI / 2).translate(0, 0.006, 0);
   geo.deleteAttribute('uv');
   const pos = geo.attributes.position, col = new Float32Array(pos.count * 3);
-  const cool = new THREE.Color(0x1E4A2E), olive = new THREE.Color(0x8A8A3C);
+  const cool = new THREE.Color(0x1C3A2C), olive = new THREE.Color(0x7A7A44);
   const gl = new THREE.Color(G.grassLight), gd = new THREE.Color(G.grassDark), dry = new THREE.Color(G.grassDry), dirt = new THREE.Color(G.dirt), jungle = new THREE.Color(G.jungle), tint = new THREE.Color();
   const bases = [0, 1].map((team) => { const f = fountain(team); return { x: f.x + (team ? -6 : 6), col: new THREE.Color(TEAM[team].deep) }; });
   const inside = (x, z) => Math.hypot(Math.max(Math.abs(x) - (w / 2 - r), 0), Math.max(Math.abs(z) - (d / 2 - r), 0)) <= r;
@@ -337,10 +337,10 @@ function coverParts(b, i, rocks, crates) {
 function bushGeo() {
   const P = [];
   const clump = (x, y, z, r, c) => P.push({ g: rockGeo(Math.round(x * 13 + z * 7), 0), c, p: [x, y, z], s: [r, r * 0.85, r], f: 'cloth' });
-  clump(0, 0.45, 0, 0.62, 0x2E5E2C);
-  for (let k = 0; k < 5; k++) { const a = (k / 5) * 6.28 + 0.4, d = 0.42; clump(Math.cos(a) * d, 0.38 + (k % 2) * 0.12, Math.sin(a) * d, 0.42, k % 2 ? 0x3F7A34 : 0x356E30); }
-  clump(0.1, 0.85, -0.05, 0.4, 0x5E9440);
-  clump(-0.18, 0.78, 0.2, 0.32, 0x6EA548);
+  clump(0, 0.45, 0, 0.62, 0x284A2A);
+  for (let k = 0; k < 5; k++) { const a = (k / 5) * 6.28 + 0.4, d = 0.42; clump(Math.cos(a) * d, 0.38 + (k % 2) * 0.12, Math.sin(a) * d, 0.42, k % 2 ? 0x37603A : 0x2E5530); }
+  clump(0.1, 0.85, -0.05, 0.4, 0x4E7A3C);
+  clump(-0.18, 0.78, 0.2, 0.32, 0x5C8644);
   return mergeParts(P);
 }
 
@@ -432,8 +432,8 @@ function buildProps(group) {
   group.add(trees, pines);
 
   const shroomGeo = mergeParts([
-    { g: new THREE.CylinderGeometry(0.1, 0.13, 0.4, 6), c: 0xFFF4E0, p: [0, 0.2, 0] },
-    { g: new THREE.SphereGeometry(0.34, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2), c: 0xC85A8A, p: [0, 0.4, 0], f: 'glass' },
+    { g: new THREE.CylinderGeometry(0.1, 0.13, 0.4, 6), c: 0xD8CDB8, p: [0, 0.2, 0] },
+    { g: new THREE.SphereGeometry(0.34, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2), c: 0x8E4A3E, p: [0, 0.4, 0], f: 'glass' },
   ]);
   const shrooms = instanced(shroomGeo, toonMat({ vertexColors: true, finish: true }), 40);
   const crystals = instanced(new THREE.OctahedronGeometry(0.5).scale(0.6, 1.5, 0.6), toonMat({ emissive: 0x6A48C8, emissiveIntensity: 0.8, roughness: 0.15, metalness: 0.2 }), 24);
@@ -462,7 +462,7 @@ function buildProps(group) {
 // Animated shallow water: world-space ripples, drifting caustic lines and a lighter shallow band.
 function waterMat() {
   return new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uDeep: { value: new THREE.Color(0x1C5E7A) }, uShallow: { value: new THREE.Color(0x4FB6C8) } },
+    uniforms: { uTime: { value: 0 }, uDeep: { value: new THREE.Color(0x15405A) }, uShallow: { value: new THREE.Color(0x3A8A9C) } },
     transparent: true, depthWrite: false,
     vertexShader: /* glsl */ `varying vec3 vW; void main() { vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
     fragmentShader: /* glsl */ `
@@ -516,8 +516,8 @@ function buildDetail(group) {
   ];
   const flowerGeo = mergeParts([...bloom(0, 0, 0.32), ...bloom(0.35, 0.2, 0.24), ...bloom(-0.25, 0.3, 0.2),
     ...[[0, 0], [0.35, 0.2], [-0.25, 0.3]].map(([x, z]) => ({ g: new THREE.CylinderGeometry(0.02, 0.03, 0.3, 3), c: 0x8AB860, p: [x, 0.14, z], f: 'cloth' }))]);
-  const fl = spots(n(260), 8.5), flowers = instanced(flowerGeo, mat, fl.length);
-  const petals = [0xFF8FB8, 0xFFE070, 0xF4F1FF, 0xB89CFF, 0xFF9E5E, 0x8FD8FF];
+  const fl = spots(n(150), 8.5), flowers = instanced(flowerGeo, mat, fl.length);
+  const petals = [0xC98A9A, 0xD8C070, 0xE4E0D8, 0x9C8CC8, 0xC88A5E, 0x9CB8CC]; // wildflower tones, not candy
   fl.forEach(([x, z], i) => { place(flowers, i, x, heightAt(x, z), z, rand(0, 6), rand(0.9, 1.5)); flowers.setColorAt(i, _c.set(petals[i % petals.length])); });
 
   // Ferns: arched fronds radiating from a root.

@@ -24,6 +24,8 @@ const RING = new THREE.TorusGeometry(0.5, 0.07, 4, 16);
 const DARK = 0x1C2029, STEEL = 0x59606B, CLOTH = 0x2C2F38, TRIM = 0xB4BAC4, HIP = 1.08;
 const TORSO = { heavy: { w: 1.06, h: 1.04, d: 0.72 }, medium: { w: 0.88, h: 1.0, d: 0.6 }, slim: { w: 0.72, h: 1.0, d: 0.52 } };
 const HEAD = 0.9;
+// v7.2: smaller heads and a slightly taller, leaner frame on every champion (less chibi), applied on top of each spec.
+const HEAD_K = 0.84, TALL = 1.06, LEAN = 0.96;
 const shade = (c, k) => new THREE.Color(c).multiplyScalar(k).getHex();
 const tint = (c, to, k) => new THREE.Color(c).lerp(new THREE.Color(to), k).getHex();
 // Pull a color slightly toward its own grey: armor reads as painted metal rather than toy plastic.
@@ -343,7 +345,7 @@ function haloGeo(kind, main, acc, gl) {
 // -> { root, lean, eyes, tail, legs, arms, skirt, hand, orb, halo, style, mats } — hero.js animates the groups and flashes mats.
 // Arms are separate groups pivoting at the shoulder (arms[0] = weapon side, arms[1] = off hand) so attacks and casts move limbs.
 export function buildChampion(spec, def, team = 0) {
-  const T = TORSO[spec.torso], main = ground(def.color, 0.08), acc = ground(def.accent, 0.05);
+  const T = TORSO[spec.torso], main = ground(def.color, 0.18), acc = ground(def.accent, 0.12); // muted, painted-metal tones
   const gl = tint(def.basic?.color ?? def.accent, 0xffffff, 0.1); // emissive accents match the champion's attacks
   const hunch = spec.hunch ? 0.18 : 0, hy = HIP + T.h + 0.3, ax = T.w / 2 + 0.2;
   const mid = HIP + T.h * 0.5, chestZ = T.d / 2 + hunch * 0.4;
@@ -359,7 +361,7 @@ export function buildChampion(spec, def, team = 0) {
     glow(HEX, gl, [0, mid + 0.22, chestZ + 0.04], [0.16, 0.04, 0.16], [Math.PI / 2, 0, 0]), // chest core
     metal(RING, TRIM, [0, HIP + T.h - 0.02, hunch * 0.45], [T.w * 0.6, T.d * 0.75, 0.8], [Math.PI / 2, 0, 0]), // collar
     cloth(CYL, CLOTH, [0, HIP + T.h + 0.08, hunch * 0.5], [0.24, 0.18, 0.24]), // neck
-    ...scaleAbout(helmet(spec.helmet, hy, hunch, main, acc, gl), [0, hy - 0.2, hunch], spec.head ?? HEAD),
+    ...scaleAbout(helmet(spec.helmet, hy, hunch, main, acc, gl), [0, hy - 0.2, hunch], (spec.head ?? HEAD) * HEAD_K),
     ...pauldrons(spec.paul, T.w, HIP + T.h - 0.02, main, acc, gl),
     ...trim(spec, T, hy, hunch, main, acc, gl),
   ];
@@ -371,7 +373,7 @@ export function buildChampion(spec, def, team = 0) {
   lean.add(toonMesh(mergeParts(body), mat, 0.03));
 
   const vc = new THREE.Color(TEAM[team].main).lerp(new THREE.Color(0xffffff), 0.35).getHex();
-  const eyes = new THREE.Mesh(mergeParts(scaleAbout(visor(spec.visor, 0, hunch, vc), [0, -0.2, hunch], spec.head ?? HEAD)), new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false }));
+  const eyes = new THREE.Mesh(mergeParts(scaleAbout(visor(spec.visor, 0, hunch, vc), [0, -0.2, hunch], (spec.head ?? HEAD) * HEAD_K)), new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false }));
   eyes.position.y = hy;
   lean.add(eyes);
 
@@ -412,7 +414,7 @@ export function buildChampion(spec, def, team = 0) {
   });
 
   const rig = new THREE.Group();
-  rig.scale.set(spec.w ?? 1, spec.h ?? 1, spec.w ?? 1);
+  rig.scale.set((spec.w ?? 1) * LEAN, (spec.h ?? 1) * TALL, (spec.w ?? 1) * LEAN);
   rig.add(lean, ...legs);
   let halo = null;
   if (spec.halo) {
