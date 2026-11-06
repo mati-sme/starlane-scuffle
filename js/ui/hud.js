@@ -66,7 +66,7 @@ export class Hud {
     this.take = root.querySelector('.takedown');
 
     this.pipEls.forEach((el, t) => {
-      el.innerHTML = '<i></i>'.repeat(5) + '<i class="core"></i>';
+      el.innerHTML = '<i></i>'.repeat(11) + '<i class="core"></i>';
       this.pipKey[t] = '';
     });
     this.shop = new Shop(root.querySelector('.gear'), match);
@@ -182,7 +182,7 @@ export class Hud {
       const k = String(m.kills[t]);
       if (this.kills[t].textContent !== k) this.kills[t].textContent = k;
       const alive = m.structures.filter((s) => s.team === t).map((s) => (s.alive ? 1 : 0)).join('');
-      if (alive !== this.pipKey[t]) { // 3 outer towers, 2 guardians, core
+      if (alive !== this.pipKey[t]) { // 9 lane towers (outer / inner / inhib x top / mid / bot), 2 guardians, core
         this.pipKey[t] = alive;
         [...this.pipEls[t].children].forEach((el, i) => el.classList.toggle('dead', alive[i] === '0'));
       }

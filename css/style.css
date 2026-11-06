@@ -41,9 +41,9 @@ svg { display: block; width: 100%; height: 100%; }
 .score .k0 { color: var(--sunny); } .score .k1 { color: var(--gloom); }
 .clock { min-width: 52px; text-align: center; color: #fff; font-variant-numeric: tabular-nums; }
 .clock.storming { color: #FF9A3D; animation: pulse 1.2s ease-in-out infinite; }
-.pips { display: flex; gap: 14px; }
-.pips div { display: flex; gap: 3px; align-items: center; }
-.pips i { width: 9px; height: 9px; border: 2px solid var(--ink); box-sizing: content-box; }
+.pips { display: flex; gap: 10px; }
+.pips div { display: flex; gap: 2px; align-items: center; }
+.pips i { width: 6px; height: 7px; border: 2px solid var(--ink); box-sizing: content-box; }
 .pips .t0 i { background: var(--sunny); } .pips .t1 i { background: var(--gloom); }
 .pips i.core { width: 11px; height: 11px; transform: rotate(45deg); }
 .pips i.dead { background: #39415A; opacity: .6; }

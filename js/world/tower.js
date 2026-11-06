@@ -1,6 +1,6 @@
 // Towers: stone-and-steel fortified plinth, ribbed armored shaft with glowing seams, turret prongs, spinning energy crystal. Shoot minions first, then heroes.
 import * as THREE from 'three';
-import { PAL, TEAM, TOWER, GROUND } from '../config.js';
+import { PAL, TEAM, TOWER, TIERS, GROUND } from '../config.js';
 import { structSpot } from './arena.js';
 import { rand } from '../core/math.js';
 import { bus } from '../core/bus.js';
@@ -29,16 +29,16 @@ export class Tower {
   constructor(scene, team, idx) {
     this.type = 'tower';
     this.team = team;
-    this.idx = idx; // 0-2 outer towers (top / mid / bot lane), 3-4 guardians
-    this.tier = idx < 3 ? 'outer' : 'guard';
-    this.lane = idx < 3 ? idx : -1;
-    const spot = structSpot(team, this.tier, this.lane >= 0 ? idx : idx - 3);
+    this.idx = idx; // 0-2 outer, 3-5 inner, 6-8 inhibitor (each top / mid / bot lane), 9-10 guardians
+    this.tier = idx < 9 ? TIERS[idx / 3 | 0] : 'guard';
+    this.lane = idx < 9 ? idx % 3 : -1;
+    const spot = structSpot(team, this.tier, this.lane >= 0 ? this.lane : idx - 9);
     this.x = spot.x;
     this.z = spot.z;
     this.rx = this.x; this.rz = this.z;
     this.radius = TOWER.radius;
     this.hitY = 2.4;
-    this.barY = this.tier === 'guard' ? 7.2 : 6.2;
+    this.barY = this.tier === 'guard' ? 7.2 : this.tier === 'inhib' ? 6.9 : 6.2;
     this.maxHp = TOWER.hp[this.tier];
     this.armor = TOWER.armor[this.tier];
 
@@ -46,6 +46,7 @@ export class Tower {
     this.group = new THREE.Group();
     this.group.position.set(this.x, GROUND, this.z);
     if (this.tier === 'guard') this.group.scale.setScalar(1.18);
+    else if (this.tier === 'inhib') this.group.scale.setScalar(1.1);
     this.group.add(makeShadow(4.4));
 
     this.mat = toonMat({ vertexColors: true, finish: true, rim: 0.25 });
@@ -100,6 +101,18 @@ export class Tower {
     this.halo = makeHalo(c.main, 3.4);
     this.halo.position.copy(this.crystal.position);
     this.top.add(this.crystal, this.halo);
+    if (this.tier !== 'outer') { // inner: a second glowing collar; inhibitor: two gyro rings round a bigger crystal
+      const ringMat = toonMat({ color: 0xD2D6DC, metalness: 0.8, roughness: 0.3, emissive: c.main, emissiveIntensity: 0.5 });
+      this.mats.push(ringMat);
+      this.rings = (this.tier === 'inner' ? [1.2] : [1.35, 1.7]).map((r, i) => {
+        const g = toonMesh(new THREE.TorusGeometry(r, 0.07, 6, 28), ringMat, 0);
+        g.position.y = CRYSTAL_Y + 0.6;
+        g.rotation.x = Math.PI / 2 + (i ? 0.55 : this.tier === 'inner' ? 0 : -0.4);
+        this.top.add(g);
+        return g;
+      });
+      if (this.tier === 'inhib') this.crystal.scale.setScalar(1.5);
+    }
 
     this.banner = new THREE.Group();
     this.banner.position.set(1.05, 3.9, 0);
@@ -117,7 +130,7 @@ export class Tower {
   reset() {
     this.hp = this.maxHp;
     this.alive = true;
-    this.vulnerable = this.tier === 'outer';
+    this.vulnerable = this.tier === 'outer'; // the rest wait on Match._rules
     this.shielded = false;
     this.hurtAt = -99;
     this.streak = 0;
@@ -174,6 +187,7 @@ export class Tower {
     this.crystal.rotation.y = t * 1.6;
     this.crystal.position.y = CRYSTAL_Y + 0.6 + Math.sin(t * 2 + this.x) * 0.15;
     this.halo.position.y = this.crystal.position.y;
+    this.rings?.forEach((g, i) => { g.position.y = this.crystal.position.y; g.rotation.z = t * (i ? -0.8 : 0.9); });
     this.banner.rotation.y = Math.sin(t * 2.5 + this.x) * 0.5;
     const k = this.hp / this.maxHp; // cracks: darker tint at 66% / 33%
     this.mat.color.setScalar(k < 0.33 ? 0.62 : k < 0.66 ? 0.8 : 1);

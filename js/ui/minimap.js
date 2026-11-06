@@ -94,7 +94,7 @@ export class Minimap {
     }
     for (const s of m.structures) {
       if (!s.alive) continue;
-      const x = this.px(s.x), z = this.pz(s.z), r = (s.type === 'core' ? 4.5 : s.tier === 'guard' ? 3.5 : 3) * dpr;
+      const x = this.px(s.x), z = this.pz(s.z), r = (s.type === 'core' ? 4.5 : s.tier === 'guard' ? 3.5 : s.tier === 'inhib' ? 3.2 : s.tier === 'inner' ? 2.6 : 2.2) * dpr;
       c.fillStyle = hex(TEAM[s.team].main);
       c.strokeStyle = '#0B1020'; c.lineWidth = dpr;
       c.beginPath();

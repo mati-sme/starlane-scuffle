@@ -33,7 +33,7 @@ export class Match {
     this.scene = scene;
     this.rig = rig;
     this.map = map;
-    this.towers = [0, 1].flatMap((team) => [0, 1, 2, 3, 4].map((idx) => new Tower(scene, team, idx)));
+    this.towers = [0, 1].flatMap((team) => Array.from({ length: 11 }, (_, idx) => new Tower(scene, team, idx)));
     this.cores = [0, 1].map((team) => new Core(scene, team));
     this.structures = [...this.towers, ...this.cores];
     this.minions = new MinionSystem(scene);
@@ -332,16 +332,22 @@ export class Match {
     }
   }
 
-  // Order of falling: outer towers always; guardians once any own outer is down; the core once both guardians are down. Structures with no enemy minion within shieldR take reduced hero damage.
+  // Order of falling (per team): each lane's outer is always open; its inner needs that lane's outer down, its inhibitor that lane's inner down;
+  // the two guardians open once ANY inhibitor is down; the Nexus once both guardians are down. Structures with no enemy minion within shieldR take reduced hero damage.
   _rules(dt) {
     const shield = (this._shT -= dt) <= 0;
     if (shield) this._shT = 0.25;
     for (const team of [0, 1]) {
-      const mine = this.towers.filter((t) => t.team === team), outer = mine.filter((t) => t.tier === 'outer'), guard = mine.filter((t) => t.tier === 'guard');
-      const outerDown = outer.some((t) => !t.alive), guardsDown = guard.filter((t) => !t.alive).length;
-      for (const t of outer) t.vulnerable = true;
-      for (const t of guard) t.vulnerable = outerDown;
-      this.cores[team].vulnerable = guardsDown === guard.length; // the nexus only falls once both guardians are down
+      const mine = this.towers.filter((t) => t.team === team), at = (tier) => mine.filter((t) => t.tier === tier), guard = at('guard');
+      const lane = (tier, l) => at(tier).find((t) => t.lane === l);
+      for (let l = 0; l < 3; l++) {
+        lane('outer', l).vulnerable = true;
+        lane('inner', l).vulnerable = !lane('outer', l).alive;
+        lane('inhib', l).vulnerable = !lane('inner', l).alive;
+      }
+      const open = at('inhib').some((t) => !t.alive);
+      for (const t of guard) t.vulnerable = open;
+      this.cores[team].vulnerable = guard.every((t) => !t.alive); // the nexus only falls once both guardians are down
     }
     if (!shield) return;
     const R2 = TOWER.shieldR * TOWER.shieldR;

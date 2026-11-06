@@ -32,7 +32,9 @@ export const ARENA = {
     [[-70, 0], [70, 0]],
     [[-70, 6], [-62, 20], [-52, 38], [52, 38], [62, 20], [70, 6]],
   ],
-  outer: [[-34, -38], [-30, 0], [-34, 38]],
+  outer: [[-34, -38], [-30, 0], [-34, 38]], // per lane (top / mid / bot), then inner and inhibitor nearer the base
+  inner: [[-48, -38], [-44, 0], [-48, 38]],
+  inhib: [[-60, -24], [-57, 0], [-60, 24]],
   guard: [[-62, -7], [-62, 7]],
   core: [-74, 0],
   fountain: [-84, 0], fountainR: 6,
@@ -75,14 +77,16 @@ export const DIFFICULTY = { react: [0.5, 0.4, 0.3], dmg: [0.92, 1, 1.1], allyRea
 export const settings = { stars: 1 };
 export const BOT = { aggro: 10, retreatHp: 0.35, returnHp: 0.9, powerRatio: 0.8, groupDeficit: 2 };
 
-export const TOWER = { range: 9, cd: 1.1, radius: 1.5, hp: { outer: 2300, guard: 2500 }, armor: { outer: 10, guard: 15 }, heroDmg: 70, heroPct: 0.06, minionDmg: 100, shield: 0.35, shieldR: 10 };
-// The Nexus: 3x a guardian's health plus heavy armor, its own laser, and a shield pulse the first time it is hit once exposed.
-export const CORE = { hp: 7000, armor: 40, radius: 2.4, range: 13, cd: 1.2, heroDmg: 100, heroPct: 0.08, minionDmg: 80, pulse: 3, pulseR: 9, pulseDr: 0.7 };
+// Tiers per lane: outer -> inner -> inhib (each needs the one before it down), then two guardians and the Nexus. 3 x 3 lane towers + 2 guardians per team.
+export const TIERS = ['outer', 'inner', 'inhib'];
+export const TOWER = { range: 9, cd: 1.1, radius: 1.5, hp: { outer: 1700, inner: 1800, inhib: 1900, guard: 2200 }, armor: { outer: 8, inner: 10, inhib: 12, guard: 14 }, heroDmg: 70, heroPct: 0.06, minionDmg: 100, shield: 0.35, shieldR: 10 };
+// The Nexus: 2.5x a guardian's health plus heavy armor, its own laser, and a shield pulse the first time it is hit once exposed.
+export const CORE = { hp: 5500, armor: 40, radius: 2.4, range: 13, cd: 1.2, heroDmg: 100, heroPct: 0.08, minionDmg: 80, pulse: 3, pulseR: 9, pulseDr: 0.7 };
 
 // Gold: per-kill rewards, a small passive trickle, and the starting purse (auto-buys boots at the fountain).
 export const GOLD = {
   start: 350, trickle: 1.6, minion: { blobling: 20, zapper: 24, bigblob: 60 }, minionShare: 0.35,
-  camp: 60, campTeam: 25, hero: 300, assist: 120, assistR: 14, tower: { outer: 150, guard: 200 }, towerTeam: 50, towerR: 28,
+  camp: 60, campTeam: 25, hero: 300, assist: 120, assistR: 14, tower: { outer: 150, inner: 175, inhib: 200, guard: 225 }, towerTeam: 50, towerR: 28,
 };
 
 // Epic bosses (neutral camp-type entities; see world/camps.js). first / respawn in seconds; buffs in match.js.

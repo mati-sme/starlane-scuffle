@@ -14,14 +14,18 @@ const MELEE = { tank: 0, bruiser: 1, assassin: 2 };
 const SPACING = { tank: 1, bruiser: 0, assassin: 0, blaster: -3, shooter: -4, support: -2 };
 const ROAM = 3;
 
-// Lane plan per team: bot lane = shooter + support, mid = blaster, top = the more durable melee, roam = the other melee.
+// Lane plan per team (bots only; a human plays wherever they like and nobody is tied to them): top = the most durable melee,
+// mid = blaster, bot = shooter + support. Anyone who does not fit (a second blaster, the other melee...) roams.
+const LANE_CAP = [1, 1, 2], LANE_OF = { tank: 0, bruiser: 0, assassin: 0, blaster: 1, shooter: 2, support: 2 };
+const PRIORITY = ['tank', 'bruiser', 'assassin', 'blaster', 'shooter', 'support'];
 export function assignLanes(heroes) {
   for (const team of [0, 1]) {
-    const bots = heroes.filter((h) => h.team === team && h.brain);
-    const melee = bots.filter((h) => h.def.role in MELEE).sort((a, b) => MELEE[a.def.role] - MELEE[b.def.role]);
+    const used = [0, 0, 0];
+    const bots = heroes.filter((h) => h.team === team && h.brain).sort((a, b) => PRIORITY.indexOf(a.def.role) - PRIORITY.indexOf(b.def.role));
     for (const h of bots) {
-      const r = h.def.role;
-      h.brain.lane = r === 'blaster' ? 1 : r === 'shooter' || r === 'support' ? 2 : melee.indexOf(h) === 0 ? 0 : ROAM;
+      const l = LANE_OF[h.def.role] ?? ROAM;
+      h.brain.lane = l !== ROAM && used[l] < LANE_CAP[l] ? l : ROAM;
+      if (h.brain.lane !== ROAM) used[l]++;
       h.brain.roamLane = h.brain.lane === ROAM ? 1 : h.brain.lane;
     }
   }
@@ -123,7 +127,7 @@ export class Bot {
     return bd < 4 ? pts[bi - 1] : pts[bi];
   }
 
-  // Lane front: just behind (or ahead of, for tanks) our furthest minion on the lane; with no wave, at our outer tower.
+  // Lane front: just behind (or ahead of, for tanks) our furthest minion on the lane; with no wave, just behind our furthest-out standing tower of that lane.
   _laneGoal(ctx, lane, g) {
     const h = this.h, off = SPACING[h.def.role] ?? 0;
     let front = null;
@@ -135,13 +139,10 @@ export class Bot {
       const dx = p.x - front.x, dz = p.z - front.z, d = Math.hypot(dx, dz) || 1;
       g.x = front.x - (dx / d) * off; g.z = front.z - (dz / d) * off;
     } else {
-      const t = structSpot(h.team, 'outer', lane), fo = fountain(h.team);
+      const tw = ctx.towers.find((t) => t.team === h.team && t.lane === lane && t.alive), fo = fountain(h.team);
+      const t = tw ?? structSpot(h.team, 'inhib', lane); // outer, then inner, then inhib (towers are listed outer-first); all down: hold at the inhib spot
       const dx = fo.x - t.x, dz = fo.z - t.z, d = Math.hypot(dx, dz) || 1;
       g.x = t.x + (dx / d) * 3; g.z = t.z + (dz / d) * 3;
-    }
-    if (h.def.role === 'support') { // stay with the lane partner
-      const mate = ctx.heroes.find((o) => o !== h && o.team === h.team && o.alive && o.def.role === 'shooter');
-      if (mate && Math.hypot(mate.x - h.x, mate.z - h.z) > 5) { g.x = mate.x; g.z = mate.z; }
     }
     g.keep = 0.6;
   }
@@ -271,6 +272,7 @@ export class Bot {
   // Group push: with the numbers advantage (enemy heroes dead) or in Overdrive, every bot walks the lane where our wave is furthest along.
   _group(ctx) {
     const h = this.h, c = (ctx._grp ??= [{ t: -9, lane: null }, { t: -9, lane: null }])[h.team];
+    if (h.def.role === 'support') return null; // supports keep their own lane
     if (ctx.time >= c.t && ctx.time - c.t < 2) return c.lane; // time < c.t: stale cache from the previous match
     c.t = ctx.time;
     let ally = 0, foe = 0;

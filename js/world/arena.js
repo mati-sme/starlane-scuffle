@@ -22,7 +22,7 @@ export const PATHS = [0, 1].map((team) => ARENA.lanes.map((lane) => {
 }));
 
 export const structSpot = (team, tier, idx) => {
-  const [x, z] = tier === 'core' ? ARENA.core : tier === 'outer' ? ARENA.outer[idx] : ARENA.guard[idx];
+  const [x, z] = tier === 'core' ? ARENA.core : (ARENA[tier] ?? ARENA.guard)[idx]; // idx = lane for outer / inner / inhib, 0-1 for the guardians
   return { x: own(team, x), z };
 };
 export const fountain = (team) => ({ x: own(team, ARENA.fountain[0]), z: ARENA.fountain[1] });
