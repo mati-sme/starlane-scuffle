@@ -232,7 +232,7 @@ body.touch .mouse { display: none; }
 .screen.select { background: rgba(6,10,22,.86); backdrop-filter: blur(4px); gap: 6px; justify-content: flex-start; padding-top: calc(10px + var(--st)); }
 .sel-title { flex: none; font-size: clamp(20px, 5vh, 34px); }
 .selwrap { flex: 1; min-height: 0; width: min(1240px, 100%); display: flex; gap: 12px; padding: 4px 14px calc(10px + var(--sb)); }
-.grid { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(8, 1fr); grid-auto-rows: minmax(128px, 1fr); gap: 8px; align-content: start; overflow-y: auto; }
+.grid { flex: 1; min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); grid-auto-rows: 128px; gap: 8px; align-content: start; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
 .hcard { position: relative; min-width: 0; min-height: 128px; padding: 6px 4px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; gap: 2px; border: 2px solid var(--c); color: #fff; font-family: inherit; font-weight: 700; cursor: pointer;
   background: linear-gradient(180deg, color-mix(in srgb, var(--c) 28%, #121a30), #0B1020); clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px)); transition: transform .12s; }
 .hcard .pic { flex: 1; min-height: 0; width: 76%; max-width: 92px; }
@@ -265,7 +265,9 @@ body.touch .mouse { display: none; }
 .skills .sk-key { font-size: 12px; color: var(--gold); font-weight: 700; }
 .skills .sk-name { grid-column: 3; line-height: 1.1; }
 .skills small { grid-column: 3; font-size: 11px; color: rgba(255,255,255,.6); letter-spacing: .06em; text-transform: uppercase; }
-.detail .go { margin-top: auto; min-height: 52px; }
+.detail .go { min-height: 52px; width: 100%; }
+.dact { position: sticky; bottom: -12px; margin-top: auto; padding: 6px 0 2px; display: flex; justify-content: center; background: linear-gradient(180deg, transparent, rgba(11,16,32,.96) 30%); }
+.stat em { flex: none; font-style: normal; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: rgba(255,255,255,.75); }
 .small, #topbtns button { width: 52px; height: 52px; padding: 12px; border: 2px solid rgba(255,255,255,.55); background: linear-gradient(160deg, #2A3656, #151C33); cursor: pointer; clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); }
 .small:active, #topbtns button:active { transform: scale(.92); }
 /* summoner-spell picker (select screen + lobby): pick 2 of 3 */
@@ -304,15 +306,18 @@ body.touch .mouse { display: none; }
   .skills li { font-size: 12px; }
   .skills .si { width: 24px; height: 24px; }
   .skills li { grid-template-columns: 24px 14px 1fr; }
-  .stats { display: none; }
+  .stats { gap: 3px 8px; grid-template-columns: 1fr 1fr; }
+  .stat { font-size: 10px; gap: 4px; }
+  .stat span { width: 26px; }
+  .stat i { height: 6px; }
   .btn { height: 44px; }
   .sel-title { display: none; }
   .select .home { width: 44px; height: 44px; padding: 9px; z-index: 2; }
   .selwrap { padding-top: 54px; }
 }
-/* short landscape phones: all 24 champions on screen at once (8 x 3) */
+/* short landscape phones: smaller cards in a left list that scrolls (48 champions do not fit on one screen) */
 @media (max-height: 520px) {
-  .grid { grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(3, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); gap: 4px; }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); grid-auto-rows: 92px; gap: 4px; }
   .hcard { min-height: 0; padding: 3px 2px; }
   .hcard b { font-size: 8px; letter-spacing: 0; max-width: 100%; }
   .hcard .role { font-size: 7px; letter-spacing: .03em; gap: 2px; max-width: 100%; }
@@ -346,7 +351,7 @@ body.playing #unstuck { display: block; }
 .code { width: 150px; height: 52px; text-align: center; font: 700 26px/1 inherit; font-family: inherit; letter-spacing: .3em; text-transform: uppercase; color: #fff; background: #0B1020; border: 2px solid rgba(255,255,255,.6); }
 .neterr { margin: 0; min-height: 1.2em; font-size: 14px; font-weight: 700; color: #FFB4BC; text-shadow: 0 2px 0 var(--ink); }
 .btn:disabled { opacity: .45; filter: grayscale(.6); cursor: default; animation: none; }
-.screen.lobby { background: rgba(6, 10, 22, .88); backdrop-filter: blur(4px); gap: 6px; justify-content: flex-start; padding-top: calc(8px + var(--st)); overflow-y: auto; }
+.screen.lobby { background: rgba(6, 10, 22, .88); backdrop-filter: blur(4px); gap: 4px; justify-content: flex-start; padding-top: calc(6px + var(--st)); overflow: hidden; }
 .roomcode { display: flex; align-items: center; gap: 12px; }
 .roomcode span { font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: rgba(255,255,255,.7); }
 .roomcode b { font-size: clamp(30px, 8vh, 44px); letter-spacing: .24em; color: var(--gold); text-shadow: 3px 3px 0 var(--ink); }
@@ -365,7 +370,37 @@ body.playing #unstuck { display: block; }
 .tbtn { min-width: 110px; height: 38px; border: 2px solid rgba(255,255,255,.4); background: #151C33; color: #fff; font: 700 14px/1 inherit; font-family: inherit; letter-spacing: .12em; cursor: pointer; }
 .tbtn.t0.on { background: var(--sunny); border-color: var(--ink); color: var(--ink); }
 .tbtn.t1.on { background: var(--gloom); border-color: var(--ink); color: var(--ink); }
-.lobbygrid { flex: none; width: min(92vw, 760px); grid-template-columns: repeat(8, 1fr); grid-auto-rows: auto; gap: 5px; overflow: visible; }
+.screen.lobby > .lobbybar, .screen.lobby > .lobbysub { width: min(1240px, 100%); }
+.lobbybar { flex: none; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 14px; padding: 0 14px 0 64px; min-height: 52px; }
+.lobbysub { flex: none; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 2px 12px; padding: 0 14px; }
+.lobbysub .stagehead { font-size: 16px; }
+.lobbysub .hint { font-size: 12px; }
+.lobbysub .neterr { font-size: 12px; min-height: 0; }
+.lobbysub .neterr:empty { display: none; }
+.lobbysub .sharelink { font-size: 10px; }
+.lobbybar .pl { min-width: 0; padding: 2px 8px; font-size: 12px; }
+.lobbybar .roomcode b { font-size: 24px; }
+.lobbybar .tbtn { min-width: 76px; height: 32px; font-size: 12px; }
+.lobbybar .players { flex-wrap: nowrap; }
+.lobby .selwrap { flex: 1; min-height: 0; }
+.lobby .detail .hint { text-align: left; }
+@media (max-height: 520px) {
+  .lobbysub .sharelink, .lobbysub .modeline { display: none; }
+  .lobbybar { min-height: 44px; gap: 2px 10px; }
+  .lobbybar .roomcode span { display: none; }
+  .lobbybar .roomcode b { font-size: 20px; }
+  .lobbybar .roomcode .btn { height: 30px; font-size: 11px; }
+  .lobbybar .pl .tm { display: none; }
+  .lobbybar .pl { gap: 5px; padding: 1px 6px; font-size: 11px; }
+  .lobbybar .pl .ch { font-size: 0; }
+  .lobbybar .pl .ch i { width: 22px; height: 22px; }
+  .lobbybar { flex-wrap: nowrap; padding-left: 60px; padding-right: 70px; }
+  .lobby:not(.banmode) .lobbysub .draft-help { display: none; }
+  .lobbybar .tbtn { height: 30px; min-width: 64px; font-size: 11px; }
+  .lobby .spellpick .spchip { height: 30px; }
+  .lobby .spellpick > span { display: none; }
+  .lobby .selwrap { padding-top: 2px; padding-bottom: calc(4px + var(--sb)); }
+}
 .hcard.mini { min-height: 0; height: 64px; padding: 3px 2px; flex-direction: row; justify-content: center; gap: 4px; }
 .hcard.mini .pic { flex: none; width: 34px; height: 34px; overflow: hidden; }
 .hcard.mini b { font-size: 11px; }
@@ -621,3 +656,7 @@ h2 { font-style: normal; }
 .bar u.se.down { background: #E04848; }
 .portrait[data-se='up']::after, .portrait[data-se='down']::after { content: '▲'; position: absolute; right: -4px; top: -4px; width: 18px; height: 18px; border-radius: 50%; text-align: center; line-height: 18px; font-size: 11px; color: #fff; background: #2DBE60; border: 2px solid var(--ink, #0B1020); z-index: 3; }
 .portrait[data-se='down']::after { content: '▼'; background: #E04848; }
+
+/* lobby: keep the 48-card list cheap to paint (the game scene keeps rendering behind it) */
+.screen.lobby { backdrop-filter: none; }
+.lobby .hcard:not(.mini):not(.sel) .pic img { filter: none; opacity: .85; }

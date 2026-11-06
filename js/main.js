@@ -55,7 +55,7 @@ let t = 0;
 let resultTimer = 0;
 let draftBans = []; // offline: champions banned this draft
 let setup = defaultSetup(); // offline match setup (team sizes, side, bot levels); kept between matches
-const BAN_SECS = 20, PICK_SECS = 30;
+const BAN_SECS = 12, PICK_SECS = 30;
 const pickOne = (ids) => ids[(Math.random() * ids.length) | 0];
 let picked = save.get('hero', ROSTER[0]);
 if (!ROSTER.includes(picked)) picked = ROSTER[0];
@@ -64,7 +64,7 @@ const setSpells = (s) => { spells = s; save.set('spells', s); };
 
 // Read-only debug surface for browser tests.
 window.__starlane = {
-  match, net, session, gfx,
+  match, net, session, gfx, menus,
   get state() { return state; },
   unstuck() { resetInput(); match.hero?.unstick?.(true); },
 };
