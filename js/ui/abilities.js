@@ -36,31 +36,16 @@ export class Abilities {
       up.dataset.testid = `skill-up-${s.key.toLowerCase()}`;
       up.setAttribute('aria-label', `Rank up ${s.key}`);
       up.innerHTML = '<span>+</span>';
-      let upId = null, spent = false; // pointerup spends (synthesized click is dropped while other fingers are down)
-      const over = (e) => {
-        const r = up.getBoundingClientRect();
-        return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
-      };
-      const spend = () => { if (!spent && this.match.hero.spendPoint(i)) spent = true; };
+      // '+' is a tap, not a drag: rank on pointerdown. iOS / WebKit may send pointercancel (or no click, after preventDefault) instead of pointerup,
+      // and a synthesized click is dropped while other fingers are down. The click only covers keyboard / assistive taps.
+      let lastSpend = -1e9;
+      const spend = () => { lastSpend = performance.now(); this.match.hero.spendPoint(i); };
       up.addEventListener('pointerdown', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        spent = false;
-        upId = e.pointerId;
-        try { up.setPointerCapture(upId); } catch { /* already captured / detached */ }
+        spend();
       });
-      up.addEventListener('pointerup', (e) => {
-        if (e.pointerId !== upId) return;
-        upId = null;
-        if (over(e)) spend();
-      });
-      // iOS / some WebViews fire pointercancel instead of pointerup after setPointerCapture on a short tap
-      up.addEventListener('pointercancel', (e) => {
-        if (e.pointerId !== upId) return;
-        upId = null;
-        if (over(e)) spend();
-      });
-      up.addEventListener('click', () => spend()); // keyboard, assistive, or fallback if pointerup was lost
+      up.addEventListener('click', () => { if (performance.now() - lastSpend > 600) spend(); });
       up.addEventListener('contextmenu', (e) => e.preventDefault());
       this.root.appendChild(up);
       this.ups.push(up);

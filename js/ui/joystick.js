@@ -12,8 +12,16 @@ export function initTouchControls() {
   const atk = document.getElementById('atk');
   atk.innerHTML = icons.basic_melee; // the HUD swaps in the champion's own basic-attack glyph
 
-  if (matchMedia('(pointer: coarse)').matches) document.body.classList.add('touch');
-  addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
+  // iPadOS "desktop site" reports a Mac with touch points and no coarse pointer, and may never fire touchstart: detect it up front and on the first touch/pen pointer.
+  const touchOn = () => document.body.classList.add('touch');
+  const ipadLike = /Macintosh|iPad/.test(navigator.userAgent) && navigator.maxTouchPoints > 1;
+  if (matchMedia('(pointer: coarse)').matches || ipadLike) touchOn();
+  addEventListener('touchstart', touchOn, { once: true, passive: true });
+  addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch' || e.pointerType === 'pen') touchOn(); }, { capture: true, passive: true });
+  // A hovering mouse (buttons 0) proves a real mouse; fingers never hover. Until then, iPadOS may label fingers 'mouse'.
+  let realMouse = false;
+  addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse' && e.buttons === 0) realMouse = true; }, { capture: true, passive: true });
+  const asMouse = (e) => e.pointerType === 'mouse' && (!document.body.classList.contains('touch') || realMouse);
 
   let id = null, ox = 0, oy = 0;
   const reset = () => {
@@ -23,12 +31,12 @@ export function initTouchControls() {
   };
 
   zone.addEventListener('pointerdown', (e) => {
-    if (e.pointerType === 'mouse') { mouseDown(e); return; }
+    if (asMouse(e)) { mouseDown(e); return; }
     // A tap on the move pad always recovers a stale stick (lost capture, hidden overlay) then starts a fresh drag.
     if (id !== null && !zone.hasPointerCapture?.(id)) reset();
     if (id !== null && zone.hasPointerCapture?.(id)) return;
     id = e.pointerId;
-    zone.setPointerCapture(id);
+    try { zone.setPointerCapture(id); } catch { /* pointer already gone */ }
     ox = e.clientX; oy = e.clientY;
     base.style.transform = `translate(${ox - BASE / 2}px, ${oy - BASE / 2}px)`;
     knob.style.transform = 'translate(0, 0)';

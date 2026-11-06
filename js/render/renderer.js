@@ -64,7 +64,8 @@ export function createRenderer(canvas) {
   renderer.toneMappingExposure = HI ? 0.97 : 0.95;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   // Touch devices get a 1024 PCF map (4 taps, hardware-filtered); desktops get the softer PCF-soft filter on 2048.
-  const lowEnd = matchMedia('(pointer: coarse)').matches;
+  const ipadLike = /Macintosh|iPad/.test(navigator.userAgent) && navigator.maxTouchPoints > 1; // iPadOS 'desktop site' is not a coarse pointer
+  const lowEnd = matchMedia('(pointer: coarse)').matches || ipadLike;
   const shadows = BUDGET.shadows && HI;
   renderer.shadowMap.enabled = shadows;
   renderer.shadowMap.type = lowEnd ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
@@ -114,7 +115,7 @@ export function createRenderer(canvas) {
   const gfx = {
     renderer, scene, camera, sun, onResize: null, post: !!composer,
     resize() {
-      const w = innerWidth, h = innerHeight, pr = Math.min(dpr, BUDGET.dprMax) * scale;
+      const w = innerWidth, h = innerHeight, pr = Math.min(dpr, lowEnd && Math.max(w, h) >= 900 ? 1.5 : BUDGET.dprMax) * scale; // big touch screens (iPad) are fill-rate bound
       renderer.setPixelRatio(pr);
       renderer.setSize(w, h, false);
       if (composer) { composer.setPixelRatio(pr); composer.setSize(w, h); }
