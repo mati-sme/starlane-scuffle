@@ -77,21 +77,34 @@ function finish(g, def) {
   g.strokeStyle = mix(def.color, 0xffffff, 0.35) + '66'; g.lineWidth = 3; g.strokeRect(1.5, 1.5, OUT - 3, OUT - 3);
 }
 
+// Per-silhouette framing tweaks: weapon arm pose so the signature weapon crosses the bust, and turn so back pieces show.
+const POSE = { float: [-0.6, 0, 0.75], stomp: [-0.45, 0, 0.5] };
 window.portrait = (id) => {
-  const def = HEROES[id], m = def.buildModel(0);
+  const def = HEROES[id], m = def.buildModel(0), spec = def.model;
   const fx = def.fx?.color ?? def.basic?.color ?? def.accent;
   rimL.color.set(fx); rimR.color.set(mix(def.accent, 0xffffff, 0.4));
-  // Hero pose: weapon arm cocked out to the side, off hand slightly forward; body turned to a 3/4 view.
-  m.arms[0].rotation.set(-0.35, 0, 0.55);
-  m.arms[1].rotation.set(-0.3, 0, -0.2);
-  m.root.rotation.y = -0.45;
+  // Hero pose: weapon arm raised out front-side so the weapon reads, off hand relaxed; body in a 3/4 turn
+  // (enough to reveal back pieces like banners, tails, cloaks and speakers beside the torso).
+  m.arms[0].rotation.set(...(POSE[m.style] ?? [-0.75, 0, 0.6]));
+  m.arms[1].rotation.set(-0.25, 0, -0.25);
+  m.root.rotation.y = -0.6;
+  if (m.halo) m.halo.rotation.y = 0.5;
   scene.add(m.root);
   m.root.updateMatrixWorld(true);
-  // Frame head + shoulders around the visor: ~2 units tall, eyes in the upper third.
-  const eye = m.eyes.getWorldPosition(new THREE.Vector3()), viewH = 2.05 * (def.model.w ?? 1);
+  // Frame from the top of the tallest headgear/halo down to the hips, centred on the upper-body bounds, so the bust
+  // carries the whole identity (antlers, hats, ears, weapon heads) instead of just a visor close-up.
+  const eye = m.eyes.getWorldPosition(new THREE.Vector3()), hipY = eye.y - 1.35 * (spec.h ?? 1);
+  const box = new THREE.Box3();
+  m.root.traverse((o) => {
+    if (!o.isMesh) return;
+    const b = new THREE.Box3().setFromObject(o);
+    if (b.max.y > hipY) box.union(b.intersect(new THREE.Box3(new THREE.Vector3(-9, hipY, -9), new THREE.Vector3(9, 9, 9))));
+  });
+  const top = Math.min(box.max.y, eye.y + 1.15), w = box.max.x - box.min.x;
+  const viewH = THREE.MathUtils.clamp(Math.max(top - hipY + 0.3, w * 0.8), 2.3, 2.85);
   const dist = viewH / 2 / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-  const aim = new THREE.Vector3(0, eye.y - viewH * 0.17, 0);
-  camera.position.set(aim.x + 0.2, aim.y + 0.45, dist);
+  const aim = new THREE.Vector3((box.min.x + box.max.x) / 2 * 0.6, top + 0.22 - viewH / 2, 0);
+  camera.position.set(aim.x + 0.3, aim.y + 0.55, dist);
   camera.lookAt(aim);
   renderer.render(scene, camera);
   scene.remove(m.root);

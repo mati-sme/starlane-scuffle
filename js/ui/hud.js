@@ -4,6 +4,9 @@ import * as THREE from 'three';
 import { HERO, GROUND } from '../config.js';
 import { bus } from '../core/bus.js';
 import { icons } from './icons.js';
+
+// Rendered bust of the champion (assets/portraits, same art as champion select).
+const face = (def) => `<img src="assets/portraits/${def.id}.png" alt="" draggable="false" style="--c:${def.css}">`;
 import { Abilities } from './abilities.js';
 import { LevelUp } from './levelup.js';
 import { Minimap } from './minimap.js';
@@ -45,6 +48,15 @@ export class Hud {
       this.nums.push(el);
     }
     bus.on('dmg', (e) => this._num(e));
+    this.calls = []; this.callAt = 0;
+    for (let i = 0; i < 6; i++) {
+      const el = document.createElement('div');
+      el.className = 'callout';
+      el.addEventListener('animationend', () => el.classList.remove('go'));
+      barsRoot.appendChild(el);
+      this.calls.push(el);
+    }
+    bus.on('cast', (e) => this._callout(e));
     this.ring = root.querySelector('.ring');
     this.xp = root.querySelector('.xp');
     this.face = root.querySelector('.portrait .face');
@@ -98,8 +110,8 @@ export class Hud {
       this.banner.classList.add('pop');
     });
     bus.on('takedown', ({ killer, victim }) => {
-      this.take.querySelector('.k').innerHTML = icons.champ(killer.def);
-      this.take.querySelector('.v').innerHTML = icons.champ(victim.def);
+      this.take.querySelector('.k').innerHTML = face(killer.def);
+      this.take.querySelector('.v').innerHTML = face(victim.def);
       this.take.classList.remove('pop');
       void this.take.offsetWidth;
       this.take.classList.add('pop');
@@ -126,7 +138,7 @@ export class Hud {
   // (Re)build everything that depends on which heroes are in the match.
   _setup() {
     const m = this.match, hero = m.hero;
-    this.face.innerHTML = icons.champ(hero.def);
+    this.face.innerHTML = face(hero.def);
     this.root.style.setProperty('--hero', hero.def.css);
     this.abilities.setHero(hero);
     this.shop.reset();
@@ -165,7 +177,21 @@ export class Hud {
     el.style.top = `${((-v.y * 0.5 + 0.5) * this.h).toFixed(0)}px`;
   }
 
-  hide() { this.root.hidden = true; this.shown = false; this.barsRoot.replaceChildren(...this.nums); this.bars.length = 0; this.levelup.hide(); }
+  // Skill-name callout over the caster: every ult (team colored), plus the player's own Q / E.
+  _callout({ hero, slot }) {
+    const me = this.match?.hero;
+    if (!this.shown || !me || !hero || (slot !== 2 && hero !== me) || (hero.hidden && hero.team !== me.team)) return;
+    const ab = hero.def[['s1', 's2', 'ult'][slot]];
+    const v = this._v.set(hero.rx ?? hero.x, GROUND + (hero.barY ?? 1.5) + 0.9, hero.rz ?? hero.z).project(this.camera);
+    if (!ab || v.z > 1 || Math.abs(v.x) > 1.05 || Math.abs(v.y) > 1.05) return;
+    const el = this.calls[this.callAt++ % this.calls.length];
+    el.textContent = ab.name;
+    el.className = `callout go ${slot === 2 ? 'ult' : ''} ${hero.team === me.team ? 'ally' : 'foe'}`;
+    el.style.left = `${((v.x * 0.5 + 0.5) * this.w).toFixed(0)}px`;
+    el.style.top = `${((-v.y * 0.5 + 0.5) * this.h).toFixed(0)}px`;
+  }
+
+  hide() { this.root.hidden = true; this.shown = false; this.barsRoot.replaceChildren(...this.nums, ...this.calls); this.bars.length = 0; this.levelup.hide(); }
 
   update(dt = 0.016) {
     if (!this.shown) return;

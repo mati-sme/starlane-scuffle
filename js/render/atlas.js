@@ -134,9 +134,9 @@ export const rockDetail = () => detailTex(256, (g, S, wrap) => {
 // Soft-edged ring with a bright rim and a faint inner fill: shockwaves, telegraphs, slashes (on planar-UV ring / circle geometry).
 export const shockTexture = () => canvasTex(128, 128, (g) => {
   const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
-  gr.addColorStop(0, 'rgba(255,255,255,0.06)');
-  gr.addColorStop(0.62, 'rgba(255,255,255,0.22)');
-  gr.addColorStop(0.86, 'rgba(255,255,255,0.75)');
+  gr.addColorStop(0, 'rgba(255,255,255,0.03)'); // nearly empty middle: stacked rings in a teamfight add up rims, not a white sheet
+  gr.addColorStop(0.62, 'rgba(255,255,255,0.12)');
+  gr.addColorStop(0.86, 'rgba(255,255,255,0.7)');
   gr.addColorStop(0.95, 'rgba(255,255,255,1)');
   gr.addColorStop(1, 'rgba(255,255,255,0)');
   g.fillStyle = gr;

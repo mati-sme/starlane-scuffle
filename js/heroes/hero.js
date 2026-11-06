@@ -612,7 +612,7 @@ export class Hero {
     this.shadow.scale.setScalar(1.9 * (1 - (hop + this.lift) * 0.2));
     this.ring.rotation.y = t * 1.5;
     this.ring.scale.setScalar(1 + Math.sin(t * 4) * 0.05);
-    const f = this.flash > 0 ? 1 : 0;
+    const f = this.flash > 0 ? 0.6 : 0; // strong but partial: the champion's colors still read mid-teamfight
     for (const mat of m.mats) mat.userData.flash.value = f;
 
     if (this.shieldT > 0 && this.shieldHp > 0) { // shield dome

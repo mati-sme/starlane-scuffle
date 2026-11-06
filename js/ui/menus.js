@@ -78,7 +78,7 @@ export function createMenus(root) {
     hideAll() { clearInterval(tick); root.innerHTML = ''; },
 
     showTitle(onPlay, onOnline) {
-      const row = ROSTER.map((id, i) => `<i style="--i:${i}">${icons.champ(HEROES[id])}</i>`).join('');
+      const row = ROSTER.map((id, i) => `<i style="--i:${i};--c:${HEROES[id].css}">${portrait(id)}</i>`).join('');
       show('title modal', `
         <div class="kicker">TEAM ARENA · 5 v 5</div>
         <h1><span>Starlane</span><span>Scuffle</span></h1>

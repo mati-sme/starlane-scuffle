@@ -819,7 +819,8 @@ const BASICS = {
   melee(h, ctx, t, b, dmg) {
     const dx = t.x - h.x, dz = t.z - h.z, d = Math.hypot(dx, dz) || 1, col = b.color ?? fx(h).accent;
     SWINGS[b.style ?? 'slash'](h, t, dx / d, dz / d, col, b);
-    vfx.flash(t.x, (t.hitY ?? 1) + 0.2, t.z, col, 1.2, 0.14);
+    vfx.arc(h.x, 0.2, h.z, dx / d, dz / d, col, h.basicRange * 1.05, 0.28); // ground crescent: every swing leaves a readable sweep
+    vfx.flash(t.x, (t.hitY ?? 1) + 0.2, t.z, col, 1.4, 0.16);
     const strike = (e, m = 1) => {
       let k = dmg * m;
       if (b.lowBonus && e.type === 'hero' && e.hp < e.maxHp * 0.5) k *= 1 + b.lowBonus;

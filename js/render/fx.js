@@ -72,7 +72,7 @@ const DOME_FRAG = /* glsl */ `
   varying vec3 vN; varying vec3 vV;
   void main() {
     float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 2.0);
-    gl_FragColor = vec4(uCol, (0.14 + 0.75 * f) * uA);
+    gl_FragColor = vec4(uCol, (0.06 + 0.7 * f) * uA); // clear middle so the champion inside stays visible
     #include <colorspace_fragment>
   }`;
 

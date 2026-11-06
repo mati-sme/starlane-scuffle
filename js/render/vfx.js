@@ -1,10 +1,12 @@
 // Pooled mesh VFX (rings, swipe arcs, light columns, decals, vine tubes, ghosts, falling streaks) and the auto-aim chevron.
+// Ground effects get a dark normal-blended underlay so additive color still reads on bright stone and grass in a crowd.
 import * as THREE from 'three';
 import { PAL } from '../config.js';
 import { shockTexture, runeTexture, radialTexture } from './atlas.js';
 import { HI } from './quality.js';
 
-const POOL = HI ? 64 : 40;
+const POOL = HI ? 64 : 40, SHADES = HI ? 32 : 20;
+const SHADE_KINDS = new Set(['ring', 'arc', 'decal', 'rune']);
 const ringGeo = new THREE.CircleGeometry(1, 40).rotateX(-Math.PI / 2); // shock texture paints the soft rim + faint fill
 const arcGeo = new THREE.RingGeometry(0.4, 1, 20, 1, -0.95, 1.9).rotateX(-Math.PI / 2); // planar UVs: bright leading edge
 const columnGeo = new THREE.CylinderGeometry(1, 1, 12, 16, 1, true);
@@ -46,6 +48,25 @@ class Vfx {
     this.tring.visible = false;
     this.tring.renderOrder = 5;
     scene.add(this.tring);
+    this.shades = [];
+    for (let i = 0; i < SHADES; i++) {
+      const mesh = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0x070B18, map: shock, transparent: true, depthWrite: false, toneMapped: false }));
+      mesh.visible = false;
+      mesh.renderOrder = -1;
+      scene.add(mesh);
+      this.shades.push({ mesh, owner: null });
+    }
+  }
+
+  // Borrow a dark underlay for a ground effect; it copies the owner's transform each frame (see update).
+  _shade(it) {
+    const sh = this.shades.find((q) => !q.owner || !q.owner.on || q.owner.shade !== q);
+    if (!sh) return;
+    sh.owner = it; it.shade = sh;
+    sh.mesh.geometry = it.mesh.geometry;
+    const map = it.kind === 'rune' || it.kind === 'decal' ? this.flashTex : this.shock;
+    if (sh.mesh.material.map !== map) { sh.mesh.material.map = map; sh.mesh.material.needsUpdate = true; }
+    sh.mesh.visible = true;
   }
 
   _start(kind, geo, color, dur, size) {
@@ -54,16 +75,21 @@ class Vfx {
     it.mesh.geometry = geo;
     const map = kind === 'rune' ? this.runeTex : kind === 'flash' ? this.flashTex : geo === ringGeo || geo === arcGeo || geo === decalGeo ? this.shock : null, textured = !!map;
     if (it.mesh.material.map !== map) { it.mesh.material.map = map; it.mesh.material.needsUpdate = true; }
-    it.mesh.material.color.set(color).multiplyScalar(textured ? 1.6 : 1.2); // HDR-ish boost: additive and not tone-mapped
+    // HDR-ish boost (additive, not tone-mapped), capped per channel so pale colors keep their hue instead of clipping to white.
+    const c = it.mesh.material.color.set(color), mx = Math.max(c.r, c.g, c.b, 0.01);
+    c.multiplyScalar(Math.min(textured ? 1.6 : 1.2, 1.15 / mx));
     it.mesh.visible = true;
     it.mesh.rotation.set(0, 0, 0);
     it.mesh.quaternion.identity();
     it.mesh.scale.set(1, 1, 1);
+    it.shade = null;
     return it;
   }
 
   ring(x, y, z, color, size = 3, dur = 0.4) {
-    this._start('ring', ringGeo, color, dur, size).mesh.position.set(x, y, z);
+    const it = this._start('ring', ringGeo, color, dur, size);
+    it.mesh.position.set(x, y, z);
+    if (y < 0.6) this._shade(it);
   }
 
   // Crescent facing (dx, dz) — used for melee swipes.
@@ -71,10 +97,13 @@ class Vfx {
     const m = this._start('arc', arcGeo, color, dur, size).mesh;
     m.position.set(x, y, z);
     m.rotation.y = Math.atan2(-dz, dx);
+    if (y < 0.9) this._shade(this.items.find((i) => i.mesh === m));
   }
 
   column(x, z, color, dur = 0.9) {
-    this._start('column', columnGeo, color, dur, 1).mesh.position.set(x, 6, z);
+    const it = this._start('column', columnGeo, color, dur, 1);
+    it.mesh.position.set(x, 6, z);
+    it.mesh.material.color.multiplyScalar(0.7);
   }
 
   // Flat glowing disc on the ground that fades out (craters, area markers).
@@ -82,6 +111,7 @@ class Vfx {
     const m = this._start('decal', decalGeo, color, dur, size).mesh;
     m.position.set(x, 0.12, z);
     m.scale.set(size, size, size);
+    this._shade(this.items.find((i) => i.mesh === m));
   }
 
   // Afterimage: a squashed glowing blob that fades.
@@ -110,14 +140,16 @@ class Vfx {
   rune(x, z, color, size = 2.4, dur = 0.7) {
     const it = this._start('rune', decalGeo, color, dur, size);
     it.mesh.position.set(x, 0.16, z);
-    it.mesh.material.color.multiplyScalar(1.3);
+    it.mesh.material.color.multiplyScalar(0.8); // glyphs stay hue-true: several overlapping runes must not sum to white
+    this._shade(it);
   }
 
   // Camera-facing white-hot burst (cast release, skill impacts).
   flash(x, y, z, color, size = 1.5, dur = 0.2) {
     const it = this._start('flash', flashGeo, color, dur, size);
     it.mesh.position.set(x, y, z);
-    it.mesh.material.color.lerp(_white, 0.35);
+    it.mesh.material.color.lerp(_white, 0.18);
+    it.size = Math.min(size, 3.2);
   }
 
   // Thick energy beam from a to b that flares then thins out (hitscan skill shots).
@@ -138,12 +170,16 @@ class Vfx {
       if (!it.on) continue;
       it.age += dt;
       const u = it.age / it.dur;
-      if (u >= 1) { it.on = false; it.mesh.visible = false; continue; }
+      if (u >= 1) {
+        it.on = false; it.mesh.visible = false;
+        if (it.shade?.owner === it) { it.shade.mesh.visible = false; it.shade.owner = null; }
+        continue;
+      }
       const m = it.mesh;
       switch (it.kind) {
         case 'column':
           m.scale.set(1 - u, 1, 1 - u);
-          m.material.opacity = 0.7 * (1 - u);
+          m.material.opacity = 0.35 * (1 - u);
           break;
         case 'decal':
           m.material.opacity = 0.9 * (1 - u * u) * Math.min(1, u * 20); // holds, then fades: reads as a telegraph
@@ -152,14 +188,14 @@ class Vfx {
           const grow = Math.min(1, u * 6), s = it.size * (0.6 + 0.4 * (1 - (1 - grow) ** 3));
           m.scale.set(s, s, s);
           m.rotation.y = it.age * 2.2;
-          m.material.opacity = Math.min(1, u * 8) * (1 - u * u);
+          m.material.opacity = 0.8 * Math.min(1, u * 8) * (1 - u * u);
           break;
         }
         case 'flash': {
           if (this.camera) m.quaternion.copy(this.camera.quaternion);
           const s = it.size * (0.4 + 0.6 * Math.sqrt(u));
           m.scale.set(s, s, s);
-          m.material.opacity = 1 - u;
+          m.material.opacity = (1 - u) * Math.min(1, 1.8 / it.size); // big flashes stay translucent so stacked casts keep their hue
           break;
         }
         case 'beam': {
@@ -195,6 +231,13 @@ class Vfx {
           m.scale.set(s, s, s);
           m.material.opacity = 1 - u;
         }
+      }
+      const sh = it.shade;
+      if (sh?.owner === it) {
+        sh.mesh.position.copy(m.position).y -= 0.03;
+        sh.mesh.quaternion.copy(m.quaternion);
+        sh.mesh.scale.copy(m.scale).multiplyScalar(1.12);
+        sh.mesh.material.opacity = m.material.opacity * 0.55;
       }
     }
     const tg = this.target;

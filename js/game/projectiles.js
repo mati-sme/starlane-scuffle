@@ -8,7 +8,7 @@ import { dealDamage } from './combat.js';
 import { inCover } from '../world/arena.js';
 
 const POOL = 48;
-const geo = new THREE.SphereGeometry(0.2, 8, 6);
+const geo = new THREE.SphereGeometry(0.24, 10, 8);
 const tailGeo = new THREE.CylinderGeometry(0.03, 0.2, 1, 6, 1, true).translate(0, 0.5, 0); // head at origin, tail along +Y
 const UP = new THREE.Vector3(0, 1, 0), _back = new THREE.Vector3();
 let glowTex;
@@ -25,6 +25,10 @@ export class Projectiles {
       const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, toneMapped: false }));
       halo.scale.setScalar(2.3);
       mesh.add(halo);
+      // Dark inverted-hull outline: the bright core keeps a crisp edge over sunlit stone and other glows.
+      const rim = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x0B1022, side: THREE.BackSide, toneMapped: false }));
+      rim.scale.setScalar(1.35);
+      mesh.add(rim);
       mesh.visible = false;
       scene.add(mesh);
       const tail = new THREE.Mesh(tailGeo, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
@@ -46,14 +50,14 @@ export class Projectiles {
     p.color = opts.color ?? TEAM[src.team].main;
     p.frame = opts.frame ?? FRAME.dot;
     p.onHit = opts.onHit ?? null;
-    p.mesh.material.color.set(p.color).lerp(_white, opts.core ?? 0.65); // white-hot core inside a colored glow
+    p.mesh.material.color.set(p.color).lerp(_white, opts.core ?? 0.45); // white-hot core inside a colored glow
     p.mesh.children[0].material.color.set(p.color);
     p.mesh.children[0].scale.setScalar(opts.halo ?? 2.3);
     p.mesh.scale.setScalar(opts.size ?? 1);
     p.mesh.position.set(p.sx, p.sy, p.sz);
     p.mesh.visible = true;
     p.tail.material.color.set(p.color).multiplyScalar(1.5);
-    p.tail.scale.set(opts.size ?? 1, (1.6 + speed * 0.07) * (opts.tail ?? 1), opts.size ?? 1);
+    p.tail.scale.set((opts.size ?? 1) * 1.2, (2.2 + speed * 0.1) * (opts.tail ?? 1), (opts.size ?? 1) * 1.2); // long comet tail: travel direction reads at a glance
     const fx = tgt.x - src.x, fz = tgt.z - src.z, fd = Math.hypot(fx, fz) || 1;
     p.tail.position.set(p.sx, p.sy, p.sz);
     p.tail.quaternion.setFromUnitVectors(UP, _back.set(-fx / fd, 0, -fz / fd));
