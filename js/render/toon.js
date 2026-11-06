@@ -118,7 +118,7 @@ export function outlineMat(thickness) {
     outlines.set(thickness, new THREE.ShaderMaterial({
       side: THREE.BackSide,
       fog: false,
-      uniforms: { uT: { value: thickness * 0.45 }, uCol: { value: new THREE.Color(0x0B1220) } },
+      uniforms: { uT: { value: thickness * 0.32 }, uCol: { value: new THREE.Color(0x0A0E16) } }, // v7.2: hairline, not cartoon ink
       vertexShader: /* glsl */ `
         uniform float uT;
         void main() {

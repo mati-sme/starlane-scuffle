@@ -23,8 +23,8 @@ function skyEnvironment(renderer, sunDir) {
       uniform vec3 uSun; varying vec3 vD;
       void main() {
         vec3 d = normalize(vD);
-        vec3 sky = mix(vec3(0.95, 0.88, 0.78), vec3(0.32, 0.52, 0.92), smoothstep(0.0, 0.55, d.y));
-        vec3 ground = mix(vec3(0.42, 0.40, 0.30), vec3(0.16, 0.22, 0.12), smoothstep(0.0, -0.4, d.y));
+        vec3 sky = mix(vec3(0.86, 0.80, 0.72), vec3(0.26, 0.40, 0.70), smoothstep(0.0, 0.55, d.y));
+        vec3 ground = mix(vec3(0.34, 0.33, 0.27), vec3(0.12, 0.16, 0.11), smoothstep(0.0, -0.4, d.y));
         vec3 c = d.y > 0.0 ? sky : ground;
         float s = max(dot(d, uSun), 0.0);
         c += vec3(1.0, 0.86, 0.62) * (pow(s, 220.0) * 30.0 + pow(s, 8.0) * 0.5);
@@ -37,7 +37,8 @@ function skyEnvironment(renderer, sunDir) {
   return tex;
 }
 
-// Final grade in display space: gentle S-curve contrast, a touch of saturation and warmth, and a soft vignette.
+// Final grade in display space (v7.2): a filmic S-curve with a lifted toe so shadows keep detail, split toning (cool shadows,
+// warm highlights), slightly restrained saturation for a less candy look, and a soft vignette.
 const GradeShader = {
   uniforms: { tDiffuse: { value: null } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
@@ -45,11 +46,13 @@ const GradeShader = {
     uniform sampler2D tDiffuse; varying vec2 vUv;
     void main() {
       vec4 c = texture2D(tDiffuse, vUv);
-      vec3 col = mix(c.rgb, c.rgb * c.rgb * (3.0 - 2.0 * c.rgb), 0.28);
+      vec3 col = mix(c.rgb, c.rgb * c.rgb * (3.0 - 2.0 * c.rgb), 0.38);
+      col = col * 0.965 + 0.022;
       float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
-      col = mix(vec3(l), col, 1.08) * vec3(1.02, 1.0, 0.97);
+      col = mix(vec3(l), col, 0.96);
+      col *= mix(vec3(0.94, 0.99, 1.06), vec3(1.04, 1.0, 0.95), smoothstep(0.15, 0.7, l));
       vec2 q = vUv - 0.5;
-      col *= mix(1.0, 0.78, smoothstep(0.32, 0.85, dot(q, q) * 2.2));
+      col *= mix(1.0, 0.72, smoothstep(0.30, 0.85, dot(q, q) * 2.2));
       gl_FragColor = vec4(col, c.a);
     }`,
 };
@@ -58,7 +61,7 @@ export function createRenderer(canvas) {
   const dpr = window.devicePixelRatio || 1;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: dpr < 2, powerPreference: 'high-performance' });
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.0;
+  renderer.toneMappingExposure = HI ? 0.97 : 0.95;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   // Touch devices get a 1024 PCF map (4 taps, hardware-filtered); desktops get the softer PCF-soft filter on 2048.
   const lowEnd = matchMedia('(pointer: coarse)').matches;
@@ -68,16 +71,17 @@ export function createRenderer(canvas) {
 
   const scene = new THREE.Scene();
   // Aerial haze: the far side of the island softens toward a cool blue before it reaches the void.
-  scene.fog = new THREE.Fog(HI ? 0x5A7096 : PAL.fog, HI ? 58 : 75, HI ? 200 : 160);
+  scene.fog = new THREE.Fog(HI ? 0x46546C : PAL.fog, HI ? 54 : 75, HI ? 190 : 160); // v7.2: deeper slate haze
 
   // Late-afternoon key, cool fill from the opposite side, cool back rim that separates silhouettes from the grass.
   const sunDir = new THREE.Vector3(HI ? -26 : -18, HI ? 34 : 40, HI ? 18 : 14).normalize(); // high tier: lower sun, longer modeling shadows
   if (HI) {
     scene.environment = skyEnvironment(renderer, sunDir);
-    scene.environmentIntensity = 0.75;
+    scene.environmentIntensity = 0.7;
   }
-  scene.add(new THREE.HemisphereLight(0xB8D0F0, 0x4A3E28, HI ? 0.7 : 1.05));
-  const sun = new THREE.DirectionalLight(0xFFD9A8, HI ? 2.9 : 2.5);
+  // v7.2: less ambient fill and a cleaner, stronger key give the forms more modeling (less flat toy plastic).
+  scene.add(new THREE.HemisphereLight(0xA8C0E0, 0x3A3224, HI ? 0.55 : 0.9));
+  const sun = new THREE.DirectionalLight(0xFFE0B8, HI ? 3.1 : 2.6);
   sun.position.copy(sunDir).multiplyScalar(45);
   sun.castShadow = shadows;
   const size = lowEnd ? 1024 : 2048;
@@ -86,9 +90,9 @@ export function createRenderer(canvas) {
   sun.shadow.bias = -0.0006;
   sun.shadow.normalBias = 0.035;
   const sunOffset = sun.position.clone();
-  const fill = new THREE.DirectionalLight(0x9DB8E8, HI ? 0.55 : 0.3);
+  const fill = new THREE.DirectionalLight(0x8FAAD8, HI ? 0.45 : 0.3);
   fill.position.set(22, 18, -10);
-  const rim = new THREE.DirectionalLight(0x8FB4F0, HI ? 1.1 : 0.9);
+  const rim = new THREE.DirectionalLight(0x9CBCF0, HI ? 1.3 : 1.0);
   rim.position.set(0.6, 0.5, -1).multiplyScalar(50);
   scene.add(sun, sun.target, fill, rim);
 

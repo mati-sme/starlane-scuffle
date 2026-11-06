@@ -50,7 +50,7 @@ export class Tower {
     this.group.add(makeShadow(4.4));
 
     this.mat = toonMat({ vertexColors: true, finish: true, rim: 0.25 });
-    this.crystalMat = toonMat({ color: c.main, emissive: c.main, emissiveIntensity: 1.4, roughness: 0.15, metalness: 0.1 });
+    this.crystalMat = toonMat({ color: c.main, emissive: c.main, emissiveIntensity: 1.15, roughness: 0.12, metalness: 0.2 });
     this.mats = [this.mat, this.crystalMat];
 
     // Fortified plinth: rough-cut stone base, four sloped steel buttresses, a glowing team ring.
@@ -94,17 +94,17 @@ export class Tower {
     const prongs = Array.from({ length: 4 }, (_, i) => {
       const a = (i / 4) * Math.PI * 2;
       return [
-        { g: new THREE.BoxGeometry(0.22, 1.2, 0.36), c: 0xB4BAC4, p: [Math.sin(a) * 0.82, 4.75, Math.cos(a) * 0.82], r: [Math.cos(a) * -0.3, 0, Math.sin(a) * 0.3], f: 'metal' },
+        { g: new THREE.BoxGeometry(0.22, 1.2, 0.36), c: 0x8A9099, p: [Math.sin(a) * 0.82, 4.75, Math.cos(a) * 0.82], r: [Math.cos(a) * -0.3, 0, Math.sin(a) * 0.3], f: 'metal' },
         { g: new THREE.BoxGeometry(0.08, 0.6, 0.1), c: glowC, p: [Math.sin(a) * 0.95, 5.0, Math.cos(a) * 0.95], r: [Math.cos(a) * -0.3, 0, Math.sin(a) * 0.3], f: 'glow' },
       ];
     }).flat();
     const shaftGeo = mergeParts([
-      { g: new THREE.CylinderGeometry(0.88, 1.08, 2.1, 8), c: 0x8E9098, p: [0, 2.15, 0], f: 'steel' },
+      { g: new THREE.CylinderGeometry(0.88, 1.08, 2.1, 8), c: 0x6C7078, p: [0, 2.15, 0], f: 'steel' },
       ...ribs,
       { g: new THREE.CylinderGeometry(1.08, 1.0, 0.35, 8), c: c.main, p: [0, 3.3, 0], f: 'paint' },
-      { g: new THREE.TorusGeometry(1.04, 0.07, 6, 16), c: 0xD2D6DC, p: [0, 3.48, 0], r: [Math.PI / 2, 0, 0], f: 'metal' },
+      { g: new THREE.TorusGeometry(1.04, 0.07, 6, 16), c: 0xA8AEB6, p: [0, 3.48, 0], r: [Math.PI / 2, 0, 0], f: 'metal' },
       { g: new THREE.CylinderGeometry(0.72, 0.88, 0.9, 8), c: 0x5A606A, p: [0, 3.92, 0], f: 'steel' },
-      { g: new THREE.CylinderGeometry(1.0, 0.75, 0.32, 8), c: 0xC2C6CC, p: [0, 4.5, 0], f: 'metal' },
+      { g: new THREE.CylinderGeometry(1.0, 0.75, 0.32, 8), c: 0x9096A0, p: [0, 4.5, 0], f: 'metal' },
       ...prongs,
       // v7.1 detail: lit window slits between the ribs, riveted bands, a seam ring under the collar and a crenellated crown.
       ...Array.from({ length: 4 }, (_, i) => {
@@ -126,14 +126,15 @@ export class Tower {
 
     this.crystal = toonMesh(new THREE.OctahedronGeometry(0.55).scale(1, 1.4, 1), this.crystalMat, 0);
     this.crystal.position.y = CRYSTAL_Y + 0.6;
-    this.halo = makeHalo(c.main, 3.4);
+    this.halo = makeHalo(c.main, 2.3);
+    this.halo.material.opacity = 0.55;
     this.halo.position.copy(this.crystal.position);
     this.top.add(this.crystal, this.halo);
     if (this.tier !== 'outer') { // inner: a second glowing collar; inhibitor: two gyro rings round a bigger crystal
-      const ringMat = toonMat({ color: 0xD2D6DC, metalness: 0.8, roughness: 0.3, emissive: c.main, emissiveIntensity: 0.5 });
+      const ringMat = toonMat({ color: 0x6E747C, metalness: 0.85, roughness: 0.4, emissive: c.main, emissiveIntensity: 0.25 });
       this.mats.push(ringMat);
       this.rings = (this.tier === 'inner' ? [1.2] : [1.35, 1.7]).map((r, i) => {
-        const g = toonMesh(new THREE.TorusGeometry(r, 0.07, 6, 28), ringMat, 0);
+        const g = toonMesh(new THREE.TorusGeometry(r * 0.9, 0.045, 6, 28), ringMat, 0); // v7.2: slimmer gyros, no glass-ball read
         g.position.y = CRYSTAL_Y + 0.6;
         g.rotation.x = Math.PI / 2 + (i ? 0.55 : this.tier === 'inner' ? 0 : -0.4);
         this.top.add(g);
