@@ -138,7 +138,8 @@ export class Hero {
     const L = this.level - 1;
     const g = gearStats(this.items, this.gear);
     this.dmgMul = 1 + HERO.dmgPerLevel * L;
-    this.outMul = this.dmgMul * (1 + g.ad) * (this.brain?.d?.dmg ?? 1);
+    this.baseOut = this.dmgMul * (1 + g.ad) * (this.brain?.d?.dmg ?? 1);
+    this.outMul = this.baseOut * (this.seasonOut ?? 1); // season event (game/seasons.js) is re-applied each frame by the match
     this.armor = g.armor;
     this.basicRange = this.basic.range + (this.nextBasic?.range ?? 0);
     this.rs = this.ab.map((a, i) => rankStats(a, this.ranks[i]));

@@ -5,6 +5,9 @@ import { PAL } from '../config.js';
 import { HEROES, ROSTER } from '../heroes/index.js';
 import { TEAM_NAME } from '../net/protocol.js';
 import { SPELLS, SPELL_IDS } from '../game/spells.js';
+import { factionDef } from '../game/factions.js';
+import { ROLE_BLURB } from '../game/roles.js';
+import { matchupsOf } from '../game/matchups.js';
 import { LEVELS, MAX_TEAM, applyPreset, presetOf, summary } from '../game/setup.js';
 
 const hex = (n) => '#' + n.toString(16).padStart(6, '0');
@@ -12,6 +15,15 @@ const mmss = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart
 const upper = (s) => s.toUpperCase();
 // Rendered bust of the champion's model (scripts/make-portraits.mjs).
 const portrait = (id) => `<img src="assets/portraits/${id}.png" alt="" draggable="false" decoding="async">`;
+
+// Mini portrait for matchup rows; a missing image (champions from unmerged branches) leaves the coloured disc.
+const mini = (id) => `<i class="mp" title="${HEROES[id].name}" style="--c:${HEROES[id].css}"><img src="assets/portraits/${id}.png" alt="${HEROES[id].name}" draggable="false" loading="lazy" onerror="this.remove()"></i>`;
+const chip = (id) => { const f = factionDef(id); return `<span class="fchip" style="--f:${f.color}"><s>${f.icon}</s>${f.name}</span>`; };
+const matchRows = (id) => {
+  const m = matchupsOf(id);
+  const row = (cls, label, ids) => `<div class="mrow ${cls}" data-testid="matchup-${cls}"><span>${label}</span><div>${ids.map(mini).join('')}</div></div>`;
+  return `<div class="matchups">${row('strong', 'Strong vs', m.strong)}${row('weak', 'Weak vs', m.weak)}</div>`;
+};
 
 const maxHp = Math.max(...ROSTER.map((id) => HEROES[id].stats.hp));
 const maxSpeed = Math.max(...ROSTER.map((id) => HEROES[id].stats.speed));
@@ -140,7 +152,7 @@ export function createMenus(root) {
         const def = HEROES[id], gone = out.has(id);
         return `<button type="button" class="hcard ${gone ? 'out banned' : ''}" data-id="${id}" data-testid="champion-card-${id}" data-stamp="${gone ? stamp('banned') : ''}" aria-pressed="false" ${gone ? 'disabled' : ''} style="--c:${def.css}">
           <span class="pic">${portrait(id)}</span><b>${def.name}</b>
-          <span class="role"><i>${icons.role(def.role)}</i>${upper(def.role)}</span></button>`;
+          <span class="role"><i>${icons.role(def.role)}</i>${upper(def.role)}</span>${chip(id)}</button>`;
       }).join('');
       show(`select modal ${banning ? 'banmode' : ''}`, `
         <button class="small home" type="button" aria-label="Back" data-testid="select-back">${icons.home}</button>
@@ -164,7 +176,10 @@ export function createMenus(root) {
           detail.innerHTML = `
             <div class="dhead"><i class="dport">${portrait(sel)}</i>
               <div><h3 data-testid="detail-name">${def.name}</h3><p class="dtitle" data-testid="detail-title">${def.title}</p>
-              <span class="drole" data-testid="detail-role">${upper(def.role)}</span></div></div>
+              <span class="drole" data-testid="detail-role">${upper(def.role)}</span> <span data-testid="detail-faction">${chip(sel)}</span></div></div>
+            <p class="dnote" data-testid="detail-role-blurb"><b>${def.role[0].toUpperCase() + def.role.slice(1)}</b> — ${ROLE_BLURB[def.role] ?? ''}</p>
+            <p class="dnote" data-testid="detail-passive"><b>${factionDef(sel).passive}</b> — ${factionDef(sel).blurb}</p>
+            ${matchRows(sel)}
             <div class="stats">${bar('HP', def.stats.hp / maxHp)}${bar('SPD', def.stats.speed / maxSpeed)}${bar('RNG', def.basic.range / maxRange)}</div>
             <ul class="skills">${skillRows(def)}</ul>
             ${banning ? '<button class="btn ban go" type="button" data-testid="ban-btn">BAN</button>' : '<button class="btn primary go" type="button" data-testid="go-btn">GO</button>'}`;

@@ -13,6 +13,7 @@ import { Minimap } from './minimap.js';
 import { Shop } from './shop.js';
 import { BOSS } from '../config.js';
 import { TEAM_NAME } from '../net/protocol.js';
+import { SeasonUI, seasonMark } from './season.js';
 
 const mmss = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
 
@@ -83,6 +84,8 @@ export class Hud {
     });
     this.shop = new Shop(root.querySelector('.gear'), match);
     this.buffsEl = root.querySelector('.buffs');
+    this.season = new SeasonUI(root, match);
+    this.portraitEl = root.querySelector('.portrait');
     this.toast = root.querySelector('.toast');
     this.buffKey = '';
     const say = (text, team) => {
@@ -222,6 +225,8 @@ export class Hud {
       if (rs !== this.rs) { this.rs = rs; this.rsec.textContent = rs; }
     }
 
+    this.season.update(dt);
+    this.portraitEl.dataset.se = seasonMark(hero);
     this.mini.update(this.dt, m.rig, this.w / this.h);
     this.shop.update();
     this._buffs();
@@ -258,13 +263,15 @@ export class Hud {
       let b = this.bars[n++];
       if (!b) {
         const el = document.createElement('div');
-        el.innerHTML = '<i></i>';
+        el.innerHTML = '<i></i><u></u>';
         this.barsRoot.appendChild(el);
-        b = this.bars[n - 1] = { el, fill: el.firstChild, cls: '', w: -1 };
+        b = this.bars[n - 1] = { el, fill: el.firstChild, se: el.lastChild, cls: '', w: -1, sm: '' };
       }
       if (b.cls !== cls) { b.el.className = `bar ${cls}`; b.cls = cls; }
       b.el.style.display = '';
       b.el.style.transform = `translate(${((v.x * 0.5 + 0.5) * this.w).toFixed(1)}px, ${((-v.y * 0.5 + 0.5) * this.h).toFixed(1)}px) translate(-50%, -100%)`;
+      const sm = e.type === 'hero' ? seasonMark(e) : '';
+      if (b.sm !== sm) { b.sm = sm; b.se.className = sm ? `se ${sm}` : ''; b.se.textContent = sm === 'up' ? '▲' : sm === 'down' ? '▼' : ''; }
       const w = Math.round((e.hp / e.maxHp) * 100);
       if (b.w !== w) { b.fill.style.width = w + '%'; b.w = w; }
     };

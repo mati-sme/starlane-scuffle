@@ -3,6 +3,7 @@ import { PAL, TEAM, TOWER, CORE } from '../config.js';
 import { bus } from '../core/bus.js';
 import { particles, poofStars, FRAME } from '../render/particles.js';
 import { vfx } from '../render/vfx.js';
+import { hitMul } from './factions.js';
 
 export const sim = { guest: false, bonus: [{}, {}] }; // guest: damage is the host's business, nothing is dealt locally. bonus[team]: dmg / dr / spd / minDmg / minHp / struct from epic bosses (match.js)
 export const DYING = 0.25;
@@ -16,6 +17,8 @@ const dmgEv = { t: null, amount: 0, src: null, skill: false }; // reused: listen
 export function dealDamage(t, amount, src, skill = false) {
   if (sim.guest || !t.alive || t.untarget) return;
   if (src?.outMul) amount *= src.outMul;
+  if (t.inMul) amount *= t.inMul; // season event: damage taken
+  if (src) amount *= hitMul(src, t); // faction passives (Dark bonus, Water slow)
   if (t.buf?.dr) amount *= 1 - t.buf.dr.v;
   if (t.shielded && src?.type === 'hero') amount *= TOWER.shield; // backdoor: no friendly minions nearby
   const sb = sim.bonus[src?.team];

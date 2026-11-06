@@ -25,6 +25,8 @@ import { AA_ARC } from './targeting.js';
 import { autoBuy, atBase } from './gear.js';
 import { AimPreview } from '../render/aimpreview.js';
 import { DEFAULT_SPELLS } from './spells.js';
+import { Seasons } from './seasons.js';
+import { tickFaction, seasonMods } from './factions.js';
 
 const CONFETTI = [PAL.gold, PAL.sunny, PAL.gloom, PAL.heal, PAL.nebulaB, PAL.star];
 const IDLE = { x: 0, z: 0, attack: false, cast: [false, false, false], spell: [false, false] };
@@ -160,6 +162,7 @@ export class Match {
 
   reset() {
     this.time = 0;
+    this.seasons = new Seasons();
     this.dragonN = 0;
     this.shopAt = 0;
     for (const b of this.buffs) Object.assign(b, { fire: 0, ice: 0, gale: 0, dragonT: 0, titanT: 0, heraldT: 0 });
@@ -384,6 +387,19 @@ export class Match {
     }
   }
 
+  // Faction passives + season event: refreshes each hero's outMul / inMul / icon state. Guests only mirror the icons (the host deals the damage).
+  _factions(dt, mirror = false) {
+    const sid = this.seasons.id;
+    for (const h of this.heroes) {
+      if (!mirror) tickFaction(h, this, dt, inBrush);
+      const m = seasonMods(h, sid);
+      h.seasonOut = m.out;
+      h.outMul = (h.baseOut ?? h.outMul) * m.out;
+      h.inMul = m.inn;
+      h.seasonState = m.state;
+    }
+  }
+
   _intent() {
     const it = this.intent, hero = this.hero;
     it.attack = input.attack;
@@ -504,6 +520,7 @@ export class Match {
       else this._mirror(h, dt);
     }
     this._tickBuffs(dt);
+    this._factions(dt, true);
     this.camps.netStep(dt);
     this.minions.netStep(dt);
     for (const s of this.structures) {
@@ -571,8 +588,10 @@ export class Match {
         bus.emit('storm');
       }
     }
+    if (!this.over && this.seasons.update(this.time, dt)) bus.emit('season', this.seasons.id);
     this._rules(dt);
     if (!this.over) { this._tickBuffs(dt); this._economy(dt); }
+    this._factions(dt);
     this._brush();
     this._timers(dt);
     this.zones.update(dt, this);

@@ -47,6 +47,8 @@ export function encodeSnap(match, seq, events) {
     c: match.camps.list.map((c) => [c.alive ? 1 : 0, Math.round(c.hp), r1(c.x), r1(c.z), Math.round(match.camps.eta(c, match.time)), c.variant]),
     bf: match.buffs.map((b) => [b.fire, b.ice, b.gale, Math.round(b.dragonT), Math.round(b.titanT), Math.round(b.heraldT)]),
   };
+  const se = match.seasons.encode();
+  if (se) s.se = se; // additive: older guests ignore it
   if (match.over) { s.ov = 1; s.w = match.win ? 1 : 0; s.rr = match.rawReason; }
   if (events.length) s.e = events;
   return s;
@@ -54,6 +56,7 @@ export function encodeSnap(match, seq, events) {
 
 export function applySnap(match, s) {
   match.snapAt = performance.now();
+  if (match.seasons.decode(s.se)) bus.emit('season', match.seasons.id);
   match.storm = !!s.st; match.waveNo = s.wv; match.kills = s.k; match.destroyed = s.d; match.towersLost = s.tl;
   if (Math.abs(match.time - s.tm) > 0.5) match.time = s.tm; else match.time += (s.tm - match.time) * 0.2;
 

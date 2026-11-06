@@ -480,3 +480,40 @@ body.playing #unstuck { display: block; }
   .sidehead .small { width: 30px; height: 30px; font-size: 18px; }
   .slot { height: 23px; } .lvl { height: 22px; }
 }
+
+/* ---- v7.2 factions / class info / matchups / seasons ---- */
+.fchip { display: inline-flex; align-items: center; gap: 3px; padding: 0 6px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink, #0B1020); background: var(--f, #fff); border-radius: 8px; line-height: 16px; white-space: nowrap; }
+.fchip s { text-decoration: none; font-size: 11px; }
+.hcard.hcard .fchip { position: relative; z-index: 1; font-size: 8px; line-height: 12px; padding: 0 4px; letter-spacing: 0; gap: 2px; max-width: 98%; overflow: hidden; }
+.hcard .fchip s { font-size: 8px; }
+.hcard .fchip { flex: none; }
+.dnote { margin: 0; font-size: 13px; line-height: 1.3; color: rgba(255,255,255,.88); }
+.dnote b { color: var(--gold, #FFC83D); }
+.matchups { display: grid; gap: 6px; }
+.mrow { display: flex; align-items: center; gap: 8px; }
+.mrow > span { flex: none; width: 92px; white-space: nowrap; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.mrow.strong > span { color: #7CE38B; }
+.mrow.weak > span { color: #FF8A8A; }
+.mrow > div { display: flex; gap: 5px; }
+.mp { position: relative; width: 38px; height: 38px; border-radius: 50%; overflow: hidden; background: var(--c, #445); border: 2px solid var(--c, #fff); flex: none; }
+.mrow.strong .mp { box-shadow: 0 0 0 2px #7CE38B; }
+.mrow.weak .mp { box-shadow: 0 0 0 2px #FF8A8A; }
+.mp img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 20%; display: block; }
+@media (max-height: 460px) { .mp { width: 28px; height: 28px; } .mrow > span { width: 62px; font-size: 10px; } .dnote { font-size: 11px; } }
+
+.seasonfx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; display: none; z-index: 1; }
+.seasonfx.on { display: block; }
+.season { position: absolute; top: 58px; left: 50%; transform: translateX(-50%); z-index: 6; display: none; align-items: center; gap: 10px; padding: 4px 14px; max-width: 92vw; border: 2px solid var(--sc, #fff); border-radius: 12px; background: rgba(11,16,32,.85); color: #fff; font-weight: 700; pointer-events: none; }
+.season.on { display: flex; }
+.season .sn { font-size: 18px; font-style: italic; text-transform: uppercase; color: var(--sc, #fff); white-space: nowrap; }
+.season .sl { font-size: 12px; opacity: .9; }
+.season .st { font-style: normal; font-size: 18px; min-width: 38px; text-align: right; color: var(--gold, #FFC83D); }
+.season.pop { animation: jump .5s cubic-bezier(.3, 1.6, .5, 1); }
+@media (max-height: 460px) { .season { top: 44px; padding: 2px 10px; } .season .sn, .season .st { font-size: 14px; } .season .sl { font-size: 10px; } }
+.bar.hero { overflow: visible; }
+.bar u.se { position: absolute; left: 100%; top: -3px; margin-left: 3px; width: 16px; height: 16px; border-radius: 50%; text-decoration: none; font-size: 10px; line-height: 16px; text-align: center; color: #fff; border: 2px solid var(--ink, #0B1020); box-sizing: content-box; width: 12px; height: 12px; line-height: 12px; }
+.bar u.se:empty { display: none; }
+.bar u.se.up { background: #2DBE60; }
+.bar u.se.down { background: #E04848; }
+.portrait[data-se='up']::after, .portrait[data-se='down']::after { content: '▲'; position: absolute; right: -4px; top: -4px; width: 18px; height: 18px; border-radius: 50%; text-align: center; line-height: 18px; font-size: 11px; color: #fff; background: #2DBE60; border: 2px solid var(--ink, #0B1020); z-index: 3; }
+.portrait[data-se='down']::after { content: '▼'; background: #E04848; }
