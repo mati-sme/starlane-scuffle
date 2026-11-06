@@ -320,7 +320,7 @@ export class Bot {
     };
     const hurt = [];
     forEachAlly(ctx, h.team, h.x, h.z, ab.allyR ?? ab.range ?? 6, (a) => { if (a.hp < a.maxHp * 0.65) hurt.push(a); });
-    switch (ab.kind) {
+    switch (ab.as ?? ab.kind) {
       case 'dash': case 'leap': case 'blink':
         if (ab.aim === 'move') return !!foe && near(foe, 6) && h.hp < h.maxHp * 0.6;
         if (ab.chain) return near(foe, ab.range);

@@ -3,6 +3,8 @@
 // model: spec for buildChampion (models.js). fx: ability colors + `frame` (particle sprite 0 dot 1 star 2 sparkle 3 ring) + `amb` (ambient particle).
 // Every champion has its own silhouette, palette, basic-attack look and three skills built from different verbs.
 
+import { WAVE2B } from './wave2b.js';
+
 export const ROLES = ['tank', 'bruiser', 'assassin', 'blaster', 'shooter', 'support'];
 
 // Rank r > 1 adds +20% to these per rank and -8% cooldown; the perk (at max rank) overrides params.
@@ -266,4 +268,5 @@ export const ROSTER_DEFS = [
     s2: { name: 'Guiding Step', kind: 'swap', tag: 'swap with ally', cd: 10, range: 9, width: 2, ally: true, allyShield: 120, dur: 2, allySpd: 0.3, allySpdT: 2, perk: { at: 4, allyShield: 200, allyHeal: 100 } },
     ult: { name: 'Second Wind', kind: 'buff', tag: 'team undying', cd: 50, allyR: 9, heal: 140, allyHeal: 140, undyingT: 2, cleanse: true, perk: { at: 3, heal: 220, allyHeal: 220 } },
   },
+  ...WAVE2B,
 ];
