@@ -93,7 +93,9 @@ export function initInput(canvas) {
   });
   window.addEventListener('blur', resetInput);
   document.addEventListener('visibilitychange', resetInput);
-  window.addEventListener('pointercancel', resetInput); // OS gesture / overlay stole the touch
+  // Do NOT reset all input on window pointercancel: that event bubbles from a single finger
+  // (second touch, setPointerCapture on a skill / +, OS cancelling one pointer) and would
+  // drop the joystick / attack still held by other fingers.
   window.addEventListener('orientationchange', resetInput);
   window.addEventListener('pagehide', resetInput);
   window.addEventListener('pageshow', resetInput);

@@ -36,16 +36,31 @@ export class Abilities {
       up.dataset.testid = `skill-up-${s.key.toLowerCase()}`;
       up.setAttribute('aria-label', `Rank up ${s.key}`);
       up.innerHTML = '<span>+</span>';
-      let upId = null; // spends on its own pointerup: browsers drop the synthesized click while other fingers are down
-      up.addEventListener('pointerdown', (e) => { e.stopPropagation(); upId = e.pointerId; up.setPointerCapture(upId); }); // never leaks into the attack / stick zones
+      let upId = null, spent = false; // pointerup spends (synthesized click is dropped while other fingers are down)
+      const over = (e) => {
+        const r = up.getBoundingClientRect();
+        return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+      };
+      const spend = () => { if (!spent && this.match.hero.spendPoint(i)) spent = true; };
+      up.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        spent = false;
+        upId = e.pointerId;
+        try { up.setPointerCapture(upId); } catch { /* already captured / detached */ }
+      });
       up.addEventListener('pointerup', (e) => {
         if (e.pointerId !== upId) return;
         upId = null;
-        const r = up.getBoundingClientRect();
-        if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) this.match.hero.spendPoint(i);
+        if (over(e)) spend();
       });
-      up.addEventListener('pointercancel', () => { upId = null; });
-      up.addEventListener('click', (e) => { if (e.detail === 0) this.match.hero.spendPoint(i); }); // keyboard / assistive activation (no pointer)
+      // iOS / some WebViews fire pointercancel instead of pointerup after setPointerCapture on a short tap
+      up.addEventListener('pointercancel', (e) => {
+        if (e.pointerId !== upId) return;
+        upId = null;
+        if (over(e)) spend();
+      });
+      up.addEventListener('click', () => spend()); // keyboard, assistive, or fallback if pointerup was lost
       up.addEventListener('contextmenu', (e) => e.preventDefault());
       this.root.appendChild(up);
       this.ups.push(up);
