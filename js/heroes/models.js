@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { TEAM } from '../config.js';
 import { toonMat, toonMesh, mergeParts } from '../render/toon.js';
+import { buildWave2A } from './wave2a_models.js';
 import { buildWave2B } from './wave2b_models.js';
 
 const BOX = new THREE.BoxGeometry(1, 1, 1);
@@ -346,6 +347,7 @@ function haloGeo(kind, main, acc, gl) {
 // -> { root, lean, eyes, tail, legs, arms, skirt, hand, orb, halo, style, mats } — hero.js animates the groups and flashes mats.
 // Arms are separate groups pivoting at the shoulder (arms[0] = weapon side, arms[1] = off hand) so attacks and casts move limbs.
 export function buildChampion(spec, def, team = 0) {
+  if (spec.wave === 'a') return buildWave2A(spec, def, team);
   if (spec.wave === 'b') return buildWave2B(spec, def, team);
   const T = TORSO[spec.torso], main = ground(def.color, 0.18), acc = ground(def.accent, 0.12); // muted, painted-metal tones
   const gl = tint(def.basic?.color ?? def.accent, 0xffffff, 0.1); // emissive accents match the champion's attacks

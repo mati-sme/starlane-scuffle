@@ -10,6 +10,7 @@ import { pickTarget } from '../game/targeting.js';
 import { particles, FRAME } from '../render/particles.js';
 import { vfx } from '../render/vfx.js';
 import { inCover } from '../world/arena.js';
+import { WAVE2A_BEHAVIORS } from './wave2a_beh.js';
 import { WAVE2B_BEH } from './wave2b_beh.js';
 
 const DEG = Math.PI / 180;
@@ -896,6 +897,6 @@ const BASICS = {
   },
 };
 
-Object.assign(BEHAVIORS, WAVE2B_BEH);
+Object.assign(BEHAVIORS, WAVE2A_BEHAVIORS, WAVE2B_BEH);
 
 export { BEHAVIORS, BASICS };

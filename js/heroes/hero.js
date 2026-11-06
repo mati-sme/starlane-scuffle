@@ -619,7 +619,8 @@ export class Hero {
     m.legs[0].rotation.x = swing;
     m.legs[1].rotation.x = -swing;
     this._pose(m, t, dt, swing);
-    m.anim?.(t, dt, this); // bespoke models (wave2b_models.js): wheels, parasols, caps
+    m.anim?.(t, dt, this); // wave2b live parts: wheels, parasols, caps
+    m.update?.(t, dt, mv, this); // wave2a live parts
 
     this.blink -= dt;
     m.eyes.scale.y = this.blink < 0.12 && this.blink > 0 ? 0.1 : 1;
