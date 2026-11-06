@@ -57,6 +57,12 @@ export const icons = {
   vortex: svg(`<path d="M32 32m0 0a5 5 0 1 1 7 7 12 12 0 1 1-16-16 20 20 0 1 1 28 28" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/><circle cx="32" cy="32" r="4" ${W}/>`),
   ricochet: svg(`<path d="M6 54L26 20L40 44L58 10" ${LINE(7)}/><circle cx="26" cy="20" r="6" ${W}/><circle cx="40" cy="44" r="6" ${W}/><circle cx="58" cy="10" r="5" ${W}/>`),
   tether: svg(`<circle cx="14" cy="32" r="10" ${W}/><circle cx="50" cy="32" r="10" ${W}/><path d="M24 32Q32 18 40 32" ${LINE(5)}/><path d="M24 32Q32 46 40 32" ${LINE(5)}/>`),
+  missile: svg(`<circle cx="44" cy="32" r="14" ${W}/><path d="M4 32h16M8 22h18M8 42h18" ${LINE(5)}/>`),
+  grapple: svg(`<path d="M8 56L34 30" ${LINE(7)}/><polygon points="30,8 58,14 52,42 44,34 34,40 36,30 28,22" ${W}/><circle cx="12" cy="52" r="6" ${W}/>`),
+  rewind: svg(`<path d="M32 10a22 22 0 1 1-20 13" ${LINE(7)}/><polygon points="4,10 24,10 12,28" ${W}/><path d="M32 20v14l9 6" ${LINE(5)}/>`),
+  swap: svg(`<path d="M10 24h38M10 24l12-12M54 42H16M54 42L42 54" ${LINE(7)}/><circle cx="14" cy="42" r="6" ${W}/><circle cx="50" cy="24" r="6" ${W}/>`),
+  totem: svg(`<rect x="22" y="22" width="20" height="36" ${W}/><polygon points="14,22 50,22 32,4" ${W}/><circle cx="32" cy="38" r="6" fill="${INK}"/><path d="M8 52h48" ${LINE(5)}/>`),
+  whirl: svg(`<circle cx="32" cy="32" r="8" ${W}/><path d="M32 8a24 24 0 0 1 24 24M56 32a24 24 0 0 1-24 24M32 56A24 24 0 0 1 8 32M8 32A24 24 0 0 1 32 8" fill="none" stroke="#fff" stroke-width="6" stroke-dasharray="26 10"/>`),
   bolt: svg(`<path d="M4 32h40" ${LINE(8)}/><polygon points="42,16 62,32 42,48" ${W}/>`),
 
   // target buttons + recall

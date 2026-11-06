@@ -324,6 +324,11 @@ export class Bot {
         if (ab.chain) return near(foe, ab.range);
         if (ab.trail) return near(foe, ab.range - 2) && ult;
         return near(foe, ab.range - 1) && (!ab.radius || Math.hypot(foe.x - h.x, foe.z - h.z) > 2);
+      case 'missile': case 'grapple': return near(foe, ab.range - 1) && (ab.kind !== 'grapple' || Math.hypot(foe.x - h.x, foe.z - h.z) > 3);
+      case 'swap': return ab.ally ? hurt.some((a) => a !== h) && !!foe : near(foe, ab.range - 1);
+      case 'rewind': return h.hp < h.maxHp * 0.55 && near(foe, 8);
+      case 'whirl': return near(foe, ab.r + 1);
+      case 'totem': return near(foe, ab.mode === 'heal' ? 10 : 8) && (ab.mode !== 'heal' || hurt.length > 0) && !ctx.zones.turrets.some((t) => t.src === h && t.t < t.dur - 2);
       case 'trap': return near(foe, ab.range);
       case 'quake': return ab.rings ? near(foe, ab.rings * ab.step - 1) : near(foe, 2 + ab.count * ab.gap - 1);
       case 'boomerang': case 'mark': case 'ricochet': return near(foe, (ab.range ?? 8) - 1);

@@ -46,13 +46,14 @@ export class Projectiles {
     p.color = opts.color ?? TEAM[src.team].main;
     p.frame = opts.frame ?? FRAME.dot;
     p.onHit = opts.onHit ?? null;
-    p.mesh.material.color.set(p.color).lerp(_white, 0.65); // white-hot core inside a colored glow
+    p.mesh.material.color.set(p.color).lerp(_white, opts.core ?? 0.65); // white-hot core inside a colored glow
     p.mesh.children[0].material.color.set(p.color);
+    p.mesh.children[0].scale.setScalar(opts.halo ?? 2.3);
     p.mesh.scale.setScalar(opts.size ?? 1);
     p.mesh.position.set(p.sx, p.sy, p.sz);
     p.mesh.visible = true;
     p.tail.material.color.set(p.color).multiplyScalar(1.5);
-    p.tail.scale.set(opts.size ?? 1, 1.6 + speed * 0.07, opts.size ?? 1);
+    p.tail.scale.set(opts.size ?? 1, (1.6 + speed * 0.07) * (opts.tail ?? 1), opts.size ?? 1);
     const fx = tgt.x - src.x, fz = tgt.z - src.z, fd = Math.hypot(fx, fz) || 1;
     p.tail.position.set(p.sx, p.sy, p.sz);
     p.tail.quaternion.setFromUnitVectors(UP, _back.set(-fx / fd, 0, -fz / fd));

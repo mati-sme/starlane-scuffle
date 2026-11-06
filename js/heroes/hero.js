@@ -32,6 +32,17 @@ const ease = (u) => u * u * (3 - 2 * u);
 bus.on('cast', ({ hero, slot }) => { hero.castT = 1; hero.castSlot = slot; hero._castFx = true; });
 bus.on('swing', (h) => { if (h.type === 'hero') h.atkT = 1; });
 
+// Gait per model.style: cadence, leg swing, bounce, forward lean, hover height, squash, crouch, side sway.
+const STYLE = {
+  base: { cad: 1, swing: 0.9, bob: 0.12, lean: 0.25, float: 0, sq: 0.08 },
+  stomp: { cad: 0.7, swing: 0.6, bob: 0.2, lean: 0.12, float: 0, sq: 0.14 },
+  float: { cad: 0.6, swing: 0.18, bob: 0.05, lean: 0.35, float: 0.5, sq: 0.02 },
+  hop: { cad: 1.4, swing: 0.5, bob: 0.5, lean: 0.2, float: 0, sq: 0.18 },
+  sprint: { cad: 1.35, swing: 1.25, bob: 0.08, lean: 0.55, float: 0, sq: 0.04 },
+  stalk: { cad: 0.9, swing: 0.8, bob: 0.04, lean: 0.45, float: 0, sq: 0.04, crouch: 0.1 },
+  strut: { cad: 1, swing: 0.9, bob: 0.18, lean: 0.1, float: 0, sq: 0.1, sway: 0.2 },
+};
+
 export class Hero {
   // brain: optional (hero) => controller with think(dt, ctx) -> intent. No brain = the human player.
   constructor(scene, def, team = 0, slot = 0, brain = null) {
@@ -183,6 +194,7 @@ export class Hero {
 
   _clear() {
     this.effects = [];
+    this.hist = [];
     this.script = null;
     this.windup = 0;
     this.pend = -1;
@@ -256,6 +268,7 @@ export class Hero {
     } else this.boost -= dt;
 
     this.moveMul = 1; this.noAttack = false; this.spin = 0;
+    if ((this._hT = (this._hT ?? 0) - dt) <= 0) { this._hT = 0.2; (this.hist ??= []).push({ x: this.x, z: this.z, hp: this.hp }); if (this.hist.length > 16) this.hist.shift(); } // 3 s of positions for rewinds
     for (let i = this.effects.length - 1; i >= 0; i--) {
       const e = this.effects[i];
       e.t += dt;
@@ -564,22 +577,25 @@ export class Hero {
     this.spinAng += dt * 22 * this.spin;
     this.lift = this.yOff + airLift(this);
 
-    const m = this.model, mv = this.moveAmt;
-    this.phase += dt * 11 * mv;
+    const m = this.model, mv = this.moveAmt, st = STYLE[m.style] ?? STYLE.base;
+    this.phase += dt * 11 * mv * st.cad;
     const step = Math.abs(Math.sin(this.phase)) * mv;
     const dy = this.dying > 0 ? dyingScale(this) : 1;
-    const crouch = this.windup > 0 ? 0.2 : 0;
+    const crouch = (this.windup > 0 ? 0.2 : 0) + (st.crouch ?? 0) * mv;
     const sq = this.squash * 0.15;
-    const sy = dy * (1 + 0.08 * step - sq - crouch), sx = dy * (1 - 0.04 * step + sq * 0.5 + crouch * 0.5);
+    const sy = dy * (1 + st.sq * step - sq - crouch), sx = dy * (1 - st.sq * 0.5 * step + sq * 0.5 + crouch * 0.5);
     const hop = this.celebrate ? Math.abs(Math.sin(t * 6)) * 0.7 : 0;
 
     this.holder.position.set(this.rx, GROUND + hop + this.lift, this.rz);
-    m.root.position.set(Math.sin(this.yaw) * 0.35 * this.lunge, step * 0.12 + (1 - mv) * Math.sin(t * 3) * 0.04, Math.cos(this.yaw) * 0.35 * this.lunge);
+    const fl = st.float ? st.float + Math.sin(t * 2.4 + this.slot) * 0.14 : 0; // floaters hover and bob instead of stepping
+    m.root.position.set(Math.sin(this.yaw) * 0.35 * this.lunge, step * st.bob + fl + (1 - mv) * Math.sin(t * 3) * 0.04, Math.cos(this.yaw) * 0.35 * this.lunge);
     m.root.rotation.y = this.yaw + this.spinAng;
     m.root.scale.set(sx, sy, sx);
-    m.lean.rotation.x = 0.25 * mv + 0.2 * this.lunge + this.tilt;
+    m.lean.rotation.x = st.lean * mv + 0.2 * this.lunge + this.tilt;
+    m.lean.rotation.z = st.sway ? Math.sin(this.phase) * st.sway * mv : 0;
+    if (m.halo) { m.halo.rotation.y = t * 1.3; m.halo.position.y = Math.sin(t * 1.7 + this.slot) * 0.12; }
     m.tail.rotation.y = Math.sin(t * (4 + 6 * mv)) * (0.35 + 0.3 * mv);
-    const swing = Math.sin(this.phase) * 0.9 * mv;
+    const swing = Math.sin(this.phase) * st.swing * mv;
     m.legs[0].rotation.x = swing;
     m.legs[1].rotation.x = -swing;
     this._pose(m, t, dt, swing);
@@ -629,8 +645,9 @@ export class Hero {
     }
     if (this.burn || this.burnVis) burnFx(this, dt);
     if ((this._amb = (this._amb ?? 0) - dt) <= 0) { // role-colored ambient sparks
-      this._amb = 0.16;
-      particles.emit(this.rx + (Math.random() - 0.5) * 1.2, 0.6 + Math.random() * 2, this.rz + (Math.random() - 0.5) * 1.2, 0, 0.5, 0, this.def.accent, 0.35, 0.6, FRAME.sparkle);
+      const amb = this.def.fx?.amb; // per-champion ambient: embers rise, snow falls, leaves drift, notes float
+      this._amb = amb?.rate ?? 0.16;
+      particles.emit(this.rx + (Math.random() - 0.5) * 1.2, amb?.y ?? 0.6 + Math.random() * 2, this.rz + (Math.random() - 0.5) * 1.2, (Math.random() - 0.5) * (amb?.drift ?? 0), amb?.vy ?? 0.5, 0, amb?.color ?? this.def.accent, amb?.size ?? 0.35, amb?.life ?? 0.6, amb?.frame ?? FRAME.sparkle);
     }
   }
 }

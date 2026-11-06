@@ -1,14 +1,36 @@
 // Persistent battlefield pieces made by skills: ground fields, barrier walls and auto-turrets.
 import * as THREE from 'three';
 import { GROUND, TEAM } from '../config.js';
-import { dealDamage, forEachEnemy, applyStatus, addBuff, heal } from './combat.js';
+import { dealDamage, forEachEnemy, applyStatus, addBuff, heal, shove } from './combat.js';
 import { pickTarget } from './targeting.js';
 import { particles, FRAME } from '../render/particles.js';
 import { vfx } from '../render/vfx.js';
 import { toonMat, toonMesh, mergeParts } from '../render/toon.js';
 
 const TICK = 0.25;
-const PER_TEAM = 2;
+const PER_TEAM = 3;
+const SHAPES = ['turret', 'sprout', 'bumper'];
+const GEO = { turret: null, sprout: null, bumper: null };
+
+// Totem bodies: a prism turret (shoots), a sprout (living ward that pulses), a pinball bumper (knocks enemies away).
+function sproutGeo(team) {
+  return mergeParts([
+    { g: new THREE.CylinderGeometry(0.5, 0.65, 0.25, 7), c: 0x5A3E24, p: [0, 0.12, 0] },
+    { g: new THREE.CylinderGeometry(0.12, 0.2, 1.0, 6), c: 0x6B4A2A, p: [0, 0.7, 0] },
+    ...[0, 1, 2, 3].map((k) => ({ g: new THREE.ConeGeometry(0.28, 0.9, 5), c: k % 2 ? 0x6FD05A : 0x4FA844, p: [Math.cos(k * 1.57) * 0.4, 1.35, Math.sin(k * 1.57) * 0.4], r: [Math.sin(k * 1.57) * 0.9, 0, -Math.cos(k * 1.57) * 0.9] })),
+    { g: new THREE.SphereGeometry(0.26, 8, 6), c: 0xFFE06A, p: [0, 1.35, 0] },
+    { g: new THREE.BoxGeometry(0.16, 0.16, 0.16), c: TEAM[team].main, p: [0, 1.95, 0] },
+  ]);
+}
+function bumperGeo(team) {
+  return mergeParts([
+    { g: new THREE.CylinderGeometry(0.8, 0.9, 0.3, 12), c: 0x2A3140, p: [0, 0.15, 0] },
+    { g: new THREE.CylinderGeometry(0.62, 0.7, 0.6, 12), c: 0xFF2E93, p: [0, 0.6, 0] },
+    { g: new THREE.TorusGeometry(0.66, 0.1, 6, 16), c: 0xFFFFFF, p: [0, 0.9, 0], r: [Math.PI / 2, 0, 0] },
+    { g: new THREE.SphereGeometry(0.4, 10, 6), c: 0xFFC2E0, p: [0, 1.05, 0] },
+    { g: new THREE.BoxGeometry(0.16, 0.16, 0.16), c: TEAM[team].main, p: [0, 1.7, 0] },
+  ]);
+}
 
 function turretGeo(team) {
   return mergeParts([
@@ -33,20 +55,20 @@ export class Zones {
     this.turrets = [];
     const mat = toonMat({ vertexColors: true });
     this.meshes = [0, 1].map((team) => {
-      const geo = turretGeo(team);
-      return Array.from({ length: PER_TEAM }, () => {
-        const m = toonMesh(geo, mat, 0.04);
+      const geos = { turret: turretGeo(team), sprout: sproutGeo(team), bumper: bumperGeo(team) };
+      return Object.fromEntries(SHAPES.map((k) => [k, Array.from({ length: PER_TEAM }, () => {
+        const m = toonMesh(geos[k], mat, 0.04);
         m.visible = false;
         scene.add(m);
         return m;
-      });
+      })]));
     });
   }
 
   reset() {
     this.fields.length = 0;
     this.turrets.length = 0;
-    for (const row of this.meshes) for (const m of row) m.visible = false;
+    for (const row of this.meshes) for (const k of SHAPES) for (const m of row[k]) m.visible = false;
   }
 
   // f: { team, src, x, z, r, dur, color, dps, slow, healPs, follow, selfDr, allyDr, undying, wall, len, dx, dz, allySpd }
@@ -61,7 +83,7 @@ export class Zones {
     while (mine.length >= (ab.max ?? 1)) this.turrets.splice(this.turrets.indexOf(mine.shift()), 1);
     this.turrets.push({
       src, team: src.team, x, z, t: 0, dur: ab.dur, cd: 0.3, yaw: Math.atan2(x - src.x, z - src.z),
-      range: ab.tRange, dmg: ab.tDmg, rate: ab.tCd, color: ab.color,
+      range: ab.tRange, dmg: ab.tDmg, rate: ab.tCd, color: ab.color, accent: ab.accent ?? ab.color, mode: ab.mode ?? 'shoot', shape: ab.shape ?? 'turret', ab,
       shot: { team: src.team, x, z, outMul: src.outMul },
     });
     particles.burst(x, 0.5, z, 10, { color: [ab.color, 0xffffff], speed: 2.5, up: 2, size: 0.5, life: 0.5, frame: FRAME.sparkle, grav: 1 });
@@ -83,6 +105,16 @@ export class Zones {
       }
       if (f.t >= f.dur) { this.fields.splice(i, 1); continue; }
 
+      if (f.wall && f.solid) { // a solid barrier: enemy heroes and minions cannot walk through, they slide out the nearest face
+        const push = (e) => {
+          const rx = e.x - f.x, rz = e.z - f.z, a = rx * f.dx + rz * f.dz, b = rz * f.dx - rx * f.dz, th = 0.9 + (e.radius ?? 0) * 0.5;
+          if (Math.abs(a) >= th || Math.abs(b) > f.len / 2 + (e.radius ?? 0)) return;
+          const k = (a >= 0 ? th : -th) - a;
+          e.x += f.dx * k; e.z += f.dz * k;
+        };
+        for (const e of ctx.heroes) if (e.alive && e.team !== f.team && !e.script) push(e);
+        for (const e of ctx.minions.list) if (e.alive && e.team !== f.team) push(e);
+      }
       for (const a of ctx.heroes) {
         if (!a.alive || a.team !== f.team || !inside(f, a)) continue;
         const dr = a === f.src ? f.selfDr : f.allyDr;
@@ -104,6 +136,8 @@ export class Zones {
       if ((f.vis -= dt) <= 0) {
         f.vis = 0.45;
         if (f.wall) {
+          const tx = -f.dz * f.len / 2, tz = f.dx * f.len / 2;
+          for (const y of [0.5, 1.4]) vfx.beam(f.x - tx, y, f.z - tz, f.x + tx, y, f.z + tz, f.color, 0.28, 0.5); // the barrier reads as a glowing lattice
           for (let k = 0; k < 8; k++) {
             const s = (Math.random() - 0.5) * f.len;
             particles.emit(f.x - f.dz * s, 0.3 + Math.random() * 1.6, f.z + f.dx * s, 0, 0.3, 0, f.color, 0.6, 0.5, FRAME.sparkle);
@@ -121,6 +155,7 @@ export class Zones {
         continue;
       }
       if ((T.cd -= dt) > 0) continue;
+      if (T.mode !== 'shoot') { T.cd = T.rate; this._pulse(T, ctx); continue; }
       const tgt = pickTarget(ctx, T.team, T.x, T.z, T.range, ['heroes', 'minions', 'structures']);
       if (!tgt) continue;
       T.cd = T.rate;
@@ -130,17 +165,35 @@ export class Zones {
     }
   }
 
+  // A totem pulse: heal allies, slow + hurt enemies, or knock enemies away from a bumper. Always draws a ring so it reads.
+  _pulse(T, ctx) {
+    const R = T.range, ab = T.ab, col = T.color, acc = T.accent;
+    let hit = false;
+    if (T.mode === 'heal') {
+      for (const a of ctx.heroes) if (a.team === T.team && a.alive && Math.hypot(a.x - T.x, a.z - T.z) - a.radius <= R) { heal(a, ab.tHeal ?? 30); hit = true; particles.emit(a.x, 1.2, a.z, 0, 2, 0, acc, 0.6, 0.5, FRAME.star); }
+    } else {
+      forEachEnemy(ctx, T.team, T.x, T.z, R, (e) => {
+        if (T.mode === 'bump') { const dx = e.x - T.x, dz = e.z - T.z, d = Math.hypot(dx, dz) || 1; if (e.type === 'hero' || e.type === 'minion') shove(e, dx, dz, ab.tKnock ?? 2.5, 0.2); }
+        if (T.dmg) dealDamage(e, T.dmg, T.src, true);
+        if (ab.tSlow) applyStatus(e, 'slow', 1);
+        hit = true;
+      });
+    }
+    vfx.ring(T.x, 0.25, T.z, hit ? acc : col, R * (hit ? 1.15 : 0.8), 0.35);
+    if (hit) { vfx.decal(T.x, T.z, col, R * 0.8, 0.4); particles.burst(T.x, 1, T.z, 8, { color: [col, acc, 0xffffff], speed: 3, up: 2, size: 0.6, life: 0.5, frame: FRAME.sparkle, grav: 1 }); }
+  }
+
   render() {
-    const n = [0, 0];
+    const n = { 0: { turret: 0, sprout: 0, bumper: 0 }, 1: { turret: 0, sprout: 0, bumper: 0 } };
     for (const T of this.turrets) {
-      const m = this.meshes[T.team][n[T.team]++];
+      const m = this.meshes[T.team][T.shape]?.[n[T.team][T.shape]++];
       if (!m) continue;
       const pop = Math.min(1, T.t * 5) * Math.min(1, (T.dur - T.t) / 0.3);
       m.visible = true;
       m.position.set(T.x, GROUND, T.z);
-      m.scale.setScalar(Math.max(pop, 0.01));
-      m.rotation.y = T.yaw;
+      m.scale.setScalar(Math.max(pop, 0.01) * (1 + (T.shape === 'turret' ? 0 : Math.sin(T.t * 6) * 0.04)));
+      m.rotation.y = T.shape === 'turret' ? T.yaw : T.t * 0.8;
     }
-    for (let team = 0; team < 2; team++) for (let k = n[team]; k < PER_TEAM; k++) this.meshes[team][k].visible = false;
+    for (let team = 0; team < 2; team++) for (const k of SHAPES) for (let i = n[team][k]; i < PER_TEAM; i++) this.meshes[team][k][i].visible = false;
   }
 }

@@ -1,6 +1,6 @@
 // How each skill is aimed: the shape of its drag preview and the clamp for the aimed point.
 // kind -> { type: 'line' | 'point' | 'cone' | 'self', range, width, radius, arc } (ab is the rank-resolved skill).
-const LINE = new Set(['dash', 'bolt', 'hook', 'beam', 'blink', 'turret', 'mark', 'boomerang']);
+const LINE = new Set(['dash', 'bolt', 'hook', 'beam', 'blink', 'turret', 'mark', 'boomerang', 'missile', 'grapple', 'swap']);
 const POINT = new Set(['leap', 'blast', 'rain', 'trap', 'vortex']);
 
 export function aimShape(ab) {
@@ -10,11 +10,13 @@ export function aimShape(ab) {
   if (ab.kind === 'ricochet') return ab.shots ? { type: 'self', range, radius: range } : { type: 'line', range, width: ab.width ?? 1 };
   if (ab.kind === 'detonate') return { type: 'self', range, radius: range };
   if (ab.kind === 'tether') return { type: 'self', range, radius: range };
+  if (ab.kind === 'whirl') return { type: 'self', range: ab.r, radius: ab.r };
+  if (ab.kind === 'totem') return { type: 'point', range, radius: ab.tRange };
   if (ab.kind === 'orbit') return { type: 'self', range: ab.r, radius: ab.r };
   if (ab.kind === 'blast' && ab.target) return { type: 'self', range, radius: range };
   if (ab.kind === 'field') {
     if (ab.wall) return { type: 'line', range: 3 + ab.wall / 2, width: ab.wall, wall: true };
-    if (ab.place === 'ally') return { type: 'point', range, radius: ab.r };
+    if (ab.place === 'ally' || (ab.range && !ab.follow)) return { type: 'point', range, radius: ab.r };
     return { type: 'self', range: ab.r, radius: ab.r };
   }
   if (ab.kind === 'cone') return { type: 'cone', range, arc: ab.arc ?? 90 };
