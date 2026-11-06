@@ -24,7 +24,9 @@ export function initTouchControls() {
 
   zone.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'mouse') { mouseDown(e); return; }
-    if (id !== null && zone.hasPointerCapture?.(id)) return; // a finger really is on the stick; a stale id (capture lost with the zone hidden) is taken over
+    // A tap on the move pad always recovers a stale stick (lost capture, hidden overlay) then starts a fresh drag.
+    if (id !== null && !zone.hasPointerCapture?.(id)) reset();
+    if (id !== null && zone.hasPointerCapture?.(id)) return;
     id = e.pointerId;
     zone.setPointerCapture(id);
     ox = e.clientX; oy = e.clientY;
@@ -59,6 +61,7 @@ export function initTouchControls() {
     atk.classList.remove('down', 'aiming');
   };
   atk.addEventListener('pointerdown', (e) => {
+    if (aid !== null && !atk.hasPointerCapture?.(aid)) atkEnd();
     if (aid !== null) return;
     e.preventDefault();
     aid = e.pointerId;

@@ -217,6 +217,23 @@ export class Hero {
     this.manual = null;
   }
 
+  // Drop movement locks that outlived any real skill (watchdog), or everything if the player tapped Unstuck.
+  unstick(force = false) {
+    const long = (v, max) => force || v > max;
+    if (long(this.stun, 3)) this.stun = 0;
+    if (long(this.root, 3)) this.root = 0;
+    if (long(this.air, 3)) this.air = 0;
+    if (long(this.slow, 6)) this.slow = 0;
+    if (long(this.windup, 1.2)) { this.windup = 0; this.pend = -1; }
+    if (this.script && (force || !this.script.dur || this.script.t > Math.min(4, (this.script.dur || 0) + 0.5))) {
+      this.script = null;
+      this.yOff = this.tilt = 0;
+    }
+    if (this.recall > 0 && (force || this.recall > RECALL_T + 1)) this._recallEnd(false);
+    if (force) { this.walkTo = null; this.moveMul = 1; }
+    return this;
+  }
+
   // it: { x, z (world move dir, |v| <= 1), attack, cast: [bool, bool, bool], aim?: [{ dx, dz, dist } | null x3], pref?: 0 auto | 1 minion | 2 structure, recall?: bool }
   update(dt, ctx, it) {
     this.px = this.x; this.pz = this.z;
@@ -251,6 +268,7 @@ export class Hero {
     this.lunge = Math.max(0, this.lunge - dt * 5);
     this.faceHold = Math.max(0, this.faceHold - dt);
     tickStatus(this, dt);
+    this.unstick(false); // watchdog: expired CC / script / channel cannot freeze this hero
     tickBuffs(this, dt);
     this.hidden = !!this.buf.hidden || this.brushHidden;
     this.untarget = !!this.buf.untarget;

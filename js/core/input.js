@@ -93,6 +93,11 @@ export function initInput(canvas) {
   });
   window.addEventListener('blur', resetInput);
   document.addEventListener('visibilitychange', resetInput);
+  window.addEventListener('pointercancel', resetInput); // OS gesture / overlay stole the touch
+  window.addEventListener('orientationchange', resetInput);
+  window.addEventListener('pagehide', resetInput);
+  window.addEventListener('pageshow', resetInput);
+  try { screen.orientation?.addEventListener('change', resetInput); } catch { /* no Screen Orientation API */ }
   window.addEventListener('pointermove', (e) => {
     if (e.pointerType === 'mouse') input.mouse = { x: (e.clientX / innerWidth) * 2 - 1, y: -((e.clientY / innerHeight) * 2 - 1) };
   });

@@ -330,6 +330,8 @@ body.touch .mouse { display: none; }
 #topbtns { position: fixed; top: calc(12px + var(--st)); right: calc(14px + var(--sr)); z-index: 6; display: flex; gap: 10px; }
 #pause { display: none; }
 body.playing #pause { display: block; }
+#unstuck { display: none; width: auto; min-width: 52px; padding: 10px 12px; color: #fff; font: inherit; font-size: 11px; font-weight: 800; letter-spacing: .08em; }
+body.playing #unstuck { display: block; }
 
 /* ---------- rotate-phone overlay ---------- */
 #rotate { display: none; position: fixed; inset: 0; z-index: 9; background: #060A16; align-items: center; justify-content: center; }

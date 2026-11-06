@@ -61,13 +61,22 @@ let spells = cleanSpells(save.get('spells')) ?? [...DEFAULT_SPELLS]; // summoner
 const setSpells = (s) => { spells = s; save.set('spells', s); };
 
 // Read-only debug surface for browser tests.
-window.__starlane = { match, net, session, gfx, get state() { return state; } };
+window.__starlane = {
+  match, net, session, gfx,
+  get state() { return state; },
+  unstuck() { resetInput(); match.hero?.unstick?.(true); },
+};
 
 const muteBtn = $('mute');
 const syncMute = () => { muteBtn.innerHTML = audio.muted ? icons.mute : icons.sound; };
 muteBtn.addEventListener('click', () => { audio.toggleMute(); syncMute(); });
 $('pause').innerHTML = icons.pause;
 $('pause').addEventListener('click', () => pause());
+$('unstuck').addEventListener('click', (e) => {
+  e.preventDefault();
+  resetInput();
+  match.hero?.unstick?.(true);
+});
 syncMute();
 
 function leave(next) {
@@ -89,7 +98,7 @@ function toTitle() {
 
 // ---- online ----
 function leaveRoom() {
-  if (online) { net.send({ t: T.leave }); net.forget(); }
+  if (online) { net.send({ t: T.leave }); net.forget(); save.set('lastRoom', ''); }
   net.close();
   session.end();
   online = null;
@@ -113,6 +122,7 @@ function connectRoom(code, create, tries) {
   net.close();
   leave('online');
   online = { code, lobby: null, error: '', tries, banSel: null, leftAt: 0, draftKey: '', timedOut: false };
+  save.set('lastRoom', code); // reload / reopen the app can resume this room
   menus.showOnline({ code: create ? '' : code, busy: true, error: 'Connecting…', onCreate() {}, onJoin() {}, onBack: toTitle });
   net.connect(code, { create });
 }
@@ -325,4 +335,11 @@ toTitle();
 loop.start();
 
 const deepLink = cleanCode(new URLSearchParams(location.search).get('room'));
+const lastRoom = cleanCode(save.get('lastRoom', '') || '');
 if (deepLink.length === 4) joinRoom(deepLink); // ?room=CODE opens the join flow
+else if (lastRoom.length === 4) {
+  // Reloaded mid-session: resume the same online room when we still have a slot token.
+  let token = null;
+  try { token = JSON.parse(localStorage.getItem(`starlane.room.${lastRoom}`))?.token ?? null; } catch { /* blocked */ }
+  if (token) connectRoom(lastRoom, false, 0);
+}
