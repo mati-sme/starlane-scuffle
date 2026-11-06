@@ -61,10 +61,10 @@ for (const { name, lib, uaMode } of kinds) {
   await page.locator('[data-testid="champion-card-lumen"]').tap({ force: true });
   await page.locator('[data-testid="ban-btn"]').tap({ force: true });
   await sleep(400);
-  await page.locator('[data-testid^="champion-card-"]').nth(0).tap({ force: true });
-  await sleep(300);
+  await page.locator('[data-testid^="champion-card-"]:not([disabled])').nth(0).tap({ force: true });
+  await sleep(800);
   await tap('go-btn');
-  await page.waitForFunction(() => window.__starlane.state === 'match', null, { timeout: 20000 });
+  await page.waitForFunction(() => window.__starlane.state === 'match', null, { timeout: 20000 }).catch(async (e) => { console.log('STATE', await page.evaluate(() => window.__starlane.state), await page.evaluate(() => document.body.innerText.slice(0, 200))); throw e; });
   await sleep(1200);
 
   await page.evaluate(() => { const h = window.__starlane.match.hero; h.maxHp = h.hp = 99999; h.x = h.px = 0; h.z = h.pz = 0; h.level = 9; h.points = 3; h.ranks = [0, 0, 0]; });
