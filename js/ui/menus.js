@@ -5,6 +5,7 @@ import { PAL } from '../config.js';
 import { HEROES, ROSTER } from '../heroes/index.js';
 import { TEAM_NAME } from '../net/protocol.js';
 import { SPELLS, SPELL_IDS } from '../game/spells.js';
+import { LEVELS, MAX_TEAM, applyPreset, presetOf, summary } from '../game/setup.js';
 
 const hex = (n) => '#' + n.toString(16).padStart(6, '0');
 const mmss = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
@@ -87,6 +88,46 @@ export function createMenus(root) {
         <button class="btn online" type="button" data-testid="online-btn">PLAY ONLINE</button></div>
         <p class="hint"><span class="mouse">WASD move · Space attack · Q E R skills · 1 2 3 or Ctrl+Q/E/R rank up</span><span class="touchhint">Left thumb move · Right thumb attack · tap the gold + above a skill to level it</span></p>`,
       (el) => { on(el, '.play', onPlay); on(el, '.online', onOnline); });
+    },
+
+
+    // Match setup: a preset for every bot, team sizes (1-5), your side, and a level per bot. `setup` is edited in place (see game/setup.js).
+    // online: no "your side" chooser (players pick teams in the lobby). readOnly: just the summary and slots (guests).
+    showSetup({ setup, online = false, readOnly = false, nextLabel = 'NEXT', onChange, onNext, onBack }) {
+      const cap = (l) => l[0].toUpperCase() + l.slice(1);
+      const body = () => {
+        const preset = presetOf(setup);
+        const col = (t) => {
+          const slots = Array.from({ length: setup.size[t] }, (_, i) => {
+            const you = !online && t === setup.side && i === 0;
+            const lv = you ? '<span class="you">YOU</span>' : LEVELS.map((l) => `<button type="button" class="lvl ${l} ${setup.diff[t][i] === l ? 'on' : ''}" data-t="${t}" data-i="${i}" data-l="${l}" data-testid="slot-${t}-${i}-${l}" aria-pressed="${setup.diff[t][i] === l}" ${readOnly ? 'disabled' : ''}>${cap(l)}</button>`).join('');
+            return `<li class="slot ${you ? 'me' : ''}" data-testid="slot-${t}-${i}"><b>${you ? 'You' : online ? 'Bot' : 'Bot ' + (i + (t === setup.side ? 0 : 1))}</b>${lv}</li>`;
+          }).join('');
+          return `<div class="sidecol t${t}"><div class="sidehead"><b>${TEAM_NAME[t].toUpperCase()}</b>
+            <button type="button" class="small size" data-t="${t}" data-d="-1" data-testid="size-minus-${t}" aria-label="Fewer on ${TEAM_NAME[t]}" ${readOnly || setup.size[t] <= 1 ? 'disabled' : ''}>−</button>
+            <span class="count" data-testid="size-count-${t}">${setup.size[t]}</span>
+            <button type="button" class="small size" data-t="${t}" data-d="1" data-testid="size-plus-${t}" aria-label="More on ${TEAM_NAME[t]}" ${readOnly || setup.size[t] >= MAX_TEAM ? 'disabled' : ''}>+</button></div>
+            <ul class="slots">${slots}</ul></div>`;
+        };
+        return `
+          <h2 data-testid="setup-title">Match setup</h2>
+          <p class="hint">${readOnly ? 'The host picked this match. ' : ''}Easy is gentle, Mid is classic, Hard is sharp. Tap a bot to change it.</p>
+          <div class="presets" data-testid="setup-presets">${LEVELS.map((l) => `<button type="button" class="btn preset ${l} ${preset === l ? 'on' : ''}" data-l="${l}" data-testid="preset-${l}" aria-pressed="${preset === l}" ${readOnly ? 'disabled' : ''}>${cap(l).toUpperCase()}</button>`).join('')}</div>
+          ${online ? '' : `<div class="teampick sidepick"><span>You play</span><button type="button" class="tbtn t0 ${setup.side === 0 ? 'on' : ''}" data-side="0" data-testid="side-0">SUNNY</button><button type="button" class="tbtn t1 ${setup.side === 1 ? 'on' : ''}" data-side="1" data-testid="side-1">GLOOM</button></div>`}
+          <div class="sides">${col(0)}<span class="vs">VS</span>${col(1)}</div>
+          <p class="hint" data-testid="setup-summary">${summary(setup, preset)}</p>
+          <div class="row"><button class="btn primary next" type="button" data-testid="setup-next">${nextLabel}</button></div>`;
+      };
+      const wire = (el) => {
+        const redraw = () => { el.innerHTML = '<button class="small home" type="button" aria-label="Back" data-testid="setup-back">' + icons.home + '</button>' + body(); wire(el); onChange?.(setup); };
+        on(el, '.next', onNext);
+        on(el, '.home', onBack);
+        for (const b of el.querySelectorAll('.preset')) b.addEventListener('click', () => { applyPreset(setup, b.dataset.l); redraw(); });
+        for (const b of el.querySelectorAll('.lvl')) b.addEventListener('click', () => { setup.diff[+b.dataset.t][+b.dataset.i] = b.dataset.l; redraw(); });
+        for (const b of el.querySelectorAll('.size')) b.addEventListener('click', () => { const t = +b.dataset.t; setup.size[t] = Math.min(MAX_TEAM, Math.max(1, setup.size[t] + +b.dataset.d)); redraw(); });
+        for (const b of el.querySelectorAll('[data-side]')) b.addEventListener('click', () => { setup.side = +b.dataset.side; redraw(); });
+      };
+      show('setup modal', '<button class="small home" type="button" aria-label="Back" data-testid="setup-back">' + icons.home + '</button>' + body(), wire);
     },
 
     // Offline draft. phase 'ban': tap a champion, BAN it. phase 'pick': banned champions are stamped and locked, tap one, GO.
@@ -174,7 +215,7 @@ export function createMenus(root) {
     // Room lobby: code + link, both players' team / ban / champion, host Start. Re-rendered on every lobby update.
     // stage 'ban': tap a champion (banSel), BAN it. stage 'pick': banned / taken champions are stamped and locked.
     // deadline: performance.now() ms the stage timer ends (0 = no timer).
-    showLobby({ code, link, me, players, phase, stage = 'pick', bans = [], banSel = null, spells = [], deadline = 0, conn, error }, { onTeam, onHero, onBanSel, onBan, onSpells, onStart, onCopy, onLeave, onTimeout }) {
+    showLobby({ code, link, me, players, phase, stage = 'pick', bans = [], banSel = null, spells = [], deadline = 0, conn, error, setup = null }, { onTeam, onHero, onBanSel, onBan, onSpells, onStart, onCopy, onLeave, onTimeout, onSetup }) {
       const mine = players.find((p) => p.slot === me), other = players.find((p) => p.slot !== me);
       const isHost = me === 0, two = players.length === 2;
       const banning = stage === 'ban' && phase === 'lobby';
@@ -201,6 +242,7 @@ export function createMenus(root) {
         <ul class="players">${players.map(row).join('')}${two ? '' : '<li class="pl wait"><i class="dot"></i><b>Waiting for a friend…</b></li>'}</ul>
         <div class="teampick"><button type="button" class="tbtn t0 ${mine?.team === 0 ? 'on' : ''}" data-team="0" data-testid="team-sunny">SUNNY</button>
           <button type="button" class="tbtn t1 ${mine?.team === 1 ? 'on' : ''}" data-team="1" data-testid="team-gloom">GLOOM</button></div>
+        ${setup ? `<p class="hint setupline" data-testid="lobby-setup">Match: ${summary(setup)}${isHost && phase === 'lobby' ? ' <button type="button" class="small tweak" data-testid="lobby-setup-btn">CHANGE</button>' : ''}</p>` : ''}
         <h3 class="stagehead" data-testid="draft-title">${phase === 'play' ? 'Match in progress…' : banning ? 'Ban — tap to ban' : 'Pick — tap to choose'}<span class="timer" data-testid="draft-timer"></span></h3>
         <p class="hint draft-help" data-testid="draft-help">${help}</p>
         ${phase === 'lobby' ? spellPick(spells) : ''}
@@ -214,6 +256,7 @@ export function createMenus(root) {
         if (phase === 'lobby') wireSpells(el, spells, onSpells);
         el.querySelector('.copy').addEventListener('click', () => onCopy(el.querySelector('.copy')));
         el.querySelector('.home').addEventListener('click', onLeave);
+        el.querySelector('.tweak')?.addEventListener('click', onSetup);
         el.querySelector('.start')?.addEventListener('click', () => onStart(!two));
         el.querySelector('.banbtn')?.addEventListener('click', () => onBan(banSel));
         if (phase === 'lobby') countdown(el, deadline, () => onTimeout?.());

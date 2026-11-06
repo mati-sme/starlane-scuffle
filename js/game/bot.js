@@ -1,8 +1,8 @@
-// Hero AI for both teams (identical rules, only reaction time / damage scale by difficulty on Gloom):
+// Hero AI for both teams (identical rules; each bot has its own difficulty: reaction time, damage, skill use, courage):
 // RETREAT > DEFEND > FIGHT > PUSH > LANE / ROAM. Decisions are re-made every `react` seconds; steering runs every sim step.
 // Bots walk lane paths with their minion wave, never stand in an enemy tower's range without 2+ friendly minions
 // near it, focus low-HP heroes and cast through the same skill rules the player uses.
-import { TOWER, CORE, BOT, DIFFICULTY, settings, MATCH } from '../config.js';
+import { TOWER, CORE, BOT, DIFFICULTY, MATCH } from '../config.js';
 import { nextItem, atBase } from './gear.js';
 import { rand } from '../core/math.js';
 import { pickTarget, bestCluster } from './targeting.js';
@@ -15,7 +15,7 @@ const SPACING = { tank: 1, bruiser: 0, assassin: 0, blaster: -3, shooter: -4, su
 const ROAM = 3;
 
 // Lane plan per team (bots only; a human plays wherever they like and nobody is tied to them): top = the most durable melee,
-// mid = blaster, bot = shooter + support. Anyone who does not fit (a second blaster, the other melee...) roams.
+// mid = blaster, bot = shooter + support (one lone bot just holds mid). Anyone who does not fit (a second blaster, the other melee...) roams.
 const LANE_CAP = [1, 1, 2], LANE_OF = { tank: 0, bruiser: 0, assassin: 0, blaster: 1, shooter: 2, support: 2 };
 const PRIORITY = ['tank', 'bruiser', 'assassin', 'blaster', 'shooter', 'support'];
 export function assignLanes(heroes) {
@@ -23,6 +23,7 @@ export function assignLanes(heroes) {
     const used = [0, 0, 0];
     const bots = heroes.filter((h) => h.team === team && h.brain).sort((a, b) => PRIORITY.indexOf(a.def.role) - PRIORITY.indexOf(b.def.role));
     for (const h of bots) {
+      if (bots.length === 1) { h.brain.lane = h.brain.roamLane = 1; continue; } // a lone bot (1v1, or next to a human) holds mid
       const l = LANE_OF[h.def.role] ?? ROAM;
       h.brain.lane = l !== ROAM && used[l] < LANE_CAP[l] ? l : ROAM;
       if (h.brain.lane !== ROAM) used[l]++;
@@ -32,8 +33,9 @@ export function assignLanes(heroes) {
 }
 
 export class Bot {
-  constructor(hero) {
+  constructor(hero, level = 'mid') {
     this.h = hero;
+    this.d = DIFFICULTY[level] ?? DIFFICULTY.mid;
     this.it = { x: 0, z: 0, attack: true, cast: [false, false, false] };
     this.goal = { x: hero.x, z: hero.z, follow: null, keep: 0.5 };
     this.lane = 1;
@@ -60,7 +62,7 @@ export class Bot {
     if (!h.alive) return it;
     if (h.points > 0) this._spend();
     if ((this.t -= dt) <= 0) {
-      this.t = (h.team === 1 ? DIFFICULTY.react[settings.stars - 1] : DIFFICULTY.allyReact) * rand(0.8, 1.2);
+      this.t = this.d.react * rand(0.8, 1.2);
       this._decide(ctx);
     }
     this._steer(dt, ctx);
@@ -93,7 +95,7 @@ export class Bot {
     for (const e of ctx.heroes) {
       if (e.team === h.team || !e.alive || e.hidden || e.untarget) continue;
       const d = Math.hypot(e.x - h.x, e.z - h.z) - e.radius;
-      if (d > BOT.aggro) continue;
+      if (d > this.d.aggro) continue;
       let sc = 60 * (1 - e.hp / e.maxHp) - d * 2;
       if (e.aggroAge < 2) sc += 30;
       if (role === 'assassin' && (e.def.role === 'blaster' || e.def.role === 'shooter' || e.def.role === 'support')) sc += 40;
@@ -178,7 +180,7 @@ export class Bot {
 
     let foe = this._foe(ctx), crowd = 0;
     if (foe) for (const e of ctx.heroes) if (e.team !== h.team && e.alive && !e.hidden && Math.hypot(e.x - h.x, e.z - h.z) < 8) crowd++;
-    if (!this.retreat && (frac < BOT.retreatHp || (frac < 0.5 && crowd >= 2))) this.retreat = true;
+    if (!this.retreat && (frac < this.d.retreat || (frac < this.d.crowd && crowd >= this.d.crowdN))) this.retreat = true;
     else if (!this.retreat && !foe && this._wantsShop(ctx)) { this.retreat = true; this.shopping = true; } // enough gold: walk home and buy
     else if (this.retreat && (this.shopping ? atBase(h) && frac >= 0.6 : frac >= BOT.returnHp)) { this.retreat = false; this.shopping = false; this.shopAt = ctx.time + 40; }
 
@@ -187,7 +189,7 @@ export class Bot {
       g.x = p.x; g.z = p.z; g.keep = 0.4;
       this.state = 'retreat';
       if (foe && Math.hypot(foe.x - h.x, foe.z - h.z) < 5) { // escape-capable skill when someone is on our heels
-        for (let i = 1; i >= 0; i--) if (h.ranks[i] > 0 && h.cds[i] <= 0 && h.rs[i].kind !== 'nova') { it.cast[i] = true; break; }
+        for (let i = 1; i >= 0; i--) if (h.ranks[i] > 0 && h.cds[i] <= 0 && h.rs[i].kind !== 'nova') { it.cast[i] = Math.random() < this.d.cast; break; }
       }
       return;
     }
@@ -202,7 +204,7 @@ export class Bot {
     const ratio = foe ? this._power(ctx, foe) : 0;
     const boss = foe ? null : this._boss(ctx);
     let skillFoe = foe;
-    if (foe && ratio >= BOT.powerRatio) { // FIGHT
+    if (foe && ratio >= this.d.power) { // FIGHT
       this.state = 'fight';
       this.focus = foe;
       g.follow = foe;
@@ -239,7 +241,7 @@ export class Bot {
       }
     }
 
-    for (let i = 0; i < 3; i++) if (h.ranks[i] > 0 && h.cds[i] <= 0 && !it.cast[i] && this._want(ctx, i, skillFoe)) it.cast[i] = true;
+    for (let i = 0; i < 3; i++) if (h.ranks[i] > 0 && h.cds[i] <= 0 && !it.cast[i] && this._want(ctx, i, skillFoe) && Math.random() < this.d.cast) it.cast[i] = true;
   }
 
   // The next item is affordable and the bot has not shopped lately.

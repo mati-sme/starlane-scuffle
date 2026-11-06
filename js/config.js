@@ -72,10 +72,15 @@ export const HERO = {
   baseHeal: { rate: 0.2 },
 };
 
-// Bots: reaction time (s) and damage multiplier per difficulty star (1-3). Only Gloom's bots scale; Sunny allies stay at 0.4 s / 1.0x.
-export const DIFFICULTY = { react: [0.5, 0.4, 0.3], dmg: [0.92, 1, 1.1], allyReact: 0.4 };
-export const settings = { stars: 1 };
-export const BOT = { aggro: 10, retreatHp: 0.35, returnHp: 0.9, powerRatio: 0.8, groupDeficit: 2 };
+// Bot difficulty, per bot (see game/setup.js): react = seconds between decisions, dmg = outgoing damage, cast = chance a wanted skill is
+// actually cast, retreat / crowd = HP fraction that sends it home (alone / when crowdN+ foes are close), aggro = how far it notices heroes,
+// power = HP ratio it wants before it fights. Mid is the classic feel; Easy is gentle enough for a 4-6 year old.
+export const DIFFICULTY = {
+  easy: { name: 'Easy', react: 1.2, dmg: 0.7, cast: 0.3, retreat: 0.55, crowd: 0.8, crowdN: 1, aggro: 6.5, power: 1.5 },
+  mid: { name: 'Mid', react: 0.45, dmg: 1, cast: 1, retreat: 0.35, crowd: 0.5, crowdN: 2, aggro: 10, power: 0.8 },
+  hard: { name: 'Hard', react: 0.3, dmg: 1.1, cast: 1, retreat: 0.3, crowd: 0.45, crowdN: 2, aggro: 11, power: 0.7 },
+};
+export const BOT = { returnHp: 0.9, groupDeficit: 2 };
 
 // Tiers per lane: outer -> inner -> inhib (each needs the one before it down), then two guardians and the Nexus. 3 x 3 lane towers + 2 guardians per team.
 export const TIERS = ['outer', 'inner', 'inhib'];

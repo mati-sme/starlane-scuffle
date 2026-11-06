@@ -14,6 +14,7 @@ const BAN_MS = 20_000;            // draft: ban stage, then pick stage (timers o
 const PICK_MS = 30_000;
 const SPELLS = ['flash', 'barrier', 'ignite']; // summoner spells (js/game/spells.js); everyone carries two, default Flash + Barrier
 const DEFAULT_SPELLS = ['flash', 'barrier'];
+const LEVELS = ['easy', 'mid', 'hard']; // match setup (js/game/setup.js): { size: [sunny, gloom] 1-5, side, diff: [[5 levels], [5 levels]] }
 const STAGE_GRACE_MS = 1000;      // clients auto-ban at the buzzer; a `stage` skip is honoured this long after it
 
 export class GameRoom extends DurableObject {
@@ -63,6 +64,7 @@ export class GameRoom extends DurableObject {
     switch (m.t) {
       case 'pick': return this._pick(ws, p, m);
       case 'stage': return this._stage(p);
+      case 'setup': return this._setup(ws, p, m);
       case 'start': return this._start(ws, p, m);
       case 'leave': return this._leave(p);
       case 'abort': return this._abort(p); // host reloaded mid-match and lost the sim: back to the lobby
@@ -177,10 +179,23 @@ export class GameRoom extends DurableObject {
     this._lobby();
   }
 
+  // Host only: the match setup (team sizes, bot levels). Stored as sent after cleaning; a room that never gets one plays 5v5 Mid.
+  async _setup(ws, p, m) {
+    if (p.slot !== 0) return this._err(ws, 'nothost', 'Only the host can change the match setup');
+    if (this.s.phase !== 'lobby') return;
+    const setup = cleanSetup(m.setup);
+    if (!setup) return;
+    this.s.setup = setup;
+    await this._save();
+    this._lobby();
+  }
+
   async _start(ws, p, m) {
     const s = this.s;
     if (p.slot !== 0) return this._err(ws, 'nothost', 'Only the host can start');
     if (s.phase !== 'lobby') return;
+    const setup = cleanSetup(m.setup);
+    if (setup) s.setup = setup;
     if (s.players.length < 2 && !m.practice) return this._err(ws, 'alone', 'Waiting for a friend (or start Practice)');
     if (s.players.some((q) => !q.hero)) return this._err(ws, 'nohero', 'Everyone must pick a champion');
     s.phase = 'play';
@@ -217,13 +232,13 @@ export class GameRoom extends DurableObject {
     await this._schedule();
   }
 
-  _startMsg() { return { seed: this.s.seed, bans: [...this._bans()].sort(), picks: this.s.players.map((p) => ({ slot: p.slot, team: p.team, hero: p.hero, name: p.name, spells: p.spells ?? DEFAULT_SPELLS })) }; }
+  _startMsg() { return { seed: this.s.seed, bans: [...this._bans()].sort(), picks: this.s.players.map((p) => ({ slot: p.slot, team: p.team, hero: p.hero, name: p.name, spells: p.spells ?? DEFAULT_SPELLS })), ...(this.s.setup ? { setup: this.s.setup } : {}) }; }
 
   _lobby() {
     const s = this.s, live = this._live();
     if (!s) return;
     const left = s.stageEnd && s.players.length === 2 ? Math.max(0, Math.ceil((s.stageEnd - Date.now()) / 1000)) : 0;
-    const msg = { t: 'lobby', code: s.code, phase: s.phase, stage: s.stage, left, bans: [...this._bans()], players: s.players.map((p) => ({ slot: p.slot, name: p.name, team: p.team, hero: p.hero, ban: p.ban, spells: p.spells ?? DEFAULT_SPELLS, connected: live.has(p.token) })) };
+    const msg = { t: 'lobby', code: s.code, phase: s.phase, stage: s.stage, left, bans: [...this._bans()], players: s.players.map((p) => ({ slot: p.slot, name: p.name, team: p.team, hero: p.hero, ban: p.ban, spells: p.spells ?? DEFAULT_SPELLS, connected: live.has(p.token) })), ...(s.setup ? { setup: s.setup } : {}) };
     this._broadcast(msg);
   }
 
@@ -278,3 +293,14 @@ export class GameRoom extends DurableObject {
 }
 
 const clean = (v, n) => String(v ?? '').replace(/[^\w \-.]/g, '').trim().slice(0, n);
+
+// -> a well-formed setup, or null when `raw` is not one (the room then keeps what it had).
+function cleanSetup(raw) {
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.size) || !Array.isArray(raw.diff)) return null;
+  const n = (v) => Math.min(5, Math.max(1, Math.round(+v) || 5));
+  return {
+    size: [n(raw.size[0]), n(raw.size[1])],
+    side: raw.side === 1 ? 1 : 0,
+    diff: [0, 1].map((t) => Array.from({ length: 5 }, (_, i) => (LEVELS.includes(raw.diff[t]?.[i]) ? raw.diff[t][i] : 'mid'))),
+  };
+}

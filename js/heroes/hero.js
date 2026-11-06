@@ -1,6 +1,6 @@
 // Hero base: stats, XP / levels, skill ranks, movement, auto-aim basic attack, skills, status effects, respawn and animation.
 import * as THREE from 'three';
-import { PAL, CAM, MAP, MATCH, HERO, GOLD, DIFFICULTY, ARENA, settings, GROUND, TEAM } from '../config.js';
+import { PAL, CAM, MAP, MATCH, HERO, GOLD, ARENA, GROUND, TEAM } from '../config.js';
 import { padPos, fountain, pushOutCover } from '../world/arena.js';
 import { clamp, lerp, damp, angleLerp } from '../core/math.js';
 import { makeShadow } from '../render/toon.js';
@@ -138,7 +138,7 @@ export class Hero {
     const L = this.level - 1;
     const g = gearStats(this.items, this.gear);
     this.dmgMul = 1 + HERO.dmgPerLevel * L;
-    this.outMul = this.dmgMul * (1 + g.ad) * (this.team === 1 && this.brain ? DIFFICULTY.dmg[settings.stars - 1] : 1);
+    this.outMul = this.dmgMul * (1 + g.ad) * (this.brain?.d?.dmg ?? 1);
     this.armor = g.armor;
     this.basicRange = this.basic.range + (this.nextBasic?.range ?? 0);
     this.rs = this.ab.map((a, i) => rankStats(a, this.ranks[i]));

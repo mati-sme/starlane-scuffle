@@ -56,7 +56,7 @@ async function open(name) {
 {
   const { ctx, page } = await open('offline');
   await page.goto(BASE + '?gfx=low', { waitUntil: 'load', timeout: 90000 });
-  await tap(page, 'play-btn');
+  await tap(page, 'play-btn'); await page.locator('[data-testid="setup-next"]').click({ force: true, timeout: 4000 }).catch(() => {});
   await tid(page, 'draft-title').waitFor();
   check('ban phase label', await has(page, 'draft-title', 'Ban — tap to ban'));
   check('ban help text', await has(page, 'draft-help', 'First ban one champion'));
@@ -91,7 +91,7 @@ async function open(name) {
 {
   const { ctx, page } = await open('timer');
   await page.goto(BASE + '?gfx=low', { waitUntil: 'load', timeout: 90000 });
-  await tap(page, 'play-btn');
+  await tap(page, 'play-btn'); await page.locator('[data-testid="setup-next"]').click({ force: true, timeout: 4000 }).catch(() => {});
   await tid(page, 'draft-timer').waitFor();
   const t0 = parseInt(await text(page, 'draft-timer'), 10);
   const down = await page.waitForFunction((n) => parseInt(document.querySelector('[data-testid="draft-timer"]').textContent, 10) < n, t0, { timeout: 15000 }).then(() => true, () => false);

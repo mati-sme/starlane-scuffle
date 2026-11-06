@@ -10,6 +10,7 @@ import { Hero, screenToWorld } from '../heroes/hero.js';
 import { HEROES, ROSTER } from '../heroes/index.js';
 import { addBuff, heal, sim, tickStatus, tickHitFx, poof } from './combat.js';
 import { composeTeams } from './compose.js';
+import { cleanSetup, defaultSetup } from './setup.js';
 import { inBrush } from '../world/arena.js';
 import { ARENA } from '../config.js';
 import { Camps } from '../world/camps.js';
@@ -91,32 +92,39 @@ export class Match {
     this.setHero(Object.hasOwn(HEROES, id) ? id : ROSTER[0], q.get('bots')?.split(','));
   }
 
-  // The player takes `id` on Sunny with 4 bot allies against 5 Gloom bots (see compose.js); `bots` (?bots=a,b,...) forces ids; `banned` ids never show up.
-  setHero(id, bots, banned = [], spells = DEFAULT_SPELLS) {
-    this.role = 'solo'; this.myTeam = 0; this.peerHero = null; this.outbox = null; sim.guest = false;
+  // The player takes `id` on `setup.side` (Sunny by default) with bot allies against bot foes (see compose.js / setup.js); `bots` (?bots=a,b,...)
+  // forces ids; `banned` ids never show up.
+  setHero(id, bots, banned = [], spells = DEFAULT_SPELLS, setup = defaultSetup()) {
+    setup = cleanSetup(setup);
+    this.role = 'solo'; this.myTeam = setup.side; this.peerHero = null; this.outbox = null; sim.guest = false;
     for (const h of this.heroes ?? []) h.dispose();
-    const { blue, red } = composeTeams(id, bots ?? [], banned), bot = (hero) => new Bot(hero);
-    const roster = [...blue.map((k, i) => [k, 0, i, i ? bot : null]), ...red.map((k, i) => [k, 1, i, bot])];
+    const { blue, red } = composeTeams(id, bots ?? [], banned, setup.size, setup.side);
+    const brain = (team, i) => (team === setup.side && i === 0 ? null : (hero) => new Bot(hero, setup.diff[team][i]));
+    const roster = [...blue.map((k, i) => [k, 0, i, brain(0, i)]), ...red.map((k, i) => [k, 1, i, brain(1, i)])];
     this.heroes = roster.map(([k, team, slot, brain]) => new Hero(this.scene, HEROES[k], team, slot, brain));
-    this.hero = this.heroes[0];
+    this.hero = this.heroAt(setup.side, 0);
     this.hero.spells = [...spells];
     this.heroId = id;
     assignLanes(this.heroes);
     this.reset();
   }
 
-  // Online 5v5: blue / red are champion ids (see composeOnline); me / peer = { team, idx } for the two human slots.
+  // The hero at index `idx` of `team` (team sizes vary, so never compute a flat index).
+  heroAt(team, idx) { return this.heroes.find((h) => h.team === team && h.slot === idx) ?? null; }
+
+  // Online: blue / red are champion ids (see composeOnline); me / peer = { team, idx } for the two human slots; setup gives bot levels.
   // role 'host' runs everything, 'guest' mirrors the host (net/snapshot.js).
-  setOnline({ blue, red, me, peer = null }, role) {
+  setOnline({ blue, red, me, peer = null, setup = defaultSetup() }, role) {
+    setup = cleanSetup(setup);
     for (const h of this.heroes ?? []) h.dispose();
     this.role = role; this.myTeam = me.team; this.outbox = role === 'guest' ? { x: 0, z: 0, attack: false, cast: [false, false, false], spell: [false, false], spend: [false, false, false], aim: [null, null, null], pref: 0, recall: false } : null;
     sim.guest = role === 'guest';
     const human = (team, i) => (me.team === team && me.idx === i) || (peer && peer.team === team && peer.idx === i);
-    const bot = (hero) => new Bot(hero);
-    const roster = [...blue.map((k, i) => [k, 0, i, human(0, i) ? null : bot]), ...red.map((k, i) => [k, 1, i, human(1, i) ? null : bot])];
+    const brain = (team, i) => (human(team, i) ? null : (hero) => new Bot(hero, setup.diff[team][i]));
+    const roster = [...blue.map((k, i) => [k, 0, i, brain(0, i)]), ...red.map((k, i) => [k, 1, i, brain(1, i)])];
     this.heroes = roster.map(([k, team, slot, brain]) => new Hero(this.scene, HEROES[k], team, slot, brain));
-    this.hero = this.heroes[me.team * 5 + me.idx];
-    this.peerHero = peer ? this.heroes[peer.team * 5 + peer.idx] : null;
+    this.hero = this.heroAt(me.team, me.idx);
+    this.peerHero = peer ? this.heroAt(peer.team, peer.idx) : null;
     this.hero.spells = [...(me.spells ?? DEFAULT_SPELLS)];
     if (this.peerHero) this.peerHero.spells = [...(peer.spells ?? DEFAULT_SPELLS)];
     this.heroId = this.hero.id;

@@ -22,6 +22,7 @@ import { Session } from './net/session.js';
 import { T, randomCode, cleanCode, shareLink } from './net/protocol.js';
 import { composeOnline, seeded } from './game/compose.js';
 import { DEFAULT_SPELLS, cleanSpells } from './game/spells.js';
+import { cleanSetup, defaultSetup } from './game/setup.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -53,6 +54,7 @@ let state = 'title'; // title | select | online | lobby | match | paused | resul
 let t = 0;
 let resultTimer = 0;
 let draftBans = []; // offline: champions banned this draft
+let setup = defaultSetup(); // offline match setup (team sizes, side, bot levels); kept between matches
 const BAN_SECS = 20, PICK_SECS = 30;
 const pickOne = (ids) => ids[(Math.random() * ids.length) | 0];
 let picked = save.get('hero', ROSTER[0]);
@@ -93,7 +95,7 @@ function leave(next) {
 function toTitle() {
   leaveRoom();
   leave('title');
-  menus.showTitle(toSelect, () => toOnline());
+  menus.showTitle(toSetup, () => toOnline());
 }
 
 // ---- online ----
@@ -142,7 +144,7 @@ function renderLobby() {
   };
   const draftKey = `${stage}:${bans.length}:${L.players.length}`;
   if (online.draftKey !== draftKey) { online.draftKey = draftKey; online.timedOut = false; }
-  menus.showLobby({ code: online.code, link: shareLink(online.code), me: net.slot, players: L.players, phase: L.phase, stage, bans, banSel: online.banSel, spells: [...(cleanSpells(me?.spells) ?? spells)], deadline: L.left ? online.leftAt + L.left * 1000 : 0, conn: net.status, error: online.error }, {
+  menus.showLobby({ code: online.code, link: shareLink(online.code), me: net.slot, players: L.players, phase: L.phase, stage, bans, banSel: online.banSel, spells: [...(cleanSpells(me?.spells) ?? spells)], deadline: L.left ? online.leftAt + L.left * 1000 : 0, conn: net.status, error: online.error, setup: cleanSetup(L.setup) }, {
     onTeam: (team) => send({ team }),
     onHero: (hero) => { online.error = ''; picked = hero; save.set('hero', hero); send({ hero }); },
     onBanSel: (id) => { online.banSel = id; renderLobby(); },
@@ -160,7 +162,11 @@ function renderLobby() {
         send({ hero: id });
       }
     },
-    onStart: (practice) => { online.error = ''; net.send({ t: T.start, practice }); },
+    onStart: (practice) => { online.error = ''; net.send({ t: T.start, practice, setup: cleanSetup(L.setup) }); },
+    onSetup() { // host only: same screen as offline, then tell the room
+      const draft = cleanSetup(L.setup);
+      menus.showSetup({ setup: draft, online: true, nextLabel: 'DONE', onBack: renderLobby, onNext() { net.send({ t: T.setup, setup: draft }); L.setup = draft; renderLobby(); } });
+    },
     onCopy(btn) {
       const link = shareLink(online.code), done = () => { btn.textContent = 'COPIED!'; };
       if (navigator.clipboard?.writeText) navigator.clipboard.writeText(link).then(done, () => prompt('Copy this link', link));
@@ -178,14 +184,14 @@ function toLobby(error = '') {
   renderLobby();
 }
 
-function startOnline({ seed, picks, bans = [] }, role) {
-  const list = [...picks].sort((a, b) => a.slot - b.slot);
-  const { blue, red } = composeOnline(list.map((p) => ({ team: p.team, hero: p.hero })), seeded(seed), bans);
+function startOnline({ seed, picks, bans = [], setup: raw }, role) {
+  const list = [...picks].sort((a, b) => a.slot - b.slot), setup = cleanSetup(raw); // no setup from an older room = 5v5 Mid
+  const { blue, red } = composeOnline(list.map((p) => ({ team: p.team, hero: p.hero })), seeded(seed), bans, setup.size);
   const at = (p) => ({ team: p.team, idx: list.filter((q) => q.team === p.team && q.slot < p.slot).length, spells: cleanSpells(p.spells) ?? (p.slot === net.slot ? spells : null) });
   const me = list.find((p) => p.slot === net.slot), peer = list.find((p) => p.slot !== net.slot);
   if (!me) return toLobby('Could not join the match');
   clearTimeout(resultTimer);
-  match.setOnline({ blue, red, me: at(me), peer: peer ? at(peer) : null }, role);
+  match.setOnline({ blue, red, me: at(me), peer: peer ? at(peer) : null, setup }, role);
   menus.hideAll();
   rig.follow(match.hero);
   hud.show();
@@ -234,6 +240,12 @@ net.on('welcome', (m) => {
   renderLobby();
 });
 
+// Offline match setup comes first: presets, team sizes, side and a level per bot; then the draft.
+function toSetup() {
+  leave('select');
+  menus.showSetup({ setup, onChange: (s) => { setup = s; }, onNext: toSelect, onBack: toTitle });
+}
+
 // Offline draft: ban one champion, the bots ban two more (one for each side), then pick.
 function toSelect() {
   leave('select');
@@ -258,7 +270,7 @@ function startMatch(id = picked) {
   clearTimeout(resultTimer);
   picked = id;
   save.set('hero', id);
-  match.setHero(id, undefined, draftBans, spells); // fresh heroes + a fresh random bot line-up each match
+  match.setHero(id, undefined, draftBans, spells, setup); // fresh heroes + a fresh random bot line-up each match
   menus.hideAll();
   match.reset();
   rig.follow(match.hero);

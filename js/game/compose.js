@@ -1,4 +1,4 @@
-// 5v5 line-ups. Both teams get one blaster, one shooter and one support where the roster allows: each role's pair
+// Line-ups of 1-5 per side (default 5v5). Both teams get one blaster, one shooter and one support where the roster allows: each role's pair
 // is split between the teams (the player's pick stays on Sunny, Gloom gets its partner). Melee slots are random.
 import { HEROES, ROSTER } from '../heroes/index.js';
 
@@ -6,27 +6,30 @@ const CORE_ROLES = ['blaster', 'shooter', 'support'];
 const MELEE = ['tank', 'bruiser', 'assassin'];
 const shuffle = (a) => [...a].sort(() => Math.random() - 0.5);
 
-// forced: optional ids from ?bots= (up to 4 allies then 5 enemies); the rest is composed. banned: ids nobody may play.
-// Every champion appears once across both teams. -> { blue: [5], red: [5] }
-export function composeTeams(playerId, forced = [], banned = []) {
+// forced: optional ids from ?bots= (the player's allies first, then the enemies); the rest is composed. banned: ids nobody may play.
+// size: players per team [sunny, gloom]; side: the team the player leads. Every champion appears once across both teams.
+// -> { blue, red } (the player is first on their side)
+export function composeTeams(playerId, forced = [], banned = [], size = [5, 5], side = 0) {
   const role = (id) => HEROES[id].role;
   const used = new Set([playerId, ...banned]);
-  const blue = [playerId], red = [];
+  const blue = side === 0 ? [playerId] : [], red = side === 1 ? [playerId] : [];
+  const [own, foe] = side === 0 ? [blue, red] : [red, blue];
   const ok = forced.filter((k) => Object.hasOwn(HEROES, k));
-  const seed = (team, ids) => { for (const k of ids) if (team.length < 5 && !used.has(k)) { team.push(k); used.add(k); } };
-  seed(blue, ok.slice(0, 4));
-  seed(red, ok.slice(4, 9));
+  const seed = (team, ids) => { for (const k of ids) if (team.length < size[team === blue ? 0 : 1] && !used.has(k)) { team.push(k); used.add(k); } };
+  seed(own, ok.slice(0, size[side] - 1));
+  seed(foe, ok.slice(size[side] - 1));
   const take = (team, pool) => {
     const id = shuffle(pool.filter((k) => !used.has(k)))[0];
     if (id) { team.push(id); used.add(id); }
     return !!id;
   };
+  const cap = (team) => size[team === blue ? 0 : 1];
   for (const r of CORE_ROLES) {
-    for (const team of [blue, red]) if (team.length < 5 && !team.some((id) => role(id) === r)) take(team, ROSTER.filter((id) => role(id) === r));
+    for (const team of [blue, red]) if (team.length < cap(team) && !team.some((id) => role(id) === r)) take(team, ROSTER.filter((id) => role(id) === r));
   }
   for (const team of [blue, red]) {
-    while (team.length < 5 && take(team, ROSTER.filter((id) => MELEE.includes(role(id))))) { /* fill melee */ }
-    while (team.length < 5 && take(team, ROSTER)) { /* anything left */ }
+    while (team.length < cap(team) && take(team, ROSTER.filter((id) => MELEE.includes(role(id))))) { /* fill melee */ }
+    while (team.length < cap(team) && take(team, ROSTER)) { /* anything left */ }
   }
   return { blue, red };
 }
@@ -43,9 +46,9 @@ export function seeded(seed) {
   };
 }
 
-// Online 5v5: humans [{ team, hero }] come first on their team, in order; bots fill each side (a blaster, shooter and
-// support first, then melee) with champions not already taken or banned. -> { blue: [5], red: [5] }
-export function composeOnline(picks, rng = Math.random, banned = []) {
+// Online: humans [{ team, hero }] come first on their team, in order; bots fill each side up to size[team] (at least the humans on it;
+// a blaster, shooter and support first, then melee) with champions not already taken or banned. -> { blue, red }
+export function composeOnline(picks, rng = Math.random, banned = [], size = [5, 5]) {
   const shuf = (a) => [...a].sort(() => rng() - 0.5);
   const role = (id) => HEROES[id].role;
   const teams = [[], []], used = new Set(banned);
@@ -55,10 +58,11 @@ export function composeOnline(picks, rng = Math.random, banned = []) {
     if (id) { team.push(id); used.add(id); }
     return !!id;
   };
-  for (const team of teams) {
-    for (const r of CORE_ROLES) if (team.length < 5 && !team.some((id) => role(id) === r)) take(team, ROSTER.filter((id) => role(id) === r));
-    while (team.length < 5 && take(team, ROSTER.filter((id) => MELEE.includes(role(id))))) { /* fill melee */ }
-    while (team.length < 5 && take(team, ROSTER)) { /* anything left */ }
-  }
+  teams.forEach((team, t) => {
+    const n = Math.max(size[t], team.length);
+    for (const r of CORE_ROLES) if (team.length < n && !team.some((id) => role(id) === r)) take(team, ROSTER.filter((id) => role(id) === r));
+    while (team.length < n && take(team, ROSTER.filter((id) => MELEE.includes(role(id))))) { /* fill melee */ }
+    while (team.length < n && take(team, ROSTER)) { /* anything left */ }
+  });
   return { blue: teams[0], red: teams[1] };
 }

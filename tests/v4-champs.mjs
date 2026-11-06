@@ -37,7 +37,7 @@ const tap = (id) => page.locator(`[data-testid="${id}"]`).click({ force: true })
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 await page.goto(BASE + '?gfx=low', { waitUntil: 'load', timeout: 90000 });
-await tap('play-btn');
+await tap('play-btn'); await page.locator('[data-testid="setup-next"]').click({ force: true, timeout: 4000 }).catch(() => {});
 await sleep(500);
 const ids = await page.$$eval('[data-testid^="champion-card-"]', (els) => els.map((e) => e.dataset.id));
 console.log(`cards: ${ids.length}`);
@@ -47,7 +47,7 @@ await page.screenshot({ path: join(OUT, 'champ-select.png') });
 // Fire every skill of the picked champion (maxed) next to an enemy hero; report thrown errors / dead casts.
 async function fire(id, shot) {
   await page.goto(BASE + `?gfx=low&hero=${id}`, { waitUntil: 'load', timeout: 90000 });
-  await tap('play-btn'); await sleep(300);
+  await tap('play-btn'); await page.locator('[data-testid="setup-next"]').click({ force: true, timeout: 4000 }).catch(() => {}); await sleep(300);
   await page.locator(`[data-testid="champion-card-${id}"]`).click({ force: true }); await sleep(200);
   await tap('go-btn');
   await page.waitForFunction(() => window.__starlane.state === 'match', null, { timeout: 20000 });

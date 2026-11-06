@@ -39,7 +39,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const HERO = process.env.HERO ?? 'cinder';
 
 await page.goto(BASE + `?gfx=${GFX}`, { waitUntil: 'load', timeout: 90000 });
-await tap('play-btn'); await sleep(400);
+await tap('play-btn'); await page.locator('[data-testid="setup-next"]').click({ force: true, timeout: 4000 }).catch(() => {}); await sleep(400);
 await page.locator('[data-testid="champion-card-lumen"]').click({ force: true }); await tap('ban-btn'); await sleep(400); // v6 draft: ban first
 await page.locator(`[data-testid="champion-card-${HERO}"]`).click({ force: true }); await sleep(200);
 await tap('go-btn');

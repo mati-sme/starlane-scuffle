@@ -41,7 +41,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const checks = [];
 async function run(id, body) {
   await page.goto(BASE + `?gfx=low&hero=${id}`, { waitUntil: 'load', timeout: 90000 });
-  await tap('play-btn'); await sleep(300);
+  await tap('play-btn'); await page.locator('[data-testid="setup-next"]').click({ force: true, timeout: 4000 }).catch(() => {}); await sleep(300);
   await page.locator(`[data-testid="champion-card-${id}"]`).click({ force: true }); await sleep(200);
   await tap('go-btn');
   await page.waitForFunction(() => window.__starlane.state === 'match', null, { timeout: 20000 });

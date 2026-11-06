@@ -44,7 +44,7 @@ page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
 page.on('console', (m) => { if (m.type() === 'error' && !/favicon|WebSocket|ERR_/.test(m.text())) errors.push(`console: ${m.text().slice(0, 300)}`); });
 
 await page.goto(BASE + `?gfx=${GFX}`, { waitUntil: 'load', timeout: 90000 });
-await tap(page, 'play-btn');
+await tap(page, 'play-btn'); await page.locator('[data-testid="setup-next"]').click({ force: true, timeout: 4000 }).catch(() => {});
 await page.locator('[data-testid="draft-title"]').waitFor();
 const ids = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="champion-card-"]')].map((e) => e.dataset.id));
 await page.locator(`[data-testid="champion-card-${ids[0]}"]`).click({ force: true });
