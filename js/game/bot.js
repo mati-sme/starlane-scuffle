@@ -310,8 +310,8 @@ export class Bot {
   }
 
   // Per-kind rule of thumb for when a skill is worth casting.
-  _want(ctx, i, foe) {
-    const h = this.h, ab = h.rs[i], ult = i === 2, near = (e, r) => e && Math.hypot(e.x - h.x, e.z - h.z) - e.radius <= r;
+  _want(ctx, i, foe, as = null) {
+    const h = this.h, ab = as ?? h.rs[i], ult = i === 2, near = (e, r) => e && Math.hypot(e.x - h.x, e.z - h.z) - e.radius <= r;
     const cluster = (r, rad) => {
       const c = bestCluster(ctx, h.team, h.x, h.z, r, rad);
       return c && (c.hero || c.n >= (ult ? 3 : 2)) ? c : null;
@@ -358,7 +358,7 @@ export class Bot {
         if (ab.healPs) return hurt.length > 0 && !!foe;
         return near(foe, ab.r + 1);
       case 'turret': return near(foe, 9) && !ctx.zones.turrets.some((t) => t.src === h && t.t < t.dur - 2);
-      default: return false;
+      default: return ab.botAs ? this._want(ctx, i, foe, { ...ab, ...ab.botAs, botAs: null }) : false; // new verbs borrow a rule
     }
   }
 

@@ -596,7 +596,7 @@ export class Hero {
     this.spinAng += dt * 22 * this.spin;
     this.lift = this.yOff + airLift(this);
 
-    const m = this.model, mv = this.moveAmt, st = STYLE[m.style] ?? STYLE.base;
+    const m = this.model, mv = this.moveAmt, st = m.gait ?? STYLE[m.style] ?? STYLE.base;
     this.phase += dt * 11 * mv * st.cad;
     const step = Math.abs(Math.sin(this.phase)) * mv;
     const dy = this.dying > 0 ? dyingScale(this) : 1;
@@ -618,6 +618,7 @@ export class Hero {
     m.legs[0].rotation.x = swing;
     m.legs[1].rotation.x = -swing;
     this._pose(m, t, dt, swing);
+    m.update?.(t, dt, mv, this); // per-model live parts (wave 2 bodies)
 
     this.blink -= dt;
     m.eyes.scale.y = this.blink < 0.12 && this.blink > 0 ? 0.1 : 1;

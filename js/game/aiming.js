@@ -4,6 +4,7 @@ const LINE = new Set(['dash', 'bolt', 'hook', 'beam', 'blink', 'turret', 'mark',
 const POINT = new Set(['leap', 'blast', 'rain', 'trap', 'vortex']);
 
 export function aimShape(ab) {
+  if (ab.aimAs) return aimShape({ ...ab, ...ab.aimAs, aimAs: null }); // new verbs borrow an existing preview
   const range = ab.range ?? 6;
   if (ab.kind === 'dash' && ab.chain) return { type: 'self', range: ab.range, radius: ab.range };
   if (ab.kind === 'quake') return ab.rings ? { type: 'self', range: ab.rings * ab.step, radius: ab.rings * ab.step } : { type: 'line', range: 2 + ab.count * ab.gap, width: ab.radius * 2 };
