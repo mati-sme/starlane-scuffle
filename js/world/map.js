@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { PAL, TEAM, MAP, ARENA } from '../config.js';
-import { COVER, BRUSH, POCKETS, CAMP_SPOTS, inCover, inBrush, fountain } from './arena.js';
+import { COVER, BRUSH, POCKETS, CAMP_SPOTS, inCover, inBrush, fountain, structSpot } from './arena.js';
 import { rand, clamp } from '../core/math.js';
 import { toonMat, toonMesh, mergeParts, terrainMat } from '../render/toon.js';
 import { radialTexture, grassDetail, paverDetail, rockDetail } from '../render/atlas.js';
@@ -18,7 +18,7 @@ const G = {
   stone: 0x6E685D, stoneDark: 0x4C4740, curb: 0x3E3A35, bed: 0x5C4D3A, rock: 0x8A8478, rockDark: 0x3E3B38,
 };
 let TEX;
-const tex = () => (TEX ??= { grass: grassDetail(), paver: paverDetail(), rock: rockDetail() });
+const tex = () => (TEX ??= { grass: grassDetail(HI), paver: paverDetail(), rock: rockDetail() });
 // Low-poly rock: subdivided icosahedron with hashed radial jitter, flat-shaded facets.
 function rockGeo(seedK, detail = 1) {
   const g = new THREE.IcosahedronGeometry(1, detail), pos = g.attributes.position;
@@ -48,6 +48,30 @@ function vnoise(x, z) {
   return a + (b - a) * ux + (c - a) * uz + (a - b - c + d) * ux * uz;
 }
 const fbm = (x, z) => vnoise(x, z) * 0.55 + vnoise(x * 2.1 + 7, z * 2.1 + 3) * 0.3 + vnoise(x * 4.3 + 1, z * 4.3 + 9) * 0.15;
+const ss = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }; // works for a > b too (falling edge)
+
+// Gentle relief (visual only, gameplay stays on y = 0): low berms shouldering each lane, swells banked against cover walls
+// and rolling mounds past the hero bounds at the island rim. Lanes, the river, pits, bases and brush stay flat for decals.
+function heightAt(x, z) {
+  const { w, d, r } = ISLAND, qx = Math.abs(x) - (w / 2 - r), qz = Math.abs(z) - (d / 2 - r);
+  const edge = r - Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) - Math.min(Math.max(qx, qz), 0); // inside distance to the rim
+  let h = ss(9, 4, edge) * ss(0.4, 2.5, edge) * (0.5 + fbm(x * 0.08, z * 0.08)) * 1.5;
+  let ld = Infinity;
+  for (const lane of ARENA.lanes) for (let j = 1; j < lane.length; j++) ld = Math.min(ld, segDist(x, z, lane[j - 1], lane[j]));
+  ld -= MAP.laneW / 2;
+  h += Math.sin(clamp((ld - 1.6) / 3.2, 0, 1) * Math.PI) * 0.2 * (0.6 + fbm(x * 0.15 + 5, z * 0.15) * 0.8);
+  let cd = Infinity;
+  for (const b of COVER) cd = Math.min(cd, Math.hypot(Math.max(b.x0 - x, 0, x - b.x1), Math.max(b.z0 - z, 0, z - b.z1)));
+  h += 0.3 * ss(1.3, 0, cd);
+  let keep = ss(5.5, 7.5, Math.abs(x)) * ss(1.6, 2.2, ld);
+  for (const [px, pz] of ARENA.pits) keep *= ss(8, 10.5, Math.hypot(x - px, z - pz));
+  for (const t of [0, 1]) {
+    const f = fountain(t), c = structSpot(t, 'core');
+    keep *= ss(13, 16, Math.hypot(x - f.x, z - f.z)) * ss(7, 9.5, Math.hypot(x - c.x, z - c.z));
+  }
+  for (const b of BRUSH) keep *= ss(0.4, 1.6, Math.hypot(Math.max(b.x0 - x, 0, x - b.x1), Math.max(b.z0 - z, 0, z - b.z1)));
+  return h * keep;
+}
 
 function buildSky(group) {
   const sky = new THREE.Mesh(
@@ -139,17 +163,18 @@ function buildIsland(group) {
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     return geo;
   });
-  const island = new THREE.Mesh(mergeGeometries(geos), terrainMat(tex().rock, 0.09, true));
+  const island = new THREE.Mesh(mergeGeometries(geos), terrainMat(tex().rock, 0.09, true, { bump: 0.3 }));
   island.receiveShadow = true;
   group.add(island);
 }
 
 // Grass field over the island top: indexed grid with fbm tint, worn dirt patches, darker jungle pockets and team base tints.
 function buildGrass(group) {
-  const { w, d, r } = ISLAND, step = 2, nx = w / step, nz = d / step;
+  const { w, d, r } = ISLAND, step = HI ? 1.4 : 2, nx = Math.round(w / step), nz = Math.round(d / step);
   const geo = new THREE.PlaneGeometry(w, d, nx, nz).rotateX(-Math.PI / 2).translate(0, 0.006, 0);
   geo.deleteAttribute('uv');
   const pos = geo.attributes.position, col = new Float32Array(pos.count * 3);
+  const cool = new THREE.Color(0x1E4A2E), olive = new THREE.Color(0x8A8A3C);
   const gl = new THREE.Color(G.grassLight), gd = new THREE.Color(G.grassDark), dry = new THREE.Color(G.grassDry), dirt = new THREE.Color(G.dirt), jungle = new THREE.Color(G.jungle), tint = new THREE.Color();
   const bases = [0, 1].map((team) => { const f = fountain(team); return { x: f.x + (team ? -6 : 6), col: new THREE.Color(TEAM[team].deep) }; });
   const inside = (x, z) => Math.hypot(Math.max(Math.abs(x) - (w / 2 - r), 0), Math.max(Math.abs(z) - (d / 2 - r), 0)) <= r;
@@ -163,6 +188,16 @@ function buildGrass(group) {
       _c.lerp(jungle, clamp(1 - e / 3, 0, 1) * 0.55);
     }
     for (const b of bases) _c.lerp(tint.copy(b.col), clamp(1 - (Math.hypot(x - b.x, z) - 12) / 6, 0, 1) * 0.2);
+    const y = heightAt(x, z); // sunlit crests a touch drier and brighter, hollows lusher
+    pos.setY(i, 0.006 + y);
+    _c.lerp(dry, clamp(y * 0.35, 0, 0.25)).multiplyScalar(0.93 + clamp(y, 0, 1) * 0.12);
+    // Broad meadow tone shifts (cool deep green / warm olive) and contact darkening where the grass meets lanes and cover.
+    const m = fbm(x * 0.022 - 31, z * 0.022 + 17);
+    _c.lerp(cool, clamp((0.45 - m) * 2.2, 0, 0.35)).lerp(olive, clamp((m - 0.58) * 2.5, 0, 0.3));
+    let ld = Infinity;
+    for (const lane of ARENA.lanes) for (let j = 1; j < lane.length; j++) ld = Math.min(ld, segDist(x, z, lane[j - 1], lane[j]));
+    const cd = COVER.reduce((d, b) => Math.min(d, Math.hypot(Math.max(b.x0 - x, 0, x - b.x1), Math.max(b.z0 - z, 0, z - b.z1))), Infinity);
+    _c.multiplyScalar(1 - 0.22 * ss(2.4, 0, ld - MAP.laneW / 2 - 1.1) - 0.25 * ss(1.8, 0, cd));
     col.set([_c.r, _c.g, _c.b], i * 3);
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
@@ -173,7 +208,7 @@ function buildGrass(group) {
   }
   geo.setIndex(keep);
   geo.computeVertexNormals();
-  const grass = new THREE.Mesh(geo, terrainMat(tex().grass, 0.2));
+  const grass = new THREE.Mesh(geo, terrainMat(tex().grass, 0.2, false, { bump: 0.06 }));
   grass.receiveShadow = true;
   group.add(grass);
 }
@@ -245,7 +280,7 @@ function buildGround(group) {
     for (const [x, z] of lane) flat(new THREE.CircleGeometry(W / 2 + 0.4, 14), 0.027, G.curb, x, z), flat(new THREE.CircleGeometry(W / 2, 14), 0.028, G.stone, x, z); // under the plates: only fills the wedge gaps at bends
   }
   for (const b of BRUSH) flat(new THREE.CircleGeometry(1, 20).scale(b.w / 2 + 0.6, b.d / 2 + 0.6, 1), 0.012, G.jungle, b.cx, b.cz);
-  const ground = new THREE.Mesh(mergeGeometries(flats), terrainMat(tex().paver, 0.15));
+  const ground = new THREE.Mesh(mergeGeometries(flats), terrainMat(tex().paver, 0.15, false, { bump: 0.06 }));
   ground.receiveShadow = true;
   group.add(ground);
 
@@ -312,7 +347,7 @@ function bushGeo() {
 function buildCover(group) {
   const rocks = [], crates = [];
   COVER.forEach((b, i) => coverParts(b, i, rocks, crates));
-  const rockMesh = new THREE.Mesh(mergeParts(rocks), terrainMat(tex().rock, 0.45, true, { finish: true }));
+  const rockMesh = new THREE.Mesh(mergeParts(rocks), terrainMat(tex().rock, 0.45, true, { finish: true, bump: 0.12 }));
   rockMesh.castShadow = rockMesh.receiveShadow = true;
   group.add(rockMesh, toonMesh(mergeParts(crates), toonMat({ vertexColors: true, finish: true }), 0));
 
@@ -327,19 +362,41 @@ function buildCover(group) {
   group.add(bushes);
 
   // Grass tufts scattered over the open field (not on lanes / cover): breaks up the flat ground at camera height.
-  const tuftGeo = mergeParts([0, 1, 2, 3, 4].map((k) => ({
-    g: new THREE.ConeGeometry(0.05, 0.5, 3), c: k % 2 ? 0x6E9E44 : 0x4E8434, p: [Math.cos(k * 1.3) * 0.12, 0.2, Math.sin(k * 1.3) * 0.12], r: [Math.sin(k * 2.1) * 0.4, 0, Math.cos(k * 1.7) * 0.4], f: 'cloth',
-  })));
-  const tufts = [];
-  for (let k = 0; k < 900 && tufts.length < 520; k++) {
-    const x = rand(-ISLAND.w / 2 + 6, ISLAND.w / 2 - 6), z = rand(-ISLAND.d / 2 + 6, ISLAND.d / 2 - 6);
+  // Each tuft: seven tapered blades leaning out from the root, dark at the base cluster, sunlit tips outside.
+  const tuftGeo = mergeParts([0, 1, 2, 3, 4, 5, 6].map((k) => {
+    const a = k * 2.4, lean = 0.25 + (k % 3) * 0.15;
+    return { g: new THREE.ConeGeometry(0.045, 0.42 + (k % 3) * 0.12, 3).translate(0, 0.2, 0), c: [0x3E6E2C, 0x6E9E44, 0x4E8434, 0x86B04E][k % 4], p: [Math.cos(a) * 0.08, 0, Math.sin(a) * 0.08], r: [Math.sin(a) * lean, 0, -Math.cos(a) * lean], f: 'cloth' };
+  }));
+  const tufts = [], want = HI ? 1700 : 520;
+  for (let k = 0; k < want * 3 && tufts.length < want; k++) {
+    const x = rand(-ISLAND.w / 2 + 4, ISLAND.w / 2 - 4), z = rand(-ISLAND.d / 2 + 4, ISLAND.d / 2 - 4);
     if (inCover(x, z) || ARENA.lanes.some((lane) => lane.some(([lx, lz], j) => j && segDist(x, z, lane[j - 1], [lx, lz]) < MAP.laneW / 2 + 1.5))) continue;
     if (Math.abs(x) < 6 || fountainNear(x, z)) continue;
     tufts.push([x, z]);
   }
   const tm = instanced(tuftGeo, toonMat({ vertexColors: true, finish: true, rim: 0.3 }), tufts.length);
-  tufts.forEach(([x, z], i) => { place(tm, i, x, 0, z, rand(0, 6), rand(0.8, 1.6)); tm.setColorAt(i, _c.setScalar(rand(0.8, 1.15))); });
+  tufts.forEach(([x, z], i) => { place(tm, i, x, heightAt(x, z), z, rand(0, 6), rand(0.8, 1.7)); tm.setColorAt(i, _c.setScalar(rand(0.8, 1.15))); });
   group.add(tm);
+
+  // Pebbles and small stones on the trodden lane shoulders and scattered through the grass.
+  const pebbles = [], np = HI ? 520 : 180;
+  for (let k = 0; k < np * 4 && pebbles.length < np; k++) {
+    const x = rand(-ISLAND.w / 2 + 6, ISLAND.w / 2 - 6), z = rand(-ISLAND.d / 2 + 6, ISLAND.d / 2 - 6);
+    let ld = Infinity;
+    for (const lane of ARENA.lanes) for (let j = 1; j < lane.length; j++) ld = Math.min(ld, segDist(x, z, lane[j - 1], lane[j]));
+    ld -= MAP.laneW / 2;
+    if (ld < 0.25 || (ld > 3 && Math.random() < 0.7) || inCover(x, z) || Math.abs(x) < 5.5 || fountainNear(x, z)) continue;
+    if (ARENA.pits.some(([px, pz]) => Math.hypot(x - px, z - pz) < 7.5)) continue;
+    pebbles.push([x, z]);
+  }
+  const pm = instanced(rockGeo(17, 0), terrainMat(tex().rock, 0.6, true, { vertexColors: false, color: G.rock, finish: false }), pebbles.length);
+  pm.receiveShadow = true;
+  pebbles.forEach(([x, z], i) => {
+    const sz = rand(0.08, 0.3) * (Math.random() < 0.12 ? 2.2 : 1);
+    place(pm, i, x, heightAt(x, z) + sz * 0.15, z, rand(0, 6), sz, sz * rand(0.45, 0.8), sz * rand(0.7, 1.2));
+    pm.setColorAt(i, _c.setScalar(rand(0.7, 1.15)));
+  });
+  group.add(pm);
 }
 const segDist = (x, z, [ax, az], [bx, bz]) => {
   const dx = bx - ax, dz = bz - az, t = clamp(((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1), 0, 1);
@@ -368,7 +425,8 @@ function buildProps(group) {
   for (let i = 0; i < N; i++) { // along the north / south rim and behind each base
     const rim = i < 48, sx = i % 2 ? 1 : -1;
     const m = i % 2 ? trees : pines, j = i >> 1;
-    place(m, j, rim ? rand(-90, 90) : sx * rand(88, 94), 0, rim ? sx * rand(47, 56) : rand(-40, 40), rand(0, 6), rand(1, 1.6));
+    const x = rim ? rand(-90, 90) : sx * rand(88, 94), z = rim ? sx * rand(47, 56) : rand(-40, 40);
+    place(m, j, x, heightAt(x, z) - 0.1, z, rand(0, 6), rand(1, 1.6));
     m.setColorAt(j, _c.setScalar(rand(0.85, 1.15)));
   }
   group.add(trees, pines);
@@ -387,8 +445,8 @@ function buildProps(group) {
       fn(i, x, z);
     }
   };
-  scatter(shrooms, 40, (i, x, z) => { place(shrooms, i, x, 0, z, rand(0, 6), rand(0.8, 1.6)); shrooms.setColorAt(i, _c.setScalar(1)); });
-  scatter(crystals, 24, (i, x, z) => { place(crystals, i, x, 0.6, z, rand(0, 6), rand(0.7, 1.6)); crystals.setColorAt(i, _c.set(tints[i % tints.length])); });
+  scatter(shrooms, 40, (i, x, z) => { place(shrooms, i, x, heightAt(x, z), z, rand(0, 6), rand(0.8, 1.6)); shrooms.setColorAt(i, _c.setScalar(1)); });
+  scatter(crystals, 24, (i, x, z) => { place(crystals, i, x, 0.6 + heightAt(x, z), z, rand(0, 6), rand(0.7, 1.6)); crystals.setColorAt(i, _c.set(tints[i % tints.length])); });
   group.add(shrooms, crystals);
 
   // Floating rocks drift and spin around the island.
@@ -460,7 +518,7 @@ function buildDetail(group) {
     ...[[0, 0], [0.35, 0.2], [-0.25, 0.3]].map(([x, z]) => ({ g: new THREE.CylinderGeometry(0.02, 0.03, 0.3, 3), c: 0x8AB860, p: [x, 0.14, z], f: 'cloth' }))]);
   const fl = spots(n(260), 8.5), flowers = instanced(flowerGeo, mat, fl.length);
   const petals = [0xFF8FB8, 0xFFE070, 0xF4F1FF, 0xB89CFF, 0xFF9E5E, 0x8FD8FF];
-  fl.forEach(([x, z], i) => { place(flowers, i, x, 0, z, rand(0, 6), rand(0.9, 1.5)); flowers.setColorAt(i, _c.set(petals[i % petals.length])); });
+  fl.forEach(([x, z], i) => { place(flowers, i, x, heightAt(x, z), z, rand(0, 6), rand(0.9, 1.5)); flowers.setColorAt(i, _c.set(petals[i % petals.length])); });
 
   // Ferns: arched fronds radiating from a root.
   const fernGeo = mergeParts(Array.from({ length: 7 }, (_, k) => {
@@ -468,7 +526,7 @@ function buildDetail(group) {
     return { g: new THREE.ConeGeometry(0.16, 1.1, 3).translate(0, 0.55, 0), c: k % 2 ? 0x3E7A36 : 0x4E8E3E, p: [Math.cos(a) * 0.05, 0, Math.sin(a) * 0.05], s: [1, 1, 0.35], r: [Math.sin(a) * 1.0, 0, -Math.cos(a) * 1.0], f: 'cloth' };
   }));
   const fe = spots(n(150), 8.5), ferns = instanced(fernGeo, mat, fe.length);
-  fe.forEach(([x, z], i) => { place(ferns, i, x, 0, z, rand(0, 6), rand(0.8, 1.4)); ferns.setColorAt(i, _c.setScalar(rand(0.8, 1.15))); });
+  fe.forEach(([x, z], i) => { place(ferns, i, x, heightAt(x, z), z, rand(0, 6), rand(0.8, 1.4)); ferns.setColorAt(i, _c.setScalar(rand(0.8, 1.15))); });
 
   // Ruined colonnade: plinth, fluted drums, a broken top with moss; plus fallen drums.
   const stone = 0xA49C8C, moss = 0x557F3A;
@@ -496,8 +554,8 @@ function buildDetail(group) {
   const pil = ruinSpots.filter((r) => !r[2]), fal = ruinSpots.filter((r) => r[2]);
   const pillars = instanced(pillarGeo, mat, pil.length), drums = instanced(drumGeo, mat, fal.length);
   pillars.castShadow = drums.castShadow = true;
-  pil.forEach(([x, z], i) => { place(pillars, i, x, 0, z, rand(0, 6), rand(0.85, 1.15), rand(0.7, 1.25), rand(0.85, 1.15)); pillars.setColorAt(i, _c.setScalar(rand(0.85, 1.1))); });
-  fal.forEach(([x, z], i) => { place(drums, i, x, 0, z, rand(0, 6), rand(0.9, 1.2)); drums.setColorAt(i, _c.setScalar(rand(0.85, 1.1))); });
+  pil.forEach(([x, z], i) => { place(pillars, i, x, heightAt(x, z) - 0.05, z, rand(0, 6), rand(0.85, 1.15), rand(0.7, 1.25), rand(0.85, 1.15)); pillars.setColorAt(i, _c.setScalar(rand(0.85, 1.1))); });
+  fal.forEach(([x, z], i) => { place(drums, i, x, heightAt(x, z) - 0.05, z, rand(0, 6), rand(0.9, 1.2)); drums.setColorAt(i, _c.setScalar(rand(0.85, 1.1))); });
 
   // Reeds on the river banks and pit rims, lily pads on the water.
   const reedGeo = mergeParts([0, 1, 2, 3, 4, 5].map((k) => ({ g: new THREE.ConeGeometry(0.04, 1.2 + (k % 3) * 0.3, 3).translate(0, 0.6, 0), c: k % 2 ? 0x6F9A48 : 0x88A858, p: [Math.cos(k * 2.4) * 0.18, 0, Math.sin(k * 2.4) * 0.18], r: [Math.sin(k) * 0.2, 0, Math.cos(k) * 0.2], f: 'cloth' })));

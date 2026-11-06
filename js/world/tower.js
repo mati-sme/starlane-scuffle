@@ -64,6 +64,19 @@ export class Tower {
       }),
       { g: new THREE.TorusGeometry(1.32, 0.09, 6, 24), c: glowC, p: [0, 1.06, 0], r: [Math.PI / 2, 0, 0], f: 'glow' },
       { g: new THREE.CylinderGeometry(1.2, 1.3, 0.3, 8), c: c.deep, p: [0, 1.18, 0], f: 'metal' },
+      // v7.1 detail: a dressed-stone course with alternating block tones, a steel lip, rivets on every buttress, team light strips.
+      ...Array.from({ length: 16 }, (_, i) => {
+        const a = (i / 16) * Math.PI * 2;
+        return { g: new THREE.BoxGeometry(0.62, 0.26, 0.2), c: i % 2 ? 0x7E776A : 0x625C52, p: [Math.sin(a) * 1.86, 0.4, Math.cos(a) * 1.86], r: [0, a, 0], f: 'stone' };
+      }),
+      { g: new THREE.TorusGeometry(1.6, 0.05, 4, 32), c: 0x8A9098, p: [0, 1.03, 0], r: [Math.PI / 2, 0, 0], f: 'metal' },
+      ...Array.from({ length: 4 }, (_, i) => {
+        const a = (i / 4) * Math.PI * 2 + Math.PI / 4, ox = Math.sin(a) * 1.58, oz = Math.cos(a) * 1.58;
+        return [
+          ...[0.55, 1.05, 1.5].map((y) => ({ g: new THREE.CylinderGeometry(0.05, 0.05, 0.06, 6), c: 0xC8CDD4, p: [ox, y, oz], r: [Math.PI / 2, a, 0], f: 'metal' })),
+          { g: new THREE.BoxGeometry(0.08, 0.9, 0.04), c: glowC, p: [Math.sin(a) * 1.57, 1.0, Math.cos(a) * 1.57], r: [0, a, 0], f: 'glow' },
+        ];
+      }).flat(),
     ]);
     const base = toonMesh(stumpGeo, this.mat, 0);
     base.receiveShadow = true;
@@ -93,6 +106,21 @@ export class Tower {
       { g: new THREE.CylinderGeometry(0.72, 0.88, 0.9, 8), c: 0x5A606A, p: [0, 3.92, 0], f: 'steel' },
       { g: new THREE.CylinderGeometry(1.0, 0.75, 0.32, 8), c: 0xC2C6CC, p: [0, 4.5, 0], f: 'metal' },
       ...prongs,
+      // v7.1 detail: lit window slits between the ribs, riveted bands, a seam ring under the collar and a crenellated crown.
+      ...Array.from({ length: 4 }, (_, i) => {
+        const a = (i / 4) * Math.PI * 2 + Math.PI / 4 + Math.PI / 8;
+        return [1.65, 2.5].map((y) => ({ g: new THREE.BoxGeometry(0.16, 0.42, 0.06), c: 0xFFE2A8, p: [Math.sin(a) * 1.0, y, Math.cos(a) * 1.0], r: [0, a, 0], f: 'glow' }));
+      }).flat(),
+      { g: new THREE.TorusGeometry(1.07, 0.05, 4, 24), c: 0x6A707A, p: [0, 1.2, 0], r: [Math.PI / 2, 0, 0], f: 'metal' },
+      { g: new THREE.TorusGeometry(0.98, 0.035, 4, 24), c: glowC, p: [0, 3.05, 0], r: [Math.PI / 2, 0, 0], f: 'glow' },
+      ...Array.from({ length: 16 }, (_, i) => {
+        const a = (i / 16) * Math.PI * 2;
+        return { g: new THREE.SphereGeometry(0.045, 5, 3), c: 0xD2D6DC, p: [Math.sin(a) * 1.08, 3.48 + (i % 2) * 0.001, Math.cos(a) * 1.08], f: 'metal' };
+      }),
+      ...Array.from({ length: 8 }, (_, i) => {
+        const a = (i / 8) * Math.PI * 2;
+        return { g: new THREE.BoxGeometry(0.3, 0.22, 0.16), c: 0x9EA4AE, p: [Math.sin(a) * 0.92, 4.75, Math.cos(a) * 0.92], r: [0, a, 0], f: 'metal' };
+      }),
     ]);
     this.top.add(toonMesh(shaftGeo, this.mat, 0));
 

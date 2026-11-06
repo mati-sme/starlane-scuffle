@@ -49,6 +49,18 @@ const DETAIL_F = /* glsl */ `
     #endif
     float macro = texture2D(uDetail, vWPos.xz * uScale * 0.14 + 0.37).g;
     diffuseColor.rgb *= dt * 2.0 * mix(0.86, 1.14, macro);
+    float dH = dot(dt, vec3(0.333));
+  #endif`;
+// High tier: the detail texture doubles as a height field (screen-space derivative bump) and breaks up roughness, so grass
+// blades, flagstone grout and rock strata catch the low sun instead of reading as flat paint.
+const BUMP_F = /* glsl */ `
+  #if defined(USE_DETAIL) && defined(USE_BUMP)
+    roughnessFactor = clamp(roughnessFactor * mix(1.12, 0.82, dH), 0.04, 1.0);
+    vec3 bpx = dFdx(-vViewPosition), bpy = dFdy(-vViewPosition);
+    vec3 bR1 = cross(bpy, normal), bR2 = cross(normal, bpx);
+    float bDet = dot(bpx, bR1);
+    vec3 bGrad = sign(bDet) * (dFdx(dH) * bR1 + dFdy(dH) * bR2);
+    normal = normalize(abs(bDet) * normal - bGrad * BUMP_K);
   #endif`;
 const FINISH_R = '#include <roughnessmap_fragment>\n#ifdef USE_FINISH\n roughnessFactor = clamp(roughnessFactor * vFin.x, 0.04, 1.0);\n#endif';
 const FINISH_M = '#include <metalnessmap_fragment>\n#ifdef USE_FINISH\n metalnessFactor = max(metalnessFactor, vFin.y);\n#endif\n metalnessFactor *= METAL_K;'; // no reflections on the low tier: keep metal from going black
@@ -69,7 +81,11 @@ export function toonMat(opts = {}) {
   m.userData.flash = flash;
   m.defines = { RIM_K: rim.toFixed(3), METAL_K: HI ? '1.0' : '0.35' };
   if (finish) m.defines.USE_FINISH = '';
-  if (detail) { m.defines.USE_DETAIL = ''; if (detail.tri) m.defines.USE_TRIPLANAR = ''; }
+  if (detail) {
+    m.defines.USE_DETAIL = '';
+    if (detail.tri) m.defines.USE_TRIPLANAR = '';
+    if (HI) { m.defines.USE_BUMP = ''; m.defines.BUMP_K = (detail.bump ?? 0.05).toFixed(3); }
+  }
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uFlash = flash;
     if (detail) { sh.uniforms.uDetail = { value: detail.tex }; sh.uniforms.uScale = { value: detail.scale }; }
@@ -81,15 +97,19 @@ export function toonMat(opts = {}) {
       .replace('#include <color_fragment>', '#include <color_fragment>' + DETAIL_F)
       .replace('#include <roughnessmap_fragment>', FINISH_R)
       .replace('#include <metalnessmap_fragment>', FINISH_M)
+      .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>' + BUMP_F)
       .replace('#include <emissivemap_fragment>', FINISH_E)
       .replace('#include <opaque_fragment>', RIM + '#include <opaque_fragment>');
   };
-  m.customProgramCacheKey = () => `sty-${finish ? 1 : 0}-${detail ? (detail.tri ? 2 : 1) : 0}-${m.defines.RIM_K}`;
+  m.customProgramCacheKey = () => `sty-${finish ? 1 : 0}-${detail ? (detail.tri ? 2 : 1) : 0}-${m.defines.RIM_K}-${m.defines.BUMP_K ?? 0}`;
   return m;
 }
 
 // Ground / cliff material: vertex colors times a tiling world-space detail texture. Receives shadows.
-export const terrainMat = (tex, scale, tri = false, opts = {}) => toonMat({ vertexColors: true, roughness: 0.92, rim: 0.05, detail: { tex, scale, tri }, ...opts });
+export const terrainMat = (tex, scale, tri = false, opts = {}) => {
+  const { bump, ...rest } = opts;
+  return toonMat({ vertexColors: true, roughness: 0.92, rim: 0.05, detail: { tex, scale, tri, bump }, ...rest });
+};
 
 // Outlines are a soft deep-navy hull, kept only on characters and key props so the world reads painted, not inked.
 const outlines = new Map();
@@ -98,7 +118,7 @@ export function outlineMat(thickness) {
     outlines.set(thickness, new THREE.ShaderMaterial({
       side: THREE.BackSide,
       fog: false,
-      uniforms: { uT: { value: thickness * 0.55 }, uCol: { value: new THREE.Color(0x0B1220) } },
+      uniforms: { uT: { value: thickness * 0.45 }, uCol: { value: new THREE.Color(0x0B1220) } },
       vertexShader: /* glsl */ `
         uniform float uT;
         void main() {

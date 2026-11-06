@@ -1,60 +1,119 @@
-// Renderer, scene, lights and dynamic resolution scaling.
-// Filmic ACES grade, a baked room environment for metal reflections, and one soft shadow map that follows the camera focus.
+// Renderer, scene, lights, post and dynamic resolution scaling.
+// Filmic ACES grade, a baked outdoor sky environment for PBR reflections, one soft shadow map that follows the camera focus,
+// and on the high tier a light post chain (HDR bloom on the glow parts, then contrast / warmth / vignette).
 import * as THREE from 'three';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { PAL, CAM, BUDGET } from '../config.js';
 import { HI } from './quality.js';
 
 const SHADOW_R = 34; // half-size of the shadow frustum around the camera focus (covers the visible play area)
 
+// Outdoor light probe: blue zenith, warm hazy horizon, green-brown ground bounce and a hot sun disc where the key light sits.
+function skyEnvironment(renderer, sunDir) {
+  const scene = new THREE.Scene();
+  scene.add(new THREE.Mesh(new THREE.SphereGeometry(10, 32, 16), new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    uniforms: { uSun: { value: sunDir } },
+    vertexShader: 'varying vec3 vD; void main(){ vD = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: /* glsl */ `
+      uniform vec3 uSun; varying vec3 vD;
+      void main() {
+        vec3 d = normalize(vD);
+        vec3 sky = mix(vec3(0.95, 0.88, 0.78), vec3(0.32, 0.52, 0.92), smoothstep(0.0, 0.55, d.y));
+        vec3 ground = mix(vec3(0.42, 0.40, 0.30), vec3(0.16, 0.22, 0.12), smoothstep(0.0, -0.4, d.y));
+        vec3 c = d.y > 0.0 ? sky : ground;
+        float s = max(dot(d, uSun), 0.0);
+        c += vec3(1.0, 0.86, 0.62) * (pow(s, 220.0) * 30.0 + pow(s, 8.0) * 0.5);
+        gl_FragColor = vec4(c, 1.0);
+      }`,
+  })));
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const tex = pmrem.fromScene(scene, 0.02).texture;
+  pmrem.dispose();
+  return tex;
+}
+
+// Final grade in display space: gentle S-curve contrast, a touch of saturation and warmth, and a soft vignette.
+const GradeShader = {
+  uniforms: { tDiffuse: { value: null } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: /* glsl */ `
+    uniform sampler2D tDiffuse; varying vec2 vUv;
+    void main() {
+      vec4 c = texture2D(tDiffuse, vUv);
+      vec3 col = mix(c.rgb, c.rgb * c.rgb * (3.0 - 2.0 * c.rgb), 0.28);
+      float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
+      col = mix(vec3(l), col, 1.08) * vec3(1.02, 1.0, 0.97);
+      vec2 q = vUv - 0.5;
+      col *= mix(1.0, 0.78, smoothstep(0.32, 0.85, dot(q, q) * 2.2));
+      gl_FragColor = vec4(col, c.a);
+    }`,
+};
+
 export function createRenderer(canvas) {
   const dpr = window.devicePixelRatio || 1;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: dpr < 2, powerPreference: 'high-performance' });
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.95;
+  renderer.toneMappingExposure = 1.0;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  // Touch devices get a 1024 shadow map; plain PCF (4 taps, hardware-filtered) keeps the per-pixel cost mobile-friendly.
+  // Touch devices get a 1024 PCF map (4 taps, hardware-filtered); desktops get the softer PCF-soft filter on 2048.
   const lowEnd = matchMedia('(pointer: coarse)').matches;
   const shadows = BUDGET.shadows && HI;
   renderer.shadowMap.enabled = shadows;
-  renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.shadowMap.type = lowEnd ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(PAL.fog, 75, 160);
+  // Aerial haze: the far side of the island softens toward a cool blue before it reaches the void.
+  scene.fog = new THREE.Fog(HI ? 0x5A7096 : PAL.fog, HI ? 58 : 75, HI ? 200 : 160);
 
-  // Image-based ambient: a dim neutral room so painted metal and visors pick up soft highlights.
+  // Late-afternoon key, cool fill from the opposite side, cool back rim that separates silhouettes from the grass.
+  const sunDir = new THREE.Vector3(HI ? -26 : -18, HI ? 34 : 40, HI ? 18 : 14).normalize(); // high tier: lower sun, longer modeling shadows
   if (HI) {
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    scene.environmentIntensity = 0.9;
-    pmrem.dispose();
+    scene.environment = skyEnvironment(renderer, sunDir);
+    scene.environmentIntensity = 0.75;
   }
-
-  // Late-afternoon key, cool sky / warm ground bounce, and a cool back rim that separates silhouettes from the grass.
-  scene.add(new THREE.HemisphereLight(0xB4CAEC, 0x3E3424, HI ? 0.85 : 1.05));
-  const sun = new THREE.DirectionalLight(0xFFDDB2, 2.5);
-  sun.position.set(-18, 40, 14);
+  scene.add(new THREE.HemisphereLight(0xB8D0F0, 0x4A3E28, HI ? 0.7 : 1.05));
+  const sun = new THREE.DirectionalLight(0xFFD9A8, HI ? 2.9 : 2.5);
+  sun.position.copy(sunDir).multiplyScalar(45);
   sun.castShadow = shadows;
   const size = lowEnd ? 1024 : 2048;
   sun.shadow.mapSize.set(size, size);
   Object.assign(sun.shadow.camera, { left: -SHADOW_R, right: SHADOW_R, top: SHADOW_R, bottom: -SHADOW_R, near: 1, far: 120 });
-  sun.shadow.bias = -0.0008;
-  sun.shadow.normalBias = 0.04;
+  sun.shadow.bias = -0.0006;
+  sun.shadow.normalBias = 0.035;
   const sunOffset = sun.position.clone();
-  const rim = new THREE.DirectionalLight(0x8FB4F0, 0.9);
+  const fill = new THREE.DirectionalLight(0x9DB8E8, HI ? 0.55 : 0.3);
+  fill.position.set(22, 18, -10);
+  const rim = new THREE.DirectionalLight(0x8FB4F0, HI ? 1.1 : 0.9);
   rim.position.set(0.6, 0.5, -1).multiplyScalar(50);
-  scene.add(sun, sun.target, rim);
+  scene.add(sun, sun.target, fill, rim);
 
   const camera = new THREE.PerspectiveCamera(CAM.fov, 1, 0.5, 700);
+
+  // High tier: HDR multisampled target -> bloom (only real emitters cross the threshold) -> tone map -> grade.
+  let composer = null;
+  if (HI) {
+    const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: dpr < 2 ? 4 : 0 });
+    composer = new EffectComposer(renderer, rt);
+    composer.addPass(new RenderPass(scene, camera));
+    if (!lowEnd) composer.addPass(new UnrealBloomPass(new THREE.Vector2(256, 256), 0.32, 0.45, 0.92));
+    composer.addPass(new OutputPass());
+    composer.addPass(new ShaderPass(GradeShader));
+  }
 
   let scale = 1, avg = 16.7, cool = 3, starved = 0;
   const texel = (SHADOW_R * 2) / size;
   const gfx = {
-    renderer, scene, camera, sun, onResize: null,
+    renderer, scene, camera, sun, onResize: null, post: !!composer,
     resize() {
-      const w = innerWidth, h = innerHeight;
-      renderer.setPixelRatio(Math.min(dpr, BUDGET.dprMax) * scale);
+      const w = innerWidth, h = innerHeight, pr = Math.min(dpr, BUDGET.dprMax) * scale;
+      renderer.setPixelRatio(pr);
       renderer.setSize(w, h, false);
+      if (composer) { composer.setPixelRatio(pr); composer.setSize(w, h); }
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       gfx.onResize?.();
@@ -66,9 +125,10 @@ export function createRenderer(canvas) {
         sun.target.position.set(x, 0, z);
         sun.position.set(x, 0, z).add(sunOffset);
       }
-      renderer.render(scene, camera);
+      if (gfx.post) composer.render();
+      else renderer.render(scene, camera);
     },
-    // Rolling frame-time average drives resolution between scaleMin and 1; if it stays pinned at the floor, shadows go too.
+    // Rolling frame-time average drives resolution between scaleMin and 1; if it stays pinned at the floor, post goes, then shadows.
     adapt(dt) {
       avg = avg * 0.95 + dt * 1000 * 0.05;
       cool -= dt;
@@ -77,6 +137,9 @@ export function createRenderer(canvas) {
         scale = Math.max(BUDGET.scaleMin, scale - 0.1);
         cool = 3;
         gfx.resize();
+      } else if (avg > 21 && gfx.post) {
+        gfx.post = false; // plain render: tone mapping moves back onto the canvas pass
+        cool = 3;
       } else if (avg > 21 && sun.castShadow && ++starved >= 2) {
         sun.castShadow = false; // blob shadows remain underneath everything
         cool = 3;

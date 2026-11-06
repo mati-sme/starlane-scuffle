@@ -77,8 +77,16 @@ export class Core {
           ...[1.4, 2.6, 3.8].map((y) => ({ g: new THREE.CylinderGeometry(0.5 - y * 0.04, 0.55 - y * 0.04, 0.18, 4), c: c.main, p: [x, y, z], r: [0, -a + Math.PI / 4, 0], f: 'paint' })),
           { g: new THREE.BoxGeometry(0.07, 3.6, 0.07), c: glowC, p: [x - Math.cos(a) * 0.36, 2.6, z - Math.sin(a) * 0.36], r, f: 'glow' },
           { g: new THREE.ConeGeometry(0.42, 0.7, 4), c: 0xD2D6DC, p: [x, 4.95, z], r: [0, Math.PI / 4, 0], f: 'metal' },
+          // v7.1 detail: warm lit windows up the spire face and a riveted footing band.
+          ...[2.0, 3.2].map((y) => ({ g: new THREE.BoxGeometry(0.16, 0.38, 0.06), c: 0xFFE2A8, p: [x - Math.cos(a) * 0.3, y, z - Math.sin(a) * 0.3], r, f: 'glow' })),
+          { g: new THREE.BoxGeometry(1.18, 0.08, 1.18), c: 0x8A9098, p: [x, 0.62, z], r, f: 'metal' },
         ];
       }),
+      // v7.1 detail: dressed-stone kerb blocks on the terrace edge, steel lips on each dais step, rivets round the reactor socket.
+      ...Array.from({ length: 32 }, (_, i) => { const a = (i / 32) * Math.PI * 2 + 0.05; return { g: new THREE.BoxGeometry(0.85, 0.22, 0.3), c: i % 2 ? 0x6E675C : 0x57524A, p: [Math.cos(a) * 4.82, 0.11, Math.sin(a) * 4.82], r: [0, -a + Math.PI / 2, 0], f: 'stone' }; }),
+      { g: new THREE.TorusGeometry(3.32, 0.05, 4, 48), c: 0x8A9098, p: [0, 0.62, 0], r: [Math.PI / 2, 0, 0], f: 'metal' },
+      { g: new THREE.TorusGeometry(2.72, 0.05, 4, 48), c: 0x8A9098, p: [0, 0.9, 0], r: [Math.PI / 2, 0, 0], f: 'metal' },
+      ...Array.from({ length: 12 }, (_, i) => { const a = (i / 12) * Math.PI * 2; return { g: new THREE.SphereGeometry(0.06, 5, 3), c: 0xD2D6DC, p: [Math.cos(a) * 1.32, 1.32, Math.sin(a) * 1.32], f: 'metal' }; }),
     ]);
     const dais = toonMesh(daisGeo, this.mat, 0);
     dais.receiveShadow = true;

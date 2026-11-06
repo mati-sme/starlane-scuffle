@@ -74,20 +74,26 @@ const grey = (v, a = 1) => `rgba(${v},${v},${v},${a})`;
 let seed = 7;
 const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
 
-// Grass: soft clumps, then hundreds of short blades in light / dark strokes, a few clover dots.
-export const grassDetail = () => detailTex(256, (g, S, wrap) => {
+// Grass: soft clumps, bare-soil flecks and pebbles, then thousands of short blades in light / dark strokes, a few clover dots.
+// 512 px on the high tier so blades stay crisp at the gameplay camera; 256 elsewhere.
+export const grassDetail = (hi = false) => detailTex(hi ? 512 : 256, (g, S, wrap) => {
   seed = 11;
+  const k = S / 256;
   for (let i = 0; i < 60; i++) {
-    const x = rnd() * S, y = rnd() * S, r = 10 + rnd() * 26, v = 105 + rnd() * 50;
+    const x = rnd() * S, y = rnd() * S, r = (10 + rnd() * 26) * k, v = 105 + rnd() * 50;
     wrap(() => { const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, grey(v, 0.5)); gr.addColorStop(1, grey(v, 0)); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); });
   }
+  for (let i = 0; i < 30 * k; i++) { // soil flecks and tiny stones peeking between the blades
+    const x = rnd() * S, y = rnd() * S, r = (1 + rnd() * 2.2) * k;
+    g.fillStyle = grey(rnd() < 0.5 ? 70 : 165, 0.55); wrap(() => { g.beginPath(); g.ellipse(x, y, r, r * 0.7, rnd() * 3, 0, 7); g.fill(); });
+  }
   g.lineCap = 'round';
-  for (let i = 0; i < 1400; i++) {
-    const x = rnd() * S, y = rnd() * S, len = 3 + rnd() * 6, a = -Math.PI / 2 + (rnd() - 0.5) * 1.3, v = rnd() < 0.55 ? 150 + rnd() * 50 : 70 + rnd() * 30;
-    g.strokeStyle = grey(v | 0, 0.55); g.lineWidth = 1 + rnd();
+  for (let i = 0; i < 1400 * k * k; i++) {
+    const x = rnd() * S, y = rnd() * S, len = (3 + rnd() * 6) * k, a = -Math.PI / 2 + (rnd() - 0.5) * 1.3, v = rnd() < 0.55 ? 150 + rnd() * 50 : 70 + rnd() * 30;
+    g.strokeStyle = grey(v | 0, 0.55); g.lineWidth = (1 + rnd()) * Math.sqrt(k);
     wrap(() => { g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len); g.stroke(); });
   }
-  for (let i = 0; i < 40; i++) { const x = rnd() * S, y = rnd() * S; g.fillStyle = grey(175, 0.5); wrap(() => { g.beginPath(); g.arc(x, y, 1.5, 0, 7); g.fill(); }); }
+  for (let i = 0; i < 40 * k; i++) { const x = rnd() * S, y = rnd() * S; g.fillStyle = grey(175, 0.5); wrap(() => { g.beginPath(); g.arc(x, y, 1.5 * k, 0, 7); g.fill(); }); }
 });
 
 // Paving: staggered flagstones with dark grout, per-stone tone, chips and speckle.
