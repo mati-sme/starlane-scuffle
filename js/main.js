@@ -6,7 +6,7 @@ import { vfx } from './render/vfx.js';
 import { createMap } from './world/map.js';
 import { Match } from './game/match.js';
 import { createLoop } from './core/loop.js';
-import { initInput } from './core/input.js';
+import { initInput, resetInput } from './core/input.js';
 import { bus } from './core/bus.js';
 import { SIM_STEP, MAP } from './config.js';
 import { Hud } from './ui/hud.js';
@@ -72,6 +72,7 @@ syncMute();
 
 function leave(next) {
   clearTimeout(resultTimer);
+  resetInput();
   state = next;
   document.body.classList.remove('playing');
   hud.hide();
@@ -265,6 +266,7 @@ function pause() {
     return;
   }
   state = 'paused';
+  resetInput();
   document.body.classList.remove('playing');
   audio.pause(true);
   menus.showPause({
@@ -276,6 +278,7 @@ function pause() {
 function resume() {
   if (state !== 'paused') return;
   state = 'match';
+  resetInput();
   document.body.classList.add('playing');
   menus.hideAll();
   audio.pause(false);

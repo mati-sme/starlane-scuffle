@@ -90,17 +90,17 @@ export class Abilities {
     ];
     this.tgts.forEach((el, k) => {
       el.addEventListener('pointerdown', (e) => { e.preventDefault(); el.setPointerCapture(e.pointerId); input.pref[k] = true; el.classList.add('down'); });
-      for (const type of ['pointerup', 'pointercancel']) el.addEventListener(type, () => { input.pref[k] = false; el.classList.remove('down'); });
+      for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) el.addEventListener(type, () => { input.pref[k] = false; el.classList.remove('down'); });
     });
     this.rc = mk('recall', 'recall', 'Recall to base', `<i class="face">${icons.recall}</i><i class="rprog"></i>`, 'B');
     this.rc.addEventListener('pointerdown', (e) => { e.preventDefault(); this.rc.setPointerCapture(e.pointerId); input.recall = true; this.rc.classList.add('down'); });
-    for (const type of ['pointerup', 'pointercancel']) this.rc.addEventListener(type, () => this.rc.classList.remove('down'));
+    for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) this.rc.addEventListener(type, () => this.rc.classList.remove('down'));
     this.rp = -1;
     // Summoner spells: two buttons left of Recall (F / G on desktop), radial cooldown wipe like the skills.
     this.spb = [0, 1].map((k) => {
       const el = mk(`spell sp${k}`, `spell-${k + 1}`, `Summoner spell ${k + 1}`, '<i class="face"></i><i class="cd"></i><b class="num"></b>', 'FG'[k]);
       el.addEventListener('pointerdown', (e) => { e.preventDefault(); el.setPointerCapture(e.pointerId); input.spell[k] = true; el.classList.add('down'); });
-      for (const type of ['pointerup', 'pointercancel']) el.addEventListener(type, () => el.classList.remove('down'));
+      for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) el.addEventListener(type, () => el.classList.remove('down'));
       return { el, face: el.querySelector('.face'), cd: el.querySelector('.cd'), num: el.querySelector('.num'), p: -1, n: -1, id: '' };
     });
     bus.on('noSpell', ({ hero, slot }) => {

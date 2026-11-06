@@ -1,5 +1,5 @@
 // Touch controls: floating joystick on the left 45%, hold-to-attack button on the right.
-import { input } from '../core/input.js';
+import { input, mouseDown } from '../core/input.js';
 import { icons } from './icons.js';
 
 const BASE = 140, DEAD = 12;
@@ -23,7 +23,8 @@ export function initTouchControls() {
   };
 
   zone.addEventListener('pointerdown', (e) => {
-    if (id !== null || e.pointerType === 'mouse') return;
+    if (e.pointerType === 'mouse') { mouseDown(e); return; }
+    if (id !== null && zone.hasPointerCapture?.(id)) return; // a finger really is on the stick; a stale id (capture lost with the zone hidden) is taken over
     id = e.pointerId;
     zone.setPointerCapture(id);
     ox = e.clientX; oy = e.clientY;
@@ -40,9 +41,14 @@ export function initTouchControls() {
     input.stick.y = -(dy / len) * k;
     knob.style.transform = `translate(${(dx / len) * Math.min(len, r)}px, ${(dy / len) * Math.min(len, r)}px)`;
   });
-  for (const type of ['pointerup', 'pointercancel']) {
+  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
     zone.addEventListener(type, (e) => { if (e.pointerId === id) reset(); });
   }
+  zone.addEventListener('contextmenu', (e) => e.preventDefault());
+  addEventListener('starlane:inputreset', () => {
+    if (id !== null && zone.hasPointerCapture?.(id)) zone.releasePointerCapture(id);
+    reset();
+  });
 
   // Attack: hold = auto-target; drag = aim the basic attack that way (the match draws the fan). Its own pointerId, like every control.
   let aid = null, ax = 0, ay = 0;
@@ -74,5 +80,6 @@ export function initTouchControls() {
   for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
     atk.addEventListener(type, (e) => { if (e.pointerId === aid) atkEnd(); });
   }
+  addEventListener('starlane:inputreset', () => { if (aid !== null) atkEnd(); });
   atk.addEventListener('contextmenu', (e) => e.preventDefault());
 }

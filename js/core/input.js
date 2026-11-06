@@ -20,6 +20,18 @@ export const input = {
   get prefNo() { return this.pref[1] ? 2 : this.pref[0] ? 1 : 0; },
 };
 
+// Drops every held / pending intent (blur, tab hidden, pause, resume, new match). The touch controls listen to the event and release their own pointer ids.
+export function resetInput() {
+  input.keys.clear();
+  input.stick.x = input.stick.y = 0;
+  input.attackTouch = input.attackKey = input.attackMouse = false;
+  input.pref[0] = input.pref[1] = false;
+  input.aiming = input.atkAim = input.walkClick = null;
+  input.cast.fill(false); input.spend.fill(false); input.spell.fill(false); input.aimCast.fill(null);
+  input.recall = false;
+  window.dispatchEvent(new Event('starlane:inputreset'));
+}
+
 const AXIS = {
   KeyW: [0, 1], ArrowUp: [0, 1], KeyS: [0, -1], ArrowDown: [0, -1],
   KeyA: [-1, 0], ArrowLeft: [-1, 0], KeyD: [1, 0], ArrowRight: [1, 0],
@@ -38,6 +50,16 @@ export function readMove(out) {
   if (len > 0) { x /= len; y /= len; } else { x = input.stick.x; y = input.stick.y; }
   out.x = x; out.y = y;
   return Math.hypot(x, y) > 0.01;
+}
+
+// Mouse buttons on the playfield. The touch stick zone sits above the canvas on touch-capable desktops, so it forwards mouse presses here.
+export function mouseDown(e) {
+  if (e.pointerType !== 'mouse') return;
+  if (e.button === 0) input.attackMouse = true;
+  else if (e.button === 2 && input.aiming) input.aiming.cancel = true; // right click while aiming = cancel
+  else if (e.button === 2) {
+    input.walkClick = { x: (e.clientX / innerWidth) * 2 - 1, y: -((e.clientY / innerHeight) * 2 - 1) };
+  }
 }
 
 export function initInput(canvas) {
@@ -69,26 +91,14 @@ export function initInput(canvas) {
       if (!a.cancel) { input.cast[slot] = true; input.aimCast[slot] = { mouse: true }; }
     }
   });
-  window.addEventListener('blur', () => {
-    input.keys.clear();
-    input.attackKey = input.attackMouse = false;
-    input.pref[0] = input.pref[1] = false;
-    input.aiming = null;
-    input.atkAim = null;
-  });
+  window.addEventListener('blur', resetInput);
+  document.addEventListener('visibilitychange', resetInput);
   window.addEventListener('pointermove', (e) => {
     if (e.pointerType === 'mouse') input.mouse = { x: (e.clientX / innerWidth) * 2 - 1, y: -((e.clientY / innerHeight) * 2 - 1) };
   });
 
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-  canvas.addEventListener('pointerdown', (e) => {
-    if (e.pointerType !== 'mouse') return;
-    if (e.button === 0) input.attackMouse = true;
-    else if (e.button === 2 && input.aiming) input.aiming.cancel = true; // right click while aiming = cancel
-    else if (e.button === 2) {
-      input.walkClick = { x: (e.clientX / innerWidth) * 2 - 1, y: -((e.clientY / innerHeight) * 2 - 1) };
-    }
-  });
+  canvas.addEventListener('pointerdown', mouseDown);
   window.addEventListener('pointerup', (e) => {
     if (e.pointerType === 'mouse' && e.button === 0) input.attackMouse = false;
   });

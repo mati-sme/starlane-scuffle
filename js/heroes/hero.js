@@ -196,6 +196,7 @@ export class Hero {
     this.effects = [];
     this.hist = [];
     this.script = null;
+    this.walkTo = null;
     this.windup = 0;
     this.pend = -1;
     this.yOff = this.tilt = this.spin = 0;
