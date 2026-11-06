@@ -128,7 +128,7 @@ check('touch: joystick moves after pause/resume', await walks(drag(7), lift(7)))
 
 // 3. mouse right-click walk after the pause cycle
 const rightClick = (x, y) => async () => { await page.mouse.move(x, y); await page.mouse.click(x, y, { button: 'right' }); };
-check('mouse: right-click walk works', await walks(rightClick(700, 120)));
+check('mouse: right-click walk works', await walks(rightClick(560, 100)));
 await page.keyboard.press('Escape'); await sleep(300); await page.keyboard.press('Escape'); await sleep(300);
 check('mouse: right-click walk works after pause/resume', await walks(rightClick(300, 330)));
 
