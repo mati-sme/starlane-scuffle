@@ -8,6 +8,7 @@ import { TEAM } from '../config.js';
 import { toonMat, toonMesh, mergeParts } from '../render/toon.js';
 import { buildWave2A } from './wave2a_models.js';
 import { buildWave2B } from './wave2b_models.js';
+import { hasForm, buildForm } from './forms.js';
 
 const BOX = new THREE.BoxGeometry(1, 1, 1);
 const RBOX = new RoundedBoxGeometry(1, 1, 1, 1, 0.16); // one segment: chamfered edges, ~44 tris
@@ -349,6 +350,7 @@ function haloGeo(kind, main, acc, gl) {
 export function buildChampion(spec, def, team = 0) {
   if (spec.wave === 'a') return buildWave2A(spec, def, team);
   if (spec.wave === 'b') return buildWave2B(spec, def, team);
+  if (hasForm(def.id)) return buildForm(spec, def, team); // v7.3: bespoke body plans (forms_*.js); the kit below is the fallback
   const T = TORSO[spec.torso], main = ground(def.color, 0.18), acc = ground(def.accent, 0.12); // muted, painted-metal tones
   const gl = tint(def.basic?.color ?? def.accent, 0xffffff, 0.1); // emissive accents match the champion's attacks
   const hunch = spec.hunch ? 0.18 : 0, hy = HIP + T.h + 0.3, ax = T.w / 2 + 0.2;
