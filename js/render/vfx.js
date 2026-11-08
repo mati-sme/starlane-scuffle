@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { PAL } from '../config.js';
 import { shockTexture, runeTexture, radialTexture } from './atlas.js';
 import { HI } from './quality.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const POOL = HI ? 64 : 40, SHADES = HI ? 32 : 20;
 const SHADE_KINDS = new Set(['ring', 'arc', 'decal', 'rune']);
@@ -18,6 +19,21 @@ const targetRingGeo = new THREE.RingGeometry(0.86, 1, 40).rotateX(-Math.PI / 2);
 const beamGeo = new THREE.CylinderGeometry(1, 1, 1, 8, 1, true).translate(0, 0.5, 0); // base at origin, +Y
 const flashGeo = new THREE.PlaneGeometry(2, 2);
 const chevGeo = new THREE.ConeGeometry(0.3, 0.55, 4).rotateX(Math.PI);
+const coneGeo = new THREE.ConeGeometry(1, 1, 12, 1, true).translate(0, -0.5, 0).rotateX(Math.PI); // apex at origin, opens along +Y
+// v7.3 jagged lightning: a few pre-baked zig-zag ribbons (crossed so they read from the top-down camera), base at origin, +Y.
+const zapGeos = [0, 1, 2, 3].map((v) => {
+  const pts = [[0, 0]];
+  for (let k = 1; k < 7; k++) pts.push([(Math.sin(k * 2.7 + v * 1.9) * 0.5 + Math.sin(k * 5.3 + v) * 0.35) * (k < 6 ? 1 : 0.2), k / 6]);
+  const geos = [];
+  for (let k = 0; k < pts.length - 1; k++) {
+    const [x0, y0] = pts[k], [x1, y1] = pts[k + 1], dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy);
+    for (const rot of [0, Math.PI / 2]) {
+      const g = new THREE.PlaneGeometry(0.32, L).rotateZ(-Math.atan2(dx, dy)).translate((x0 + x1) / 2, (y0 + y1) / 2, 0).rotateY(rot);
+      geos.push(g.toNonIndexed());
+    }
+  }
+  return mergeGeometries(geos);
+});
 
 const UP = new THREE.Vector3(0, 1, 0);
 const _white = new THREE.Color(0xffffff);
@@ -86,18 +102,46 @@ class Vfx {
     return it;
   }
 
-  ring(x, y, z, color, size = 3, dur = 0.4) {
+  ring(x, y, z, color, size = 3, dur = 0.4, dark = false) { // dark: back an air ring with the underlay too (v7.3 impacts)
     const it = this._start('ring', ringGeo, color, dur, size);
     it.mesh.position.set(x, y, z);
-    if (y < 0.6) this._shade(it);
+    if (y < 0.6 || dark) this._shade(it);
   }
 
   // Crescent facing (dx, dz) — used for melee swipes.
-  arc(x, y, z, dx, dz, color, size = 2.2, dur = 0.2) {
+  // v7.3: `tilt` rolls the crescent about its facing axis (vertical uppercuts / overhead chops), `spin` flips it.
+  arc(x, y, z, dx, dz, color, size = 2.2, dur = 0.2, tilt = 0) {
     const m = this._start('arc', arcGeo, color, dur, size).mesh;
     m.position.set(x, y, z);
-    m.rotation.y = Math.atan2(-dz, dx);
-    if (y < 0.9) this._shade(this.items.find((i) => i.mesh === m));
+    m.rotation.set(tilt, Math.atan2(-dz, dx), 0, 'YXZ');
+    if (y < 0.9 && !tilt) this._shade(this.items.find((i) => i.mesh === m));
+  }
+
+  // v7.3: a ring that collapses inward (gravity pulls, whirls, void pops).
+  implode(x, y, z, color, size = 2.4, dur = 0.3) {
+    const it = this._start('implode', ringGeo, color, dur, size);
+    it.mesh.position.set(x, y, z);
+    this._shade(it);
+  }
+
+  // v7.3: jagged lightning bolt from a to b that flickers out.
+  zap(x0, y0, z0, x1, y1, z1, color, width = 0.5, dur = 0.16) {
+    const it = this._start('zap', zapGeos[(Math.random() * zapGeos.length) | 0], color, dur, width);
+    _a.set(x1 - x0, y1 - y0, z1 - z0);
+    const len = _a.length() || 1;
+    it.mesh.position.set(x0, y0, z0);
+    it.mesh.quaternion.setFromUnitVectors(UP, _a.divideScalar(len));
+    it.mesh.scale.set(width, len, width);
+    it.ay = len;
+  }
+
+  // v7.3: muzzle / lamp cone opening from (x, y, z) along (dx, dz).
+  cone(x, y, z, dx, dz, color, len = 1.6, width = 0.5, dur = 0.12) {
+    const it = this._start('cone', coneGeo, color, dur, width);
+    it.mesh.position.set(x, y, z);
+    it.mesh.quaternion.setFromUnitVectors(UP, _a.set(dx, 0, dz).normalize());
+    it.mesh.scale.set(width, len, width);
+    it.ay = len;
   }
 
   column(x, z, color, dur = 0.9) {
@@ -207,6 +251,24 @@ class Vfx {
         case 'ghost':
           m.material.opacity = 0.55 * (1 - u);
           break;
+        case 'implode': {
+          const s = it.size * (1 - 0.75 * (1 - (1 - u) * (1 - u)));
+          m.scale.set(s, s, s);
+          m.material.opacity = Math.min(1, u * 5) * (1 - u * u);
+          break;
+        }
+        case 'zap': {
+          const w = it.size * (1 - u * 0.6) * (0.75 + Math.random() * 0.5);
+          m.scale.set(w, it.ay, w);
+          m.material.opacity = u < 0.5 ? 1 : (1 - u) * 2 * (Math.random() < 0.8 ? 1 : 0.3);
+          break;
+        }
+        case 'cone': {
+          const w = it.size * (0.7 + 0.5 * u);
+          m.scale.set(w, it.ay * (0.8 + 0.3 * u), w);
+          m.material.opacity = 1 - u;
+          break;
+        }
         case 'tube': {
           const a = it.a, b = it.b;
           _a.set(a.rx ?? a.x, it.ay, a.rz ?? a.z);

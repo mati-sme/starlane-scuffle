@@ -9,6 +9,7 @@ import { HI } from './quality.js';
 export const FIN = {
   paint: [0.55, 0.25, 0], metal: [0.35, 0.8, 0], steel: [0.5, 0.5, 0], cloth: [0.95, 0, 0],
   rubber: [0.8, 0.05, 0], stone: [1, 0, 0], glow: [0.4, 0, 3.2], glass: [0.15, 0.3, 0.6],
+  skin: [0.72, 0, 0.04], fur: [1, 0, 0], wood: [0.9, 0, 0], // v7.3: organic bodies (faces, pelts, carved wood)
 };
 
 const COMMON_V = /* glsl */ `
