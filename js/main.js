@@ -72,6 +72,7 @@ window.__starlane = {
 const muteBtn = $('mute');
 const syncMute = () => { muteBtn.innerHTML = audio.muted ? icons.mute : icons.sound; };
 muteBtn.addEventListener('click', () => { audio.toggleMute(); syncMute(); });
+audio.listener = () => match.hero; // positional sfx are placed relative to the local hero
 $('pause').innerHTML = icons.pause;
 $('pause').addEventListener('click', () => pause());
 $('unstuck').addEventListener('click', (e) => {

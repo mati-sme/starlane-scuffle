@@ -9,6 +9,10 @@ const SCALE = [261.6, 293.7, 329.6, 392, 440, 523.3];
 const ARP = [0, 2, 3, 4, 3, 2, 1, 2, 4, 3, 2, 3, 1, 2, 3, 2];
 
 let ctx, master, sfxBus, musicBus, crush, noise;
+// Positional sfx: world events are panned/attenuated against the local hero. Camera right vector on the ground plane (CAM.offset -7,20,15).
+const RIGHT_X = 0.906, RIGHT_Z = 0.423, PAN_RANGE = 16, HEAR_RANGE = 46, MIN_GAIN = 0.06;
+let listener = () => null, spot = null; // spot = per-event panner while a positional sfx is being built
+const out = () => spot ?? sfxBus;
 let voices = 0, muted = save.get('mute', false), wantMusic = false;
 let timer = 0, step = 0, next = 0, bpm = 112;
 const last = {};
@@ -35,13 +39,33 @@ function build() {
   for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
 }
 
+// Bitcrusher: shared when centred, one per positional event so it lands in that event's panner.
+function crushOut() {
+  if (!spot) return crush;
+  const c = ctx.createWaveShaper();
+  c.curve = crush.curve;
+  c.connect(spot);
+  return c;
+}
+
+// Returns a panner chain for a world source, or null when it is too far to hear.
+function place(src) {
+  const me = listener();
+  if (!me || !src || src === me || src.isPlayer || src.x == null) return undefined; // centred
+  const dx = src.x - me.x, dz = src.z - me.z, d = Math.hypot(dx, dz);
+  if (d > HEAR_RANGE) return null;
+  const gain = Math.max(MIN_GAIN, (1 - d / HEAR_RANGE) ** 1.6);
+  const pan = Math.max(-1, Math.min(1, (dx * RIGHT_X + dz * RIGHT_Z) / PAN_RANGE)) * 0.85;
+  return { gain, pan };
+}
+
 function env(g, t, vol, dur, att) {
   g.gain.setValueAtTime(0.0001, t);
   g.gain.linearRampToValueAtTime(vol, t + att);
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
 }
 
-function tone(type, f0, f1, dur, vol, delay = 0, dest = sfxBus, att = 0.005) {
+function tone(type, f0, f1, dur, vol, delay = 0, dest = out(), att = 0.005) {
   const counted = dest !== musicBus;
   if (counted && voices >= MAX_VOICES) return;
   const t = ctx.currentTime + delay, o = ctx.createOscillator(), g = ctx.createGain();
@@ -67,13 +91,13 @@ function bell(f, dur, vol, delay = 0) {
   mg.gain.exponentialRampToValueAtTime(1, t + dur);
   env(g, t, vol, dur, 0.004);
   m.connect(mg).connect(c.frequency);
-  c.connect(g).connect(sfxBus);
+  c.connect(g).connect(out());
   voices++;
   c.onended = () => { voices--; g.disconnect(); };
   for (const o of [c, m]) { o.start(t); o.stop(t + dur + 0.02); }
 }
 
-function hiss(dur, vol, f0, f1, delay = 0, type = 'bandpass', dest = sfxBus) {
+function hiss(dur, vol, f0, f1, delay = 0, type = 'bandpass', dest = out()) {
   const t = ctx.currentTime + delay, s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
   s.buffer = noise;
   f.type = type;
@@ -91,8 +115,8 @@ const VOICE = {
   tank: (f, d, v, w) => tone('square', f * 0.5, f * 0.35, d * 1.2, v * 0.5, w),
   bruiser: (f, d, v, w) => tone('sawtooth', f * 0.7, f * 0.4, d, v * 0.35, w),
   assassin: (f, d, v, w) => tone('square', f * 1.6, f * 1.1, d * 0.7, v * 0.35, w),
-  blaster: (f, d, v, w) => tone('sawtooth', f, f * 0.3, d * 1.3, v * 0.4, w, crush),
-  shooter: (f, d, v, w) => tone('triangle', f * 1.2, f * 0.6, d, v, w, crush),
+  blaster: (f, d, v, w) => tone('sawtooth', f, f * 0.3, d * 1.3, v * 0.4, w, crushOut()),
+  shooter: (f, d, v, w) => tone('triangle', f * 1.2, f * 0.6, d, v, w, crushOut()),
   support: (f, d, v, w) => bell(f * 1.5, d * 2.5, v * 0.7, w),
 };
 const voice = (h) => VOICE[h?.def?.role] ?? VOICE.tank;
@@ -114,8 +138,8 @@ const SFX = {
     v(450, 0.18, 0.2, 0.06);
   },
   ult: (h) => {
-    tone('sawtooth', 120, 520, 0.5, 0.18, 0, sfxBus, 0.3);
-    tone('sawtooth', 124, 530, 0.5, 0.18, 0, sfxBus, 0.3);
+    tone('sawtooth', 120, 520, 0.5, 0.18, 0, out(), 0.3);
+    tone('sawtooth', 124, 530, 0.5, 0.18, 0, out(), 0.3);
     tone('sine', 90, 35, 0.35, 0.6, 0.45);
     if (h?.isPlayer) duck();
   },
@@ -137,12 +161,21 @@ const SFX = {
   lose: () => [NOTE.e5, NOTE.d5, NOTE.c5].forEach((f, i) => tone('sine', f, f * 0.98, i > 1 ? 1.1 : 0.4, 0.22, i * 0.35)),
 };
 
-function play(name, a, b) {
+function play(name, a, b, src) {
   if (!ctx || muted) return;
+  const where = src ? place(src) : undefined;
+  if (where === null) return; // out of earshot: don't spend a voice or the retrigger slot
   const now = performance.now();
   if (now - (last[name] ?? 0) < 30) return;
   last[name] = now;
-  SFX[name](a, b);
+  if (!where) { SFX[name](a, b); return; }
+  const g = ctx.createGain(), p = ctx.createStereoPanner();
+  g.gain.value = where.gain;
+  p.pan.value = where.pan;
+  g.connect(p).connect(sfxBus);
+  spot = g;
+  try { SFX[name](a, b); } finally { spot = null; }
+  setTimeout(() => { g.disconnect(); p.disconnect(); }, 3000);
 }
 
 // Light music: 8th-note step sequencer at 112 BPM in C major pentatonic. Lookahead 100 ms, tick 25 ms.
@@ -176,13 +209,13 @@ function unlock() {
 }
 for (const type of ['pointerdown', 'keydown']) addEventListener(type, unlock, { once: true, capture: true });
 
-bus.on('swing', (h) => play('swing', h));
-bus.on('cast', ({ hero, slot }) => play(slot === 2 ? 'ult' : 'skill', hero));
-bus.on('hit', (t) => { if (t.type !== 'minion') play('tick'); });
-bus.on('down', (t) => play(t.type === 'tower' || t.type === 'core' ? 'shatter' : 'poof', t.type === 'core'));
+bus.on('swing', (h) => play('swing', h, undefined, h));
+bus.on('cast', ({ hero, slot }) => play(slot === 2 ? 'ult' : 'skill', hero, undefined, hero));
+bus.on('hit', (t) => { if (t.type !== 'minion') play('tick', undefined, undefined, t); });
+bus.on('down', (t) => play(t.type === 'tower' || t.type === 'core' ? 'shatter' : 'poof', t.type === 'core', undefined, t));
 bus.on('levelUp', (h) => { if (h.isPlayer) play('level'); });
 bus.on('rankUp', ({ hero }) => { if (hero.isPlayer) play('level'); });
-bus.on('towerShot', () => play('tower'));
+bus.on('towerShot', (t) => play('tower', undefined, undefined, t));
 bus.on('storm', () => { bpm = 120; });
 bus.on('end', ({ win }) => {
   stopMusic();
@@ -192,6 +225,7 @@ bus.on('end', ({ win }) => {
 export const audio = {
   get muted() { return muted; },
   sfx: play,
+  set listener(fn) { listener = fn; }, // () => local hero, for positional sfx
   toggleMute() {
     muted = !muted;
     save.set('mute', muted);
