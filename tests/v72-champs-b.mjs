@@ -39,7 +39,7 @@ const tap = (id) => page.locator(`[data-testid="${id}"]`).click({ force: true })
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 await page.goto(BASE + '?gfx=low', { waitUntil: 'load', timeout: 90000 });
-await tap('play-btn');
+await tap('play-btn'); await sleep(300); await tap('setup-next');
 await sleep(500);
 const ids = await page.$$eval('[data-testid^="champion-card-"]', (els) => els.map((e) => e.dataset.id));
 console.log(`cards: ${ids.length}`);

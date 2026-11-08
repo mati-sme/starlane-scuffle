@@ -42,7 +42,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // Ban -> pick -> GO through the real select flow, then swap in the exact line-up via match.setHero(id, bots).
 async function start(hero, bots = [], gfx = 'low') {
   await page.goto(BASE + `?gfx=${gfx}`, { waitUntil: 'load', timeout: 90000 });
-  await tap('play-btn'); await sleep(300);
+  await tap('play-btn'); await sleep(300); await tap('setup-next'); await sleep(300);
   await page.locator('[data-testid="champion-card-bulwark"]').click({ force: true }); await sleep(150);
   await tap('ban-btn'); await sleep(300);
   await page.locator('[data-testid="champion-card-magnus"]').click({ force: true }); await sleep(150);
@@ -53,7 +53,7 @@ async function start(hero, bots = [], gfx = 'low') {
 }
 
 await page.goto(BASE + '?gfx=low', { waitUntil: 'load', timeout: 90000 });
-await tap('play-btn');
+await tap('play-btn'); await sleep(300); await tap('setup-next');
 await sleep(500);
 const ids = await page.$$eval('[data-testid^="champion-card-"]', (els) => els.map((e) => e.dataset.id));
 check('select screen lists all 12 new champions', NEW.every((id) => ids.includes(id)), `${ids.length} cards`);
