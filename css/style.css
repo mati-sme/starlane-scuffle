@@ -709,3 +709,21 @@ h2 { font-style: normal; }
 .skinchip.on { border-color: var(--gold); background: rgba(70,52,8,.8); }
 .skinchip:disabled { opacity: .45; cursor: default; }
 @media (max-height: 460px) { .skinchip { min-width: 40px; padding: 1px 3px; } .skinchip i { width: 13px; height: 13px; } .skins > span { font-size: 9px; } }
+
+/* v8.3 profile + badges */
+.profbtn { margin-left: 6px; font-size: 12px; letter-spacing: .1em; }
+.screen.profile { gap: 8px; background: radial-gradient(ellipse at 50% 40%, rgba(6,10,22,.7), rgba(6,10,22,.94)); }
+.profile h2 { font-size: clamp(26px, 7vh, 44px); }
+.proftop { display: flex; align-items: center; gap: 12px; }
+.lvl-pill.big, .coins.big { font-size: 20px; padding: 4px 16px; }
+.xpbar { position: relative; width: min(40vw, 320px); height: 24px; border: 2px solid rgba(255,255,255,.5); background: rgba(10,16,34,.9); }
+.xpbar i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #3DA5FF, #8FE1FF); }
+.xpbar em { position: absolute; inset: 0; display: grid; place-items: center; font-style: normal; font-weight: 800; font-size: 13px; text-shadow: 0 1px 2px #000; }
+.pstats, .badges { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 94vw; }
+.pstats li { min-width: 92px; padding: 4px 10px; border: 2px solid rgba(255,255,255,.3); background: rgba(10,16,34,.8); text-align: center; display: flex; flex-direction: column; }
+.pstats b { font-size: 22px; color: var(--gold); } .pstats span { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: rgba(255,255,255,.7); }
+.badge { width: 112px; padding: 6px 4px; border: 2px solid rgba(255,255,255,.2); background: rgba(10,16,34,.7); text-align: center; display: flex; flex-direction: column; align-items: center; gap: 1px; opacity: .55; filter: grayscale(1); }
+.badge i { font-style: normal; font-size: 28px; line-height: 1.1; }
+.badge b { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; } .badge small { font-size: 10px; color: rgba(255,255,255,.75); }
+.badge.on { opacity: 1; filter: none; border-color: var(--gold); background: rgba(70,52,8,.7); }
+@media (max-height: 460px) { .profile { gap: 4px; } .badge { width: 88px; padding: 2px; } .badge i { font-size: 20px; } .badge b { font-size: 10px; } .badge small { font-size: 8px; } .pstats li { padding: 1px 8px; min-width: 70px; } .pstats b { font-size: 16px; } .xpbar { height: 18px; } }

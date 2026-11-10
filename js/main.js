@@ -25,6 +25,7 @@ import { DEFAULT_SPELLS, cleanSpells } from './game/spells.js';
 import { cleanSetup, defaultSetup } from './game/setup.js';
 import { isOwned, awardMatch, addCoins, FREE_CHAMPS } from './game/progress.js';
 import { progressMatch } from './game/quests.js';
+import { evaluate as checkBadges, setFlag } from './game/badges.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -99,7 +100,7 @@ function leave(next) {
 function toTitle() {
   leaveRoom();
   leave('title');
-  menus.showTitle(toSetup, () => toOnline());
+  menus.showTitle(toSetup, () => toOnline(), () => menus.showProfile(toTitle));
 }
 
 // ---- online ----
@@ -322,6 +323,8 @@ bus.on('end', (res) => {
   res.rewards = awardMatch(res); // XP + coins (local only; the online lobby doesn't need to know)
   res.rewards.quests = progressMatch(res); // daily quests finished by this match: their coins are paid now and shown on the result screen
   for (const q of res.rewards.quests) addCoins(q.coins);
+  if (res.win && res.stars >= 3) setFlag('threeStar');
+  res.rewards.badges = checkBadges();
   document.body.classList.remove('playing');
   resultTimer = setTimeout(() => menus.showResult(res, online
     ? { onAgain: () => { if (net.slot === 0) net.send({ t: T.abort }); toLobby(); }, onHome: toTitle, againLabel: 'LOBBY', homeLabel: 'EXIT' }

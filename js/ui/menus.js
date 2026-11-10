@@ -10,6 +10,7 @@ import { ROLE_BLURB } from '../game/roles.js';
 import { matchupsOf } from '../game/matchups.js';
 import { LEVELS, MAX_TEAM, applyPreset, presetOf, summary } from '../game/setup.js';
 import { PALETTES, SKIN_IDS, SKIN_PRICE, equipped, ownsSkin, equip, buySkin, portraitShift } from '../game/skins.js';
+import { BADGES, isEarned, evaluate as checkBadges } from '../game/badges.js';
 import { view as questView } from '../game/quests.js';
 import { profile, isOwned, nextPrice, buyChampion, xpNeeded } from '../game/progress.js';
 
@@ -128,20 +129,37 @@ export function createMenus(root) {
   return {
     hideAll() { clearInterval(tick); root.innerHTML = ''; },
 
-    showTitle(onPlay, onOnline) {
+    showTitle(onPlay, onOnline, onProfile) {
       const row = ROSTER.map((id, i) => `<i style="--i:${i};--c:${HEROES[id].css}">${portrait(id)}</i>`).join('');
       show('title modal', `
         <div class="kicker">TEAM ARENA · 5 v 5</div>
         <h1><span>Starlane</span><span>Scuffle</span></h1>
         <div class="parade">${row}</div>
-        <div class="wallet" data-testid="title-wallet">${wallet()}</div>
+        <div class="wallet" data-testid="title-wallet">${wallet()}<button class="small profbtn" type="button" data-testid="profile-btn">PROFILE</button></div>
         <div class="quests" data-testid="quests-panel"><b>TODAY'S QUESTS</b>${questView().map((q) => `<span class="quest ${q.done ? 'done' : ''}" data-testid="quest-${q.id}"><i>${q.done ? '✓' : ''}</i>${q.text}<em>${q.done ? 'DONE' : `${q.prog}/${q.goal}`}</em><small>+${q.coins}</small>${COIN}</span>`).join('')}</div>
         <div class="row"><button class="btn primary play" type="button" data-testid="play-btn">PLAY</button>
         <button class="btn online" type="button" data-testid="online-btn">PLAY ONLINE</button></div>
         <p class="hint"><span class="mouse">WASD move · Space attack · Q E R skills · 1 2 3 or Ctrl+Q/E/R rank up</span><span class="touchhint">Left thumb move · Right thumb attack · tap the gold + above a skill to level it</span></p>`,
-      (el) => { on(el, '.play', onPlay); on(el, '.online', onOnline); });
+      (el) => { on(el, '.play', onPlay); on(el, '.online', onOnline); el.querySelector('.profbtn').addEventListener('click', () => onProfile?.()); });
     },
 
+
+    // Profile: level + XP bar, coins, totals, champions unlocked and the badge wall.
+    showProfile(onBack) {
+      checkBadges(); // catch up on anything earned before this version
+      const p = profile(), need = xpNeeded(p.level), owned = ROSTER.filter(isOwned).length;
+      const stat = (k, v, t) => `<li data-testid="${t}"><b>${v}</b><span>${k}</span></li>`;
+      const wall = BADGES.map((b) => { const on = isEarned(b.id); return `<li class="badge ${on ? 'on' : ''}" data-testid="badge-${b.id}" data-earned="${on}"><i>${on ? b.icon : '?'}</i><b>${b.name}</b><small>${b.hint}</small></li>`; }).join('');
+      show('profile modal', `
+        <button class="small home" type="button" aria-label="Back" data-testid="profile-back">${icons.home}</button>
+        <h2>Profile</h2>
+        <div class="proftop"><span class="lvl-pill big" data-testid="profile-level">LV ${p.level}</span>
+          <div class="xpbar" data-testid="profile-xp"><i style="width:${Math.round((p.xp / need) * 100)}%"></i><em>${p.xp} / ${need} XP</em></div>
+          <span class="coins big" data-testid="profile-coins">${COIN}<b>${p.coins}</b></span></div>
+        <ul class="pstats">${stat('Matches', p.matches, 'stat-matches')}${stat('Wins', p.wins, 'stat-wins')}${stat('KOs', p.kills, 'stat-kos')}${stat('Champions', `${owned}/${ROSTER.length}`, 'stat-champs')}</ul>
+        <ul class="badges" data-testid="badge-wall">${wall}</ul>`,
+      (el) => { el.dataset.testid = 'profile-root'; on(el, '.home', onBack); });
+    },
 
     // Match setup: a preset for every bot, team sizes (1-5), your side, and a level per bot. `setup` is edited in place (see game/setup.js).
     // online: no "your side" chooser (players pick teams in the lobby). readOnly: just the summary and slots (guests).
@@ -377,6 +395,7 @@ export function createMenus(root) {
         <p class="reason">${reason} · ${mmss(time)}</p>
         ${win ? `<div class="stars">${row}</div>` : ''}
         ${rewards ? `<p class="rewards" data-testid="rewards">+${rewards.coins} ${COIN} · +${rewards.xp} XP${rewards.levelsGained ? ` · <b data-testid="level-up">LEVEL UP! LV ${rewards.level} (+${rewards.bonus} ${COIN})</b>` : ''}</p>` : ''}
+        ${(rewards?.badges ?? []).map((b) => `<p class="questdone" data-testid="badge-new">${b.icon} NEW BADGE: ${b.name}</p>`).join('')}
         ${(rewards?.quests ?? []).map((q) => `<p class="questdone" data-testid="quest-complete">★ QUEST DONE: ${q.text} · +${q.coins} ${COIN}</p>`).join('')}${btns}`,
       (el) => { on(el, '.again', onAgain); on(el, '.home', onHome); });
     },
