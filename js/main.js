@@ -26,6 +26,7 @@ import { cleanSetup, defaultSetup } from './game/setup.js';
 import { isOwned, awardMatch, addCoins, FREE_CHAMPS } from './game/progress.js';
 import { progressMatch } from './game/quests.js';
 import { evaluate as checkBadges, setFlag } from './game/badges.js';
+import { Tutorial } from './ui/tutorial.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -58,6 +59,7 @@ let t = 0;
 let resultTimer = 0;
 let draftBans = []; // offline: champions banned this draft
 let setup = defaultSetup(); // offline match setup (team sizes, side, bot levels); kept between matches
+const tutorial = new Tutorial(match, { onDone: () => { save.set('tutorialSeen', true); setFlag('tutorial'); checkBadges(); toTitle(); }, onSkip: () => { save.set('tutorialSeen', true); toTitle(); } });
 const BAN_SECS = 12, PICK_SECS = 30;
 const pickOne = (ids) => ids[(Math.random() * ids.length) | 0];
 let picked = save.get('hero', ROSTER[0]);
@@ -87,6 +89,7 @@ $('unstuck').addEventListener('click', (e) => {
 syncMute();
 
 function leave(next) {
+  tutorial.stop();
   clearTimeout(resultTimer);
   resetInput();
   state = next;
@@ -100,7 +103,7 @@ function leave(next) {
 function toTitle() {
   leaveRoom();
   leave('title');
-  menus.showTitle(() => toSetup(), () => toOnline(), () => menus.showProfile(toTitle), () => toSetup(true));
+  menus.showTitle(() => toSetup(), () => toOnline(), () => menus.showProfile(toTitle), () => toSetup(true), () => startTutorial());
 }
 
 // ---- online ----
@@ -251,6 +254,23 @@ net.on('welcome', (m) => {
   renderLobby();
 });
 
+// Tutorial: a tiny practice match (you vs one Easy bot) with four short, skippable hints (ui/tutorial.js).
+function startTutorial() {
+  leave('match');
+  draftBans = [];
+  const tut = { size: [1, 1], side: 0, diff: [Array(5).fill('easy'), Array(5).fill('easy')] };
+  match.setHero('bulwark', undefined, [], [...spells], tut);
+  menus.hideAll();
+  match.reset();
+  rig.follow(match.hero);
+  hud.show();
+  document.body.classList.add('playing');
+  lockLandscape();
+  state = 'match';
+  audio.music(true);
+  tutorial.start();
+}
+
 // Offline match setup comes first: presets, team sizes, side and a level per bot; then the draft.
 function toSetup(coop = false) {
   leave('select');
@@ -362,8 +382,11 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden && !online) { pause(); loop.stop(); } else loop.start();
 });
 
+const q0 = new URLSearchParams(location.search);
 toTitle();
 loop.start();
+// First launch: start the tutorial by itself (skippable). Automated browsers (navigator.webdriver) skip this unless ?tutorial=1.
+if (!save.get('tutorialSeen', false) && !q0.get('room') && (q0.get('tutorial') === '1' || !navigator.webdriver)) startTutorial();
 
 const deepLink = cleanCode(new URLSearchParams(location.search).get('room'));
 const lastRoom = cleanCode(save.get('lastRoom', '') || '');

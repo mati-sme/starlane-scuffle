@@ -734,3 +734,14 @@ h2 { font-style: normal; }
 .btn.coopset.on { background: linear-gradient(180deg, #2f7a4a, #17402a); }
 @media (max-height: 460px) { .btn.coopset { height: 26px; font-size: 11px; } }
 .profbtn.small { position: static !important; width: auto !important; min-width: 0 !important; height: 30px !important; padding: 0 12px !important; font-size: 12px; font-weight: 800; letter-spacing: .1em; white-space: nowrap; color: #fff; clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); }
+
+/* v8.5 tutorial */
+#tutorial { position: fixed; left: 50%; top: 14%; transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 10px; max-width: min(92vw, 640px); padding: 8px 12px; border: 3px solid var(--gold); background: rgba(8,12,26,.9); box-shadow: 0 4px 0 rgba(0,0,0,.5); pointer-events: none; }
+#tutorial .tut-emoji { font-size: 28px; }
+#tutorial .tut-text { margin: 0; font-size: clamp(14px, 3.6vh, 22px); font-weight: 800; color: #fff; text-shadow: 0 2px 0 var(--ink); }
+#tutorial .tut-btn { pointer-events: auto; height: 38px; padding: 0 14px; border: 2px solid rgba(255,255,255,.6); background: linear-gradient(180deg, #2A3656, #151C33); color: #fff; font-family: inherit; font-weight: 800; letter-spacing: .1em; cursor: pointer; }
+#tutorial .tut-btn.finish { background: linear-gradient(180deg, #FFE28A, var(--gold)); color: var(--ink); border-color: var(--ink); }
+#tutorial .tut-btn[hidden] { display: none; }
+@media (max-height: 460px) { #tutorial { top: 8%; padding: 4px 8px; } #tutorial .tut-emoji { font-size: 20px; } #tutorial .tut-btn { height: 28px; font-size: 11px; } }
+#tutorial { top: 27%; max-width: min(46vw, 520px); }
+@media (max-height: 460px) { #tutorial { top: 27%; } }

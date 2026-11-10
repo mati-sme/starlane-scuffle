@@ -129,19 +129,19 @@ export function createMenus(root) {
   return {
     hideAll() { clearInterval(tick); root.innerHTML = ''; },
 
-    showTitle(onPlay, onOnline, onProfile, onCoop) {
+    showTitle(onPlay, onOnline, onProfile, onCoop, onTutorial) {
       const row = ROSTER.map((id, i) => `<i style="--i:${i};--c:${HEROES[id].css}">${portrait(id)}</i>`).join('');
       show('title modal', `
         <div class="kicker">TEAM ARENA · 5 v 5</div>
         <h1><span>Starlane</span><span>Scuffle</span></h1>
         <div class="parade">${row}</div>
-        <div class="wallet" data-testid="title-wallet">${wallet()}<button class="small profbtn" type="button" data-testid="profile-btn">PROFILE</button></div>
+        <div class="wallet" data-testid="title-wallet">${wallet()}<button class="small profbtn" type="button" data-testid="profile-btn">PROFILE</button><button class="small profbtn" type="button" data-testid="tutorial-start">HOW TO PLAY</button></div>
         <div class="quests" data-testid="quests-panel"><b>TODAY'S QUESTS</b>${questView().map((q) => `<span class="quest ${q.done ? 'done' : ''}" data-testid="quest-${q.id}"><i>${q.done ? '✓' : ''}</i>${q.text}<em>${q.done ? 'DONE' : `${q.prog}/${q.goal}`}</em><small>+${q.coins}</small>${COIN}</span>`).join('')}</div>
         <div class="row"><button class="btn primary play" type="button" data-testid="play-btn">PLAY</button>
         <button class="btn coop" type="button" data-testid="coop-btn">2v2 CO-OP</button>
         <button class="btn online" type="button" data-testid="online-btn">PLAY ONLINE</button></div>
         <p class="hint"><span class="mouse">WASD move · Space attack · Q E R skills · 1 2 3 or Ctrl+Q/E/R rank up</span><span class="touchhint">Left thumb move · Right thumb attack · tap the gold + above a skill to level it</span></p>`,
-      (el) => { on(el, '.play', onPlay); on(el, '.online', onOnline); on(el, '.coop', () => onCoop?.()); el.querySelector('.profbtn').addEventListener('click', () => onProfile?.()); });
+      (el) => { on(el, '.play', onPlay); on(el, '.online', onOnline); on(el, '.coop', () => onCoop?.()); el.querySelector('[data-testid="profile-btn"]').addEventListener('click', () => onProfile?.()); el.querySelector('[data-testid="tutorial-start"]').addEventListener('click', () => onTutorial?.()); });
     },
 
 
