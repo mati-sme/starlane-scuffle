@@ -23,10 +23,14 @@ export const sideX = (team, d) => (team === 0 ? -d : d);
 export const GROUND = 0.08;
 export const SIM_STEP = 1 / 30;
 
-export const MAP = { halfX: 90, halfZ: 56, heroX: 80, heroBound: { x: 87, z: 53 }, laneW: 10 };
+// v9.1: the arena is 0.7x the old 180x112 map (126x78): shorter lanes, quicker rotations. All quadrant data below is authored at the old size and scaled once here.
+export const MAP_SCALE = 0.7;
+const S = MAP_SCALE, sp = ([x, z, ...r]) => [+(x * S).toFixed(2), +(z * S).toFixed(2), ...r], sl = (l) => l.map(sp);
+const sbox = ([cx, cz, w, d]) => [+(cx * S).toFixed(2), +(cz * S).toFixed(2), +Math.max(1.6, w * S).toFixed(2), +Math.max(1.6, d * S).toFixed(2)];
+export const MAP = { halfX: 63, halfZ: 39, heroX: 56, heroBound: { x: 61, z: 37 }, laneW: 8 };
 
 // Quadrant data (x < 0, z < 0), mirrored 4x by world/arena.js. Team 0 (Sunny) owns -x; the top lane is z < 0.
-export const ARENA = {
+const ARENA_RAW = {
   lanes: [ // waypoints run Sunny base -> Gloom base
     [[-70, -6], [-62, -20], [-52, -38], [52, -38], [62, -20], [70, -6]],
     [[-70, 0], [70, 0]],
@@ -45,6 +49,13 @@ export const ARENA = {
   camps: [[-30, -18]],
   pits: [[0, 29, 'dragon'], [0, -29, 'titan']], // epic boss pits on the centre line (x, z); the Herald shares the Titan pit
   brushSeeRange: 3.5, brushRevealT: 1.2,
+};
+export const ARENA = {
+  lanes: ARENA_RAW.lanes.map(sl), outer: sl(ARENA_RAW.outer), inner: sl(ARENA_RAW.inner), inhib: sl(ARENA_RAW.inhib), guard: sl(ARENA_RAW.guard),
+  core: sp(ARENA_RAW.core), fountain: sp(ARENA_RAW.fountain), fountainR: 5, pads: sl(ARENA_RAW.pads),
+  cover: ARENA_RAW.cover.map(sbox), brush: ARENA_RAW.brush.map(sbox), pockets: ARENA_RAW.pockets.map(sbox), camps: sl(ARENA_RAW.camps),
+  pits: [[0, 17, 'dragon'], [0, -17, 'titan']], // pits sit closer to the lanes than a plain 0.7 scale would put them (clear of the side lanes)
+  brushSeeRange: 3.0, brushRevealT: 1.2,
 };
 
 export const MATCH = {

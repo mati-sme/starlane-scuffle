@@ -53,4 +53,4 @@ export function inBrush(x, z) {
 }
 
 // Which lane (0 top, 1 mid, 2 bot) a point is closest to, by z band.
-export const laneOf = (z) => (z < -19 ? 0 : z > 19 ? 2 : 1);
+export const laneOf = (z) => (z < -13.5 ? 0 : z > 13.5 ? 2 : 1);

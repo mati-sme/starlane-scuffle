@@ -135,7 +135,7 @@ function roundRect(w, d, r) {
 }
 
 // Rounded-slab floating island: two cliff tiers, each stacked from rock strata with alternating insets and tones.
-const ISLAND = { w: 196, d: 124, r: 22 };
+const ISLAND = { w: 138, d: 88, r: 15 };
 function buildIsland(group) {
   const layer = (w, d, r, h, y) => new THREE.ExtrudeGeometry(roundRect(w, d, r), { depth: h, bevelEnabled: false, curveSegments: 6 })
     .rotateX(-Math.PI / 2).translate(0, y, 0); // extrusions are already non-indexed
@@ -145,7 +145,7 @@ function buildIsland(group) {
     insets.forEach((k, i) => strata.push({ geo: layer(w - k * 2, d - k * 2, r - k, h, top - h * (i + 1)), top: top - h * i, h, i }));
   };
   tier(ISLAND.w, ISLAND.d, ISLAND.r, 0, -10, [0, 0.7, 0.3, 1.2]);
-  tier(150, 86, 20, -10, -19, [0, 0.9, 0.4, 1.4]);
+  tier(105, 60, 14, -10, -19, [0, 0.9, 0.4, 1.4]);
   const cap = new THREE.Color(G.grassDark), cl = new THREE.Color(G.rock), cd = new THREE.Color(G.rockDark), warm = new THREE.Color(0x8C7558);
   const geos = strata.map(({ geo, top, h, i }) => {
     geo.deleteAttribute('uv');
@@ -425,7 +425,7 @@ function buildProps(group) {
   for (let i = 0; i < N; i++) { // along the north / south rim and behind each base
     const rim = i < 48, sx = i % 2 ? 1 : -1;
     const m = i % 2 ? trees : pines, j = i >> 1;
-    const x = rim ? rand(-90, 90) : sx * rand(88, 94), z = rim ? sx * rand(47, 56) : rand(-40, 40);
+    const x = rim ? rand(-MAP.halfX, MAP.halfX) : sx * rand(MAP.halfX - 2, MAP.halfX + 4), z = rim ? sx * rand(MAP.halfZ - 9, MAP.halfZ) : rand(-28, 28);
     place(m, j, x, heightAt(x, z) - 0.1, z, rand(0, 6), rand(1, 1.6));
     m.setColorAt(j, _c.setScalar(rand(0.85, 1.15)));
   }
@@ -560,13 +560,13 @@ function buildDetail(group) {
   // Reeds on the river banks and pit rims, lily pads on the water.
   const reedGeo = mergeParts([0, 1, 2, 3, 4, 5].map((k) => ({ g: new THREE.ConeGeometry(0.04, 1.2 + (k % 3) * 0.3, 3).translate(0, 0.6, 0), c: k % 2 ? 0x6F9A48 : 0x88A858, p: [Math.cos(k * 2.4) * 0.18, 0, Math.sin(k * 2.4) * 0.18], r: [Math.sin(k) * 0.2, 0, Math.cos(k) * 0.2], f: 'cloth' })));
   const reedSpots = [];
-  for (let z = -54; z < 54; z += HI ? 3.2 : 5.5) for (const sx of [-1, 1]) { const x = sx * rand(4.8, 5.6), zz = z + rand(-1, 1); if (!ARENA.lanes.some((lane) => lane.some(([lx, lz], j) => j && segDist(x, zz, lane[j - 1], [lx, lz]) < MAP.laneW / 2 + 0.8)) && !ARENA.pits.some(([px, pz]) => Math.hypot(x - px, zz - pz) < 7.6)) reedSpots.push([x, zz]); }
+  for (let z = -(MAP.halfZ - 2); z < MAP.halfZ - 2; z += HI ? 3.2 : 5.5) for (const sx of [-1, 1]) { const x = sx * rand(4.8, 5.6), zz = z + rand(-1, 1); if (!ARENA.lanes.some((lane) => lane.some(([lx, lz], j) => j && segDist(x, zz, lane[j - 1], [lx, lz]) < MAP.laneW / 2 + 0.8)) && !ARENA.pits.some(([px, pz]) => Math.hypot(x - px, zz - pz) < 7.6)) reedSpots.push([x, zz]); }
   for (const [px, pz] of ARENA.pits) for (let k = 0; k < (HI ? 16 : 8); k++) { const a = rand(0, 6.28); reedSpots.push([px + Math.cos(a) * 6.9, pz + Math.sin(a) * 6.9]); }
   const reeds = instanced(reedGeo, mat, reedSpots.length);
   reedSpots.forEach(([x, z], i) => { place(reeds, i, x, 0, z, rand(0, 6), rand(0.7, 1.2)); reeds.setColorAt(i, _c.setScalar(rand(0.85, 1.15))); });
   const padGeo = mergeParts([{ g: new THREE.CircleGeometry(0.45, 10, 0.3, Math.PI * 1.8).rotateX(-Math.PI / 2), c: 0x4E8E3E, p: [0, 0, 0], f: 'cloth' }, { g: new THREE.SphereGeometry(0.1, 5, 3), c: 0xFFB6D0, p: [0.12, 0.06, 0.1], f: 'cloth' }]);
   const padSpots = [];
-  for (let k = 0; k < (HI ? 40 : 18); k++) padSpots.push([rand(-3.8, 3.8), rand(-54, 54), 0.04]);
+  for (let k = 0; k < (HI ? 40 : 18); k++) padSpots.push([rand(-3.8, 3.8), rand(-(MAP.halfZ - 2), MAP.halfZ - 2), 0.04]);
   for (const [px, pz] of ARENA.pits) for (let k = 0; k < 6; k++) { const a = rand(0, 6.28), r = rand(4.2, 5.6); padSpots.push([px + Math.cos(a) * r, pz + Math.sin(a) * r, 0.07]); }
   const pads = instanced(padGeo, mat, padSpots.length);
   padSpots.forEach(([x, z, y], i) => { place(pads, i, x, y, z, rand(0, 6), rand(0.8, 1.5)); pads.setColorAt(i, _c.setScalar(rand(0.85, 1.15))); });

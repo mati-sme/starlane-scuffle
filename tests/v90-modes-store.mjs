@@ -31,7 +31,7 @@ await page.evaluate(async () => {
   const f3 = m.heroes.filter((h) => h.team === 1)[2]; f3.x = me.x + 2; f3.z = me.z; f3.alive = false; f3.killer = ally; bus.emit('down', f3);
   me.alive = false; me.killer = foe; bus.emit('down', me);
 });
-await sleep(1500);
+await page.waitForFunction(() => document.querySelector('[data-testid="player-kda"]').textContent.replace(/\s/g, '').includes('2/1/1'), null, { timeout: 15000 }).catch(() => {});
 const k1 = (await tid('player-kda').textContent()).replace(/\s/g, '');
 check('KDA counts 2 kills / 1 death / 1 assist', k1.includes('2/1/1'), k1);
 await page.screenshot({ path: SHOTS + 'hud-kda.png' });

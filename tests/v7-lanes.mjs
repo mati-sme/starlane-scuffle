@@ -137,7 +137,7 @@ const sup = await page.evaluate(() => {
   const support = m.heroes.find((h) => h.team === 0 && h.brain && h.def.role === 'support');
   if (!support) return { none: true };
   m._intent = () => { // the human walks to the top lane and stays there
-    const tx = -40, tz = -38, dx = tx - me.x, dz = tz - me.z, d = Math.hypot(dx, dz);
+    const tx = -28, tz = -26, dx = tx - me.x, dz = tz - me.z, d = Math.hypot(dx, dz);
     return { x: d > 1 ? dx / d : 0, z: d > 1 ? dz / d : 0, attack: false, cast: [false, false, false], spell: [false, false], aim: [null, null, null], pref: 0, recall: false };
   };
   me.hp = me.maxHp = 99999; // the human stays alive and out of the way
@@ -148,7 +148,7 @@ const sup = await page.evaluate(() => {
     if (i % 15 === 0) {
       samples++;
       if (support.brain.goal.follow === me) follows++;
-      if (support.alive) { minZ = Math.min(minZ, support.z); if (i > 30 * 30 && Math.hypot(support.x - me.x, support.z - me.z) > 25) farFromPlayer++; }
+      if (support.alive) { minZ = Math.min(minZ, support.z); if (i > 30 * 30 && Math.hypot(support.x - me.x, support.z - me.z) > 18) farFromPlayer++; }
       if (i % 300 === 0) log.push(`${Math.round(m.time)}s me(${me.x | 0},${me.z | 0}) sup(${support.x | 0},${support.z | 0}) ${support.brain.state}`);
     }
   }
@@ -157,8 +157,8 @@ const sup = await page.evaluate(() => {
 check('an ally support exists', !sup.none);
 check('support assigned to bot lane (2)', sup.lane === 2, String(sup.lane));
 check('support never sets follow = the player', sup.follows === 0, `${sup.follows}/${sup.samples}`);
-check('player reached the top lane', sup.meZ < -25, `z=${Math.round(sup.meZ)}`);
-check('support stayed near the bot lane (z > 8) while the player was at top', sup.supZ > 8, `z=${Math.round(sup.supZ)}`);
+check('player reached the top lane', sup.meZ < -17, `z=${Math.round(sup.meZ)}`);
+check('support stayed near the bot lane (z > 5) while the player was at top', sup.supZ > 5, `z=${Math.round(sup.supZ)}`);
 check('support was far from the player for most of the walk', sup.farFromPlayer > 10, String(sup.farFromPlayer));
 console.log('  ', sup.log?.join(' | '));
 

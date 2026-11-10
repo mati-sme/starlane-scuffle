@@ -43,14 +43,14 @@ function run(sx, sz, gx, gz, { maxT = 60, straight = false } = {}) {
   return { ok: false, t, worstStill };
 }
 
-// 1. focused: the tall block at (-20, -26) is 2 wide, 10 tall; start on its west face, goal on the east face.
+// 1. focused (v9.1 map, 0.7x): the tall block at (-14, -18.2) is 1.6 wide, 7 tall; start on its west face, goal on the east face.
 {
-  const r = run(-24, -26, -16, -26, { maxT: 20 });
-  ok('far side of the (-20,-26) block reached', r.ok, `${r.t.toFixed(1)}s`);
-  const r2 = run(-16, -26, -24, -26, { maxT: 20 });
+  const r = run(-17.4, -18.2, -10.6, -18.2, { maxT: 20 });
+  ok('far side of the (-14,-18.2) block reached', r.ok, `${r.t.toFixed(1)}s`);
+  const r2 = run(-10.6, -18.2, -17.4, -18.2, { maxT: 20 });
   ok('...and back again', r2.ok, `${r2.t.toFixed(1)}s`);
-  const wide = run(-44, -20, -44, -28, { maxT: 20 });
-  ok('around the wide (-44,-24) wall', wide.ok, `${wide.t.toFixed(1)}s`);
+  const wide = run(-30.8, -14, -30.8, -19.6, { maxT: 20 });
+  ok('around the wide (-30.8,-16.8) wall', wide.ok, `${wide.t.toFixed(1)}s`);
 }
 
 // 2. a face-to-face trip across every cover block (4 mirrors included), both directions
@@ -77,7 +77,7 @@ function run(sx, sz, gx, gz, { maxT = 60, straight = false } = {}) {
 
 // 4. random cross-map trips (fixed seed): arrive, never stationary > 3 s while heading for the goal
 {
-  const free = () => { for (;;) { const x = (rnd() * 2 - 1) * 84, z = (rnd() * 2 - 1) * 50; if (!inCover(x, z)) return [x, z]; } };
+  const free = () => { for (;;) { const x = (rnd() * 2 - 1) * (MAP.halfX - 5), z = (rnd() * 2 - 1) * (MAP.halfZ - 5); if (!inCover(x, z)) return [x, z]; } };
   let bad = 0, worst = 0; const N = 400;
   for (let i = 0; i < N; i++) {
     const [a, b] = [free(), free()];
@@ -90,7 +90,7 @@ function run(sx, sz, gx, gz, { maxT = 60, straight = false } = {}) {
 
 // 5. sensitivity: the old straight-line walk must visibly fail the focused case (otherwise the test proves nothing)
 {
-  const r = run(-24, -26, -16, -26, { maxT: 12, straight: true });
+  const r = run(-17.4, -18.2, -10.6, -18.2, { maxT: 12, straight: true });
   ok('straight-line baseline is stuck on the block (test can see the bug)', !r.ok && r.worstStill > 3, `worst still ${r.worstStill.toFixed(1)}s`);
 }
 process.exit(fail);
