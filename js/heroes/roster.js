@@ -5,6 +5,7 @@
 
 import { WAVE2A } from './wave2a.js';
 import { WAVE2B } from './wave2b.js';
+import { WAVE3 } from './wave3.js';
 
 export const ROLES = ['tank', 'bruiser', 'assassin', 'blaster', 'shooter', 'support'];
 
@@ -319,4 +320,5 @@ export const ROSTER_DEFS = [
   },
   ...WAVE2A,
   ...WAVE2B,
+  ...WAVE3,
 ];

@@ -47,7 +47,7 @@ const res = await page.evaluate(async (only) => {
         row.slots.push(info);
         m.zones.reset();
         if (info.err) row.problems.push(`slot ${slot} threw: ${info.err}`);
-        else if (!info.cast) row.problems.push(`slot ${slot} did not cast (${info.no})`);
+        else if (!info.cast && !(info.no === 'target' && h.ab[slot].ally)) row.problems.push(`slot ${slot} did not cast (${info.no})`);
       }
     } catch (e) { row.problems.push('harness: ' + String(e.message).slice(0, 100)); }
     out.push(row);

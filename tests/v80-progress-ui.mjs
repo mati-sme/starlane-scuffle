@@ -33,7 +33,7 @@ await page.goto(BASE + '?gfx=low', { waitUntil: 'load', timeout: 90000 });
 check('title lists 3 daily quests', (await page.locator('[data-testid="quests-panel"] .quest').count()) === 3);
 if (process.env.TSHOT) await page.screenshot({ path: process.env.TSHOT });
 await tid('profile-btn').click({ force: true }); await tid('profile-root').waitFor({ timeout: 4000 });
-check('profile screen: level/coins/badge wall', (await tid('profile-level').textContent()).includes('1') && (await page.locator('[data-testid^="badge-"][data-earned]').count()) >= 8 && (await tid('stat-champs').textContent()).includes('10/48'));
+check('profile screen: level/coins/badge wall', (await tid('profile-level').textContent()).includes('1') && (await page.locator('[data-testid^="badge-"][data-earned]').count()) >= 8 && (await tid('stat-champs').textContent()).includes('10/58'));
 if (process.env.PSHOT) await page.screenshot({ path: process.env.PSHOT });
 await tid('profile-back').click({ force: true }); await tid('play-btn').waitFor({ timeout: 4000 });
 check('title shows level 1', (await tid('player-level').first().textContent()).includes('1'));

@@ -16,6 +16,7 @@ import { WAVE2B_BEH } from './wave2b_beh.js';
 import { KITS_A } from './kits_a.js';
 import { KITS_B } from './kits_b.js';
 import { KITS_C } from './kits_c.js';
+import { KITS_D } from './kits_d.js';
 
 const DEG = Math.PI / 180;
 // Ability VFX colors: a champion may override its body colors with `fx: { color, accent }` so skills stay distinct.
@@ -909,6 +910,6 @@ const BASICS = {
   },
 };
 
-Object.assign(BEHAVIORS, WAVE2A_BEHAVIORS, WAVE2B_BEH, KITS_A, KITS_B, KITS_C);
+Object.assign(BEHAVIORS, WAVE2A_BEHAVIORS, WAVE2B_BEH, KITS_A, KITS_B, KITS_C, KITS_D);
 
 export { BEHAVIORS, BASICS };

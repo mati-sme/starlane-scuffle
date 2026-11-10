@@ -10,10 +10,10 @@ export const FACTIONS = {
 export const FACTION_IDS = Object.keys(FACTIONS);
 
 const ROSTER = {
-  light: ['lumen', 'prism', 'solace', 'beacon', 'aurora', 'hymn', 'aria', 'corsa', 'bulwark', 'glint', 'cinder', 'embermaw'],
-  dark: ['nyx', 'vesper', 'shade', 'wisp', 'mirage', 'comet', 'magnus', 'razor', 'basilisk', 'pounce', 'kade', 'ravel'],
-  water: ['rime', 'volt', 'zephyr', 'tempo', 'rico', 'tidewall', 'longshot', 'brine', 'keel', 'anvil', 'cyclone', 'harpoon'],
-  nature: ['mossback', 'tremor', 'bloom', 'petal', 'grove', 'mycel', 'quill', 'granite', 'loom', 'rotor', 'flint', 'torque'],
+  light: ['lumen', 'prism', 'solace', 'beacon', 'aurora', 'hymn', 'aria', 'corsa', 'bulwark', 'glint', 'cinder', 'embermaw', 'ziggy', 'dumpling', 'moxie'],
+  dark: ['nyx', 'vesper', 'shade', 'wisp', 'mirage', 'comet', 'magnus', 'razor', 'basilisk', 'pounce', 'kade', 'ravel', 'dusk', 'pixel'],
+  water: ['rime', 'volt', 'zephyr', 'tempo', 'rico', 'tidewall', 'longshot', 'brine', 'keel', 'anvil', 'cyclone', 'harpoon', 'gumdrop', 'nimbus'],
+  nature: ['mossback', 'tremor', 'bloom', 'petal', 'grove', 'mycel', 'quill', 'granite', 'loom', 'rotor', 'flint', 'torque', 'bruno', 'sprocket', 'scarlet'],
 };
 const OF = {};
 for (const f of FACTION_IDS) for (const id of ROSTER[f]) OF[id] = f;
