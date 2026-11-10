@@ -8,6 +8,7 @@ import { rand } from '../core/math.js';
 import { pickTarget, bestCluster } from './targeting.js';
 import { forEachAlly, forEachEnemy } from './combat.js';
 import { PATHS, fountain, structSpot, laneOf } from '../world/arena.js';
+import { findPath, clearLine, freePoint } from '../world/nav.js';
 
 const MELEE = { tank: 0, bruiser: 1, assassin: 2 };
 // Where to stand relative to the minion front: > 0 is ahead of it, < 0 behind (units along the lane).
@@ -51,6 +52,7 @@ export class Bot {
     this.roamT = 0;
     this.shopping = false; this.shopAt = 0;
     this.stuckT = 0; this.nudge = 0; this.nudgeSide = 1;
+    this.path = null; this.pathT = 0; this.pathGoal = { x: 0, z: 0 }; this.escape = null; this.escapeT = 0; this.stuckCount = 0;
     this.sx = this.h.x; this.sz = this.h.z;
     Object.assign(this.goal, { x: this.h.x, z: this.h.z, follow: null, keep: 0.4 });
   }
@@ -364,13 +366,37 @@ export class Bot {
     }
   }
 
+  // Next point to walk to on the way to (tx, tz): straight when the line is clear of cover, else along an A* path that is
+  // refreshed when the goal moves or every half second, with the first waypoint dropped as soon as it is reached or skipped.
+  _waypoint(dt, tx, tz) {
+    const h = this.h;
+    if (clearLine(h.x, h.z, tx, tz)) { this.path = null; return { x: tx, z: tz }; }
+    this.pathT -= dt;
+    const moved = Math.hypot(tx - this.pathGoal.x, tz - this.pathGoal.z);
+    if (!this.path || this.pathT <= 0 || moved > 2.5) {
+      this.path = findPath(h.x, h.z, tx, tz);
+      this.pathT = 0.5; this.pathGoal.x = tx; this.pathGoal.z = tz;
+    }
+    const p = this.path;
+    while (p.length > 1 && (Math.hypot(p[0].x - h.x, p[0].z - h.z) < 0.9 || clearLine(h.x, h.z, p[1].x, p[1].z))) p.shift();
+    return p[0];
+  }
+
   _steer(dt, ctx) {
     const h = this.h, g = this.goal, it = this.it;
     const tx = g.follow ? g.follow.x : g.x, tz = g.follow ? g.follow.z : g.z;
     const dx = tx - h.x, dz = tz - h.z, d = Math.hypot(dx, dz);
     const keep = g.follow ? g.keep + g.follow.radius : 0.6;
-    if (d > keep) { it.x = dx / d; it.z = dz / d; }
-    else if (g.follow && h.basic.range >= 6 && d < keep * 0.5) { it.x = -dx / d; it.z = -dz / d; } // ranged heroes back off
+    if (this.escape) { // stuck recovery: walk to a free spot first, then resume
+      this.escapeT -= dt;
+      const ex = this.escape.x - h.x, ez = this.escape.z - h.z, ed = Math.hypot(ex, ez);
+      if (this.escapeT <= 0 || ed < 0.8) this.escape = null;
+      else { it.x = ex / ed; it.z = ez / ed; this.sx = h.x; this.sz = h.z; this.stuckT = 0; return; }
+    }
+    if (d > keep) {
+      const w = this._waypoint(dt, tx, tz), wx = w.x - h.x, wz = w.z - h.z, wd = Math.hypot(wx, wz) || 1;
+      it.x = wx / wd; it.z = wz / wd;
+    } else if (g.follow && h.basic.range >= 6 && d < keep * 0.5) { it.x = -dx / d; it.z = -dz / d; } // ranged heroes back off
     else it.x = it.z = 0;
 
     // Never walk into an enemy tower's range without friendly minions beside it.
@@ -382,18 +408,21 @@ export class Bot {
       }
     }
 
-    // Stuck behind cover: sidestep for a moment.
+    // Stuck (wants to move, barely moved): force a fresh path, and on repeats walk to a free spot off to the side.
     this.stuckT += dt;
-    if (this.stuckT >= 1.5) {
+    if (this.stuckT >= 1) {
       this.stuckT = 0;
-      if ((it.x || it.z) && d > 4 && Math.hypot(h.x - this.sx, h.z - this.sz) < 0.6) { this.nudge = 0.7; this.nudgeSide = Math.random() < 0.5 ? -1 : 1; }
+      if ((it.x || it.z) && d > keep + 1 && Math.hypot(h.x - this.sx, h.z - this.sz) < 0.5) {
+        this.path = null; this.pathT = 0;
+        if (++this.stuckCount >= 2) {
+          const base = Math.atan2(it.z, it.x), side = Math.random() < 0.5 ? -1 : 1;
+          const a = base + side * (1.2 + Math.random() * 0.8);
+          const e = freePoint(h.x, h.z, a, 5 + Math.random() * 3);
+          if (e.x !== h.x || e.z !== h.z) { this.escape = e; this.escapeT = 1.5; }
+          this.stuckCount = 0;
+        }
+      } else this.stuckCount = 0;
       this.sx = h.x; this.sz = h.z;
-    }
-    if (this.nudge > 0) {
-      this.nudge -= dt;
-      const a = 1.2 * this.nudgeSide, c = Math.cos(a), s = Math.sin(a), x = it.x;
-      it.x = x * c - it.z * s;
-      it.z = x * s + it.z * c;
     }
   }
 }
