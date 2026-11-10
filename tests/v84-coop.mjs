@@ -39,14 +39,15 @@ check('2v2 preset button is on', (await tid('preset-2v2').getAttribute('aria-pre
 await tid('preset-hard').click({ force: true }); // difficulty still applies
 check('difficulty preset still works', (await tid('preset-hard').getAttribute('aria-pressed')) === 'true');
 await tid('setup-next').click({ force: true });
-await tid('champion-card-lumen').click({ force: true }); await tid('ban-btn').click({ force: true }); await sleep(400);
+await tid('go-btn').waitFor({ timeout: 5000 });
+check('co-op default has no ban phase', (await tid('ban-btn').count()) === 0);
 await tid('champion-card-bulwark').click({ force: true }); await tid('go-btn').click({ force: true });
 await page.waitForFunction(() => window.__starlane.state === 'match', null, { timeout: 20000 });
 await sleep(500);
 const before = await page.evaluate(() => window.__starlane.match.heroes.map((h) => ({ id: h.id, team: h.team, bot: !!h.brain, x: h.x, z: h.z })));
 check('4 heroes, 2 per side', before.length === 4 && before.filter((h) => h.team === 0).length === 2, JSON.stringify(before.map((h) => h.id + h.team)));
 check('unique champions', new Set(before.map((h) => h.id)).size === 4);
-check('3 bots + me, banned lumen absent', before.filter((h) => h.bot).length === 3 && !before.some((h) => h.id === 'lumen'));
+check('3 bots + me', before.filter((h) => h.bot).length === 3);
 await sleep(9000);
 const after = await page.evaluate(() => window.__starlane.match.heroes.map((h) => ({ x: h.x, z: h.z })));
 const moved = before.map((h, i) => Math.hypot(h.x - after[i].x, h.z - after[i].z));

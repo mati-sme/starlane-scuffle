@@ -1,5 +1,5 @@
 // End-of-match recap: MVP, damage + KO bars for the player's team and one friendly highlight. Pure (see tests/v86-recap.mjs).
-// rows: [{ id, name, team, me, dmg, ko }] for every hero; facts: { win, team (the player's side), destroyed, towersLost, firstStructureTeam, maxBehind, time }.
+// rows: [{ id, name, team, me, dmg, ko, d, a }] (ko = kills, d = deaths, a = assists) for every hero; facts: { win, team (the player's side), destroyed, towersLost, firstStructureTeam, maxBehind, time }.
 const score = (r) => r.ko * 100 + r.dmg / 10;
 
 export function buildRecap(rows, facts) {
@@ -9,7 +9,8 @@ export function buildRecap(rows, facts) {
   const me = mine.find((r) => r.me) ?? null;
   const topDmg = Math.max(1, ...mine.map((r) => r.dmg));
   const bars = mine.map((r) => ({ ...r, dmg: Math.round(r.dmg), pct: Math.round((r.dmg / topDmg) * 100) }));
-  return { mvp, bars, hasStats, highlight: pickHighlight(me, facts, mine) };
+  const kda = me ? { k: me.ko ?? 0, d: me.d ?? 0, a: me.a ?? 0 } : { k: 0, d: 0, a: 0 };
+  return { mvp, bars, hasStats, kda, highlight: pickHighlight(me, facts, mine) };
 }
 
 function pickHighlight(me, f, mine) {

@@ -43,7 +43,7 @@ async function fresh(name) {
   page.on('pageerror', (e) => errors.push(`${name} pageerror: ${e.message}`));
   page.on('console', (m) => { if (['error', 'warning'].includes(m.type()) && !/favicon|WebSocket|ERR_/.test(m.text())) errors.push(`${name} console: ${m.text().slice(0, 300)}`); });
   await page.goto(BASE + '?gfx=low', { waitUntil: 'load', timeout: 90000 });
-  await tap(page, 'play-btn');
+  await tap(page, 'play-btn'); await tap(page, 'mode-ranked');
   await tid(page, 'setup-next').waitFor();
   return { ctx, page };
 }

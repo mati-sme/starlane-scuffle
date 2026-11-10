@@ -1,5 +1,5 @@
 // Damage, hit feedback, status effects and the star-poof defeat animation.
-import { PAL, TEAM, TOWER, CORE } from '../config.js';
+import { PAL, TEAM, TOWER, CORE, HERO } from '../config.js';
 import { bus } from '../core/bus.js';
 import { particles, poofStars, FRAME } from '../render/particles.js';
 import { vfx } from '../render/vfx.js';
@@ -29,6 +29,7 @@ export function dealDamage(t, amount, src, skill = false) {
   }
   if (t.type === 'hero' && sim.bonus[t.team]?.dr) amount *= 1 - sim.bonus[t.team].dr;
   if (t.armor) amount *= 100 / (100 + t.armor);
+  if (src?.type === 'hero' && (t.type === 'tower' || t.type === 'core')) amount *= HERO.structMul; // v9: champions really can take bases down
   if (t.pulseT > 0) amount *= 1 - CORE.pulseDr; // nexus shield pulse
   SPARK.color = TEAM[src?.team]?.main ?? PAL.gold;
   if (t.shieldHp > 0) {
@@ -42,6 +43,7 @@ export function dealDamage(t, amount, src, skill = false) {
   }
   t.hp -= amount;
   if (src?.buf?.lifesteal) heal(src, amount * src.buf.lifesteal.v);
+  if (src?.gear?.ls && t.type !== 'tower' && t.type !== 'core') heal(src, amount * src.gear.ls); // gear lifesteal
   if (t.buf?.undying && t.hp < 1) t.hp = 1;
   t.flash = 0.08;
   t.squash = 1;

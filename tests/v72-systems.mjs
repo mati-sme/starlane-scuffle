@@ -55,7 +55,7 @@ check('12 per faction', Object.values(data.count).join() === '12,12,12,12', JSON
 check('every live champion has 3 strong + 3 weak, disjoint', data.bad.length === 0, data.bad.join());
 console.log(JSON.stringify(data.sample));
 
-await tap(page, 'play-btn');
+await tap(page, 'play-btn'); await tap(page, 'mode-ranked');
 await tid(page, 'setup-next').waitFor();
 await tap(page, 'setup-next');
 await tid(page, 'draft-title').waitFor();

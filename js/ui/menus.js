@@ -12,7 +12,7 @@ import { LEVELS, MAX_TEAM, applyPreset, presetOf, summary } from '../game/setup.
 import { PALETTES, SKIN_IDS, SKIN_PRICE, equipped, ownsSkin, equip, buySkin, portraitShift } from '../game/skins.js';
 import { BADGES, isEarned, evaluate as checkBadges } from '../game/badges.js';
 import { view as questView } from '../game/quests.js';
-import { profile, isOwned, nextPrice, buyChampion, xpNeeded } from '../game/progress.js';
+import { profile, isOwned, nextPrice, buyChampion, xpNeeded, FREE_CHAMPS } from '../game/progress.js';
 
 const hex = (n) => '#' + n.toString(16).padStart(6, '0');
 const mmss = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
@@ -129,21 +129,88 @@ export function createMenus(root) {
   return {
     hideAll() { clearInterval(tick); root.innerHTML = ''; },
 
-    showTitle(onPlay, onOnline, onProfile, onCoop, onTutorial) {
+    showTitle(onPlay, onOnline, onProfile, onCoop, onTutorial, onStore) {
       const row = ROSTER.map((id, i) => `<i style="--i:${i};--c:${HEROES[id].css}">${portrait(id)}</i>`).join('');
       show('title modal', `
         <div class="kicker">TEAM ARENA · 5 v 5</div>
         <h1><span>Starlane</span><span>Scuffle</span></h1>
         <div class="parade">${row}</div>
-        <div class="wallet" data-testid="title-wallet">${wallet()}<button class="small profbtn" type="button" data-testid="profile-btn">PROFILE</button><button class="small profbtn" type="button" data-testid="tutorial-start">HOW TO PLAY</button></div>
+        <div class="wallet" data-testid="title-wallet">${wallet()}<button class="small profbtn" type="button" data-testid="store-btn">STORE</button><button class="small profbtn" type="button" data-testid="profile-btn">PROFILE</button><button class="small profbtn" type="button" data-testid="tutorial-start">HOW TO PLAY</button></div>
         <div class="quests" data-testid="quests-panel"><b>TODAY'S QUESTS</b>${questView().map((q) => `<span class="quest ${q.done ? 'done' : ''}" data-testid="quest-${q.id}"><i>${q.done ? '✓' : ''}</i>${q.text}<em>${q.done ? 'DONE' : `${q.prog}/${q.goal}`}</em><small>+${q.coins}</small>${COIN}</span>`).join('')}</div>
         <div class="row"><button class="btn primary play" type="button" data-testid="play-btn">PLAY</button>
         <button class="btn coop" type="button" data-testid="coop-btn">2v2 CO-OP</button>
         <button class="btn online" type="button" data-testid="online-btn">PLAY ONLINE</button></div>
-        <p class="hint"><span class="mouse">WASD move · Space attack · Q E R skills · 1 2 3 or Ctrl+Q/E/R rank up</span><span class="touchhint">Left thumb move · Right thumb attack · tap the gold + above a skill to level it</span></p>`,
-      (el) => { on(el, '.play', onPlay); on(el, '.online', onOnline); on(el, '.coop', () => onCoop?.()); el.querySelector('[data-testid="profile-btn"]').addEventListener('click', () => onProfile?.()); el.querySelector('[data-testid="tutorial-start"]').addEventListener('click', () => onTutorial?.()); });
+        <p class="hint"><span class="mouse">WASD move · Space attack · Q W E R skills · 1 2 3 4 or Ctrl+Q/W/E/R rank up</span><span class="touchhint">Left thumb move · Right thumb attack · tap the gold + above a skill to level it</span></p>`,
+      (el) => { on(el, '.play', onPlay); on(el, '.online', onOnline); on(el, '.coop', () => onCoop?.()); el.querySelector('[data-testid="profile-btn"]').addEventListener('click', () => onProfile?.()); el.querySelector('[data-testid="store-btn"]').addEventListener('click', () => onStore?.()); el.querySelector('[data-testid="tutorial-start"]').addEventListener('click', () => onTutorial?.()); });
     },
 
+
+    // v9 mode select: Normal (default, straight to pick), Ranked Draft (ban phase first) and 2v2 Co-op.
+    showModes({ onPick, onBack }) {
+      const card = (id, cls, icon, name, blurb) => `<button type="button" class="modecard ${cls}" data-mode="${id}" data-testid="mode-${id}"><i>${icon}</i><b>${name}</b><span>${blurb}</span></button>`;
+      show('modes modal', `
+        <button class="small home" type="button" aria-label="Back" data-testid="modes-back">${icons.home}</button>
+        <h2 data-testid="modes-title">Choose a mode</h2>
+        <div class="modegrid">
+          ${card('normal', 'normal def', '⚔️', 'NORMAL <em>DEFAULT</em>', 'Pick any champion you own and play. No bans!')}
+          ${card('ranked', 'ranked', '🏆', 'RANKED DRAFT', 'Ban one champion first, then pick, just like the pros.')}
+          ${card('coop', 'coop', '🤝', '2v2 CO-OP', 'You and a bot buddy against two bots.')}
+        </div>
+        <p class="hint">Easy, Mid and Hard bots are next. Normal is the best place to start!</p>`,
+      (el) => { on(el, '.home', onBack); for (const b of el.querySelectorAll('.modecard')) b.addEventListener('click', () => onPick(b.dataset.mode)); });
+    },
+
+    // v9 store: spend coins on champions and colour skins. Champions are sold at the current unlock price (see game/progress.js).
+    showStore({ onBack, tab = 'champs', picked = null, onBought }) {
+      const sellable = ROSTER.filter((id) => !FREE_CHAMPS.includes(id));
+      let sel = picked && sellable.includes(picked) ? picked : sellable.find((id) => !isOwned(id)) ?? sellable[0];
+      const body = () => {
+        const price = nextPrice(), coins = profile().coins;
+        if (tab === 'skins') {
+          const rows = ROSTER.filter(isOwned).map((id) => `<li class="skinrow" data-testid="store-skinrow-${id}" style="--c:${HEROES[id].css}"><i class="mp">${portrait(id)}</i><b>${HEROES[id].name}</b>${['default', ...SKIN_IDS].map((k) => {
+            const own = ownsSkin(id, k), on = equipped(id) === k, poor = !own && coins < SKIN_PRICE;
+            return `<button type="button" class="skinchip ${on ? 'on' : ''} ${own ? '' : 'buyable'}" data-id="${id}" data-skin="${k}" data-testid="store-skin-${id}-${k}" aria-pressed="${on}" ${poor ? 'disabled' : ''} style="--sw:${PALETTES[k]?.swatch ?? '#9AA3B8'}"><i></i><small>${k === 'default' ? 'Classic' : PALETTES[k].name}</small>${own ? '' : `<em>${SKIN_PRICE}${COIN}</em>`}</button>`;
+          }).join('')}</li>`).join('');
+          return `<ul class="skinlist" data-testid="store-skins">${rows}</ul>`;
+        }
+        const cards = sellable.map((id) => {
+          const def = HEROES[id], own = isOwned(id);
+          return `<button type="button" class="hcard storecard ${own ? 'owned' : ''} ${id === sel ? 'sel' : ''}" data-id="${id}" data-testid="store-card-${id}" data-owned="${own}" style="--c:${def.css}"><span class="pic">${portrait(id)}</span><b>${def.name}</b><span class="role"><i>${icons.role(def.role)}</i>${upper(def.role)}</span>${own ? '<span class="ownedtag">✓ OWNED</span>' : `<span class="pricetag" data-testid="store-price">${price}${COIN}</span>`}</button>`;
+        }).join('');
+        const def = HEROES[sel], own = isOwned(sel), need = price - coins;
+        const act = own ? '<p class="hint ownedmsg" data-testid="store-owned">You own this champion!</p>'
+          : need > 0 ? `<button class="btn buy" type="button" data-testid="store-buy-btn" disabled>${LOCK} ${price} ${COIN}</button><p class="hint need" data-testid="store-need">${need} more coins. Play a match to earn them!</p>`
+          : `<button class="btn primary buy" type="button" data-testid="store-buy-btn">BUY ${price} ${COIN}</button>`;
+        return `<div class="selwrap storewrap"><div class="grid" data-testid="store-grid">${cards}</div><aside class="detail" data-testid="store-detail" style="--sel:${def.css}">${detailBody(sel)}<div class="dact">${act}</div></aside></div>`;
+      };
+      const draw = (el) => {
+        el.innerHTML = `<button class="small home" type="button" aria-label="Back" data-testid="store-back">${icons.home}</button>
+          <div class="storehead"><h2 data-testid="store-title">Store</h2>
+          <div class="tabs"><button type="button" class="tab ${tab === 'champs' ? 'on' : ''}" data-tab="champs" data-testid="store-tab-champs">CHAMPIONS</button><button type="button" class="tab ${tab === 'skins' ? 'on' : ''}" data-tab="skins" data-testid="store-tab-skins">COLORS</button></div>
+          <div class="wallet sel-wallet" data-testid="store-wallet">${wallet()}</div></div>
+          ${body()}`;
+        wire(el);
+      };
+      const wire = (el) => {
+        on(el, '.home', onBack);
+        for (const b of el.querySelectorAll('.tab')) b.addEventListener('click', () => { tab = b.dataset.tab; draw(el); });
+        for (const c of el.querySelectorAll('.storecard')) c.addEventListener('click', () => { sel = c.dataset.id; audio.sfx('skill', { def: HEROES[sel], isPlayer: true }); draw(el); });
+        el.querySelector('.buy:not(:disabled)')?.addEventListener('click', () => {
+          const r = buyChampion(sel);
+          if (!r.ok) return;
+          audio.sfx('skill', { def: HEROES[sel], isPlayer: true });
+          onBought?.(sel);
+          draw(el);
+        });
+        for (const b of el.querySelectorAll('.skinchip')) b.addEventListener('click', () => {
+          const id = b.dataset.id, k = b.dataset.skin;
+          if (!ownsSkin(id, k) && k !== 'default') { if (!buySkin(id, k).ok) return; } else equip(id, k);
+          audio.sfx('skill', { def: HEROES[id], isPlayer: true });
+          draw(el);
+        });
+      };
+      show('store modal', '', (el) => { el.dataset.testid = 'store-root'; draw(el); });
+    },
 
     // Profile: level + XP bar, coins, totals, champions unlocked and the badge wall.
     showProfile(onBack) {
@@ -209,14 +276,15 @@ export function createMenus(root) {
       const banning = phase === 'ban';
       const out = new Set(banned);
       const usable = (id) => !out.has(id) && isOwned(id); // you can only play champions you own
-      let sel = banning ? null : usable(picked) && ROSTER.includes(picked) ? picked : ROSTER.find(usable) ?? ROSTER[0];
+      let sel = banning ? null : usable(picked) && ROSTER.includes(picked) ? picked : ROSTER.find(usable) ?? ROSTER.find(isOwned) ?? ROSTER[0];
       const cardHtml = (id) => {
-        const def = HEROES[id], gone = out.has(id), locked = !isOwned(id);
+        const def = HEROES[id], gone = out.has(id), locked = false; // v9: only owned champions are listed when picking (the Store sells the rest)
         return `<button type="button" class="hcard ${gone ? 'out banned' : ''} ${locked && !gone ? 'lockd' : ''}" data-id="${id}" data-testid="champion-card-${id}" data-locked="${locked}" data-stamp="${gone ? stamp('banned') : ''}" aria-pressed="false" ${gone ? 'disabled' : ''} style="--c:${def.css}">
           <span class="pic">${portrait(id)}</span><b>${def.name}</b>
-          <span class="role"><i>${icons.role(def.role)}</i>${upper(def.role)}</span>${chip(id)}${locked && !gone ? lockBadge() : ''}</button>`;
+          <span class="role"><i>${icons.role(def.role)}</i>${upper(def.role)}</span>${chip(id)}</button>`;
       };
-      const cards = ROSTER.map(cardHtml).join('');
+      const shown = banning ? ROSTER : ROSTER.filter(isOwned); // ban phase: you may ban anyone the bots could pick; pick phase: only yours
+      const cards = shown.map(cardHtml).join('');
       show(`select modal ${banning ? 'banmode' : ''}`, `
         <button class="small home" type="button" aria-label="Back" data-testid="select-back">${icons.home}</button>
         <h2 class="sel-title" data-testid="draft-title">${banning ? 'Ban — tap to ban' : 'Pick — tap to choose'}</h2>
@@ -230,14 +298,7 @@ export function createMenus(root) {
         </div>`,
       (el) => {
         const list = [...el.querySelectorAll('.hcard')], detail = el.querySelector('.detail');
-        const act = () => {
-          if (banning) return '<button class="btn ban go" type="button" data-testid="ban-btn">BAN</button>';
-          if (isOwned(sel)) return '<button class="btn primary go" type="button" data-testid="go-btn">GO</button>';
-          const price = nextPrice(), need = price - profile().coins;
-          return need > 0
-            ? `<button class="btn buy" type="button" data-testid="buy-btn" disabled>${LOCK} ${price} ${COIN}</button><p class="hint need" data-testid="buy-need">${need} more coins — play a match!</p>`
-            : `<button class="btn primary buy" type="button" data-testid="buy-btn">UNLOCK ${price} ${COIN}</button>`;
-        };
+        const act = () => (banning ? '<button class="btn ban go" type="button" data-testid="ban-btn">BAN</button>' : '<button class="btn primary go" type="button" data-testid="go-btn">GO</button>');
         const fill = () => {
           if (!sel) {
             detail.innerHTML = '<p class="dtitle">Tap a champion you don\'t want anyone to play.</p><div class="dact"><button class="btn ban go" type="button" data-testid="ban-btn" disabled>BAN</button></div>';
@@ -255,19 +316,6 @@ export function createMenus(root) {
             fill();
           });
           detail.querySelector('.go')?.addEventListener('click', () => (banning ? onBan(sel) : onPlay(sel)));
-          detail.querySelector('.buy:not(:disabled)')?.addEventListener('click', () => {
-            const r = buyChampion(sel);
-            if (!r.ok) return;
-            audio.sfx('skill', { def: HEROES[sel], isPlayer: true });
-            const i = list.findIndex((c) => c.dataset.id === sel);
-            list[i].outerHTML = cardHtml(sel); // refresh this card + every price badge (the next unlock costs more)
-            for (const c of el.querySelectorAll('.lockbadge b')) c.textContent = nextPrice();
-            list.splice(0, list.length, ...el.querySelectorAll('.hcard'));
-            wireCards();
-            el.querySelector('.wallet').innerHTML = wallet();
-            onBuy?.(sel);
-            mark(); fill();
-          });
         };
         const mark = () => list.forEach((c) => {
           const on = c.dataset.id === sel;
@@ -326,7 +374,7 @@ export function createMenus(root) {
       const row = (p) => `<li class="pl t${p.team} ${p.connected ? '' : 'off'}" data-testid="player-${p.slot}"><i class="dot"></i><b>${p.name}${p.slot === me ? ' (you)' : ''}</b>
         <span class="tm">${TEAM_NAME[p.team]}</span>${p.ban ? `<span class="bn" data-testid="player-ban-${p.slot}">Ban: ${HEROES[p.ban]?.name ?? p.ban}</span>` : ''}<span class="ch">${p.hero ? `<i>${portrait(p.hero)}</i>${HEROES[p.hero].name}` : '…'}</span></li>`;
       const sel = banning ? banSel : mine?.hero;
-      const cards = ROSTER.map((id) => {
+      const cards = ROSTER.filter((id) => banning || isOwned(id)).map((id) => { // v9: the pick grid lists only champions you own
         const st = state(id), gone = !!st, def = HEROES[id], locked = !banning && !isOwned(id) && !gone; // online: you can only pick champions you own (bans are open to all)
         return `<button type="button" class="hcard ${id === sel ? 'sel' : ''} ${gone ? `out ${st}` : ''} ${locked ? 'lockd' : ''}" data-id="${id}" data-testid="lobby-champ-${id}" data-locked="${locked}" data-stamp="${stamp(st)}" aria-pressed="${id === sel}" style="--c:${def.css}" ${gone || locked || (banning && mine?.ban) ? 'disabled' : ''}>
           <span class="pic">${portrait(id)}</span><b>${def.name}</b>
@@ -391,9 +439,9 @@ export function createMenus(root) {
     },
 
     // Recap screen: result + stars, what you earned (coins / XP / level-up / quests / badges) and the match recap (MVP, damage + KO bars, one highlight).
-    showResult({ win, stars, time, reason, rewards, recap }, { onAgain, onHome, againLabel = 'PLAY AGAIN', homeLabel = 'CHAMPIONS' }) {
+    showResult({ win, stars, time, reason, rewards, recap }, { onHome, homeLabel = 'HOME' }) {
       const row = [0, 1, 2].map((i) => `<i class="${i < stars ? 'on' : ''}" style="--i:${i}">${icons.star(i < stars ? hex(PAL.gold) : '#2B3550')}</i>`).join('');
-      const btns = `<div class="row"><button class="btn primary again" type="button" data-testid="again-btn">${againLabel}</button><button class="btn home" type="button" data-testid="champions-btn">${homeLabel}</button></div>`;
+      const btns = `<div class="row"><button class="btn primary home" type="button" data-testid="home-btn">${homeLabel}</button></div>`; // v9: one way out, back to the title
       const earn = rewards ? `
           <p class="rewards" data-testid="rewards"><span data-testid="reward-coins">+${rewards.coins} ${COIN}</span><span data-testid="reward-xp">+${rewards.xp} XP</span></p>
           <div class="xpbar slim" data-testid="recap-xp"><i style="width:${Math.round((rewards.xpInto / rewards.xpToNext) * 100)}%"></i><em>LV ${rewards.level} · ${rewards.xpInto}/${rewards.xpToNext}</em></div>
@@ -403,6 +451,7 @@ export function createMenus(root) {
       const panel = recap ? `
         <div class="recap" data-testid="recap">
           ${recap.mvp ? `<div class="mvp" data-testid="recap-mvp"><i class="mvpic">${portrait(recap.mvp.id)}</i><div><small>TEAM MVP</small><b>${recap.mvp.name}${recap.mvp.me ? ' (you!)' : ''}</b><span>${recap.mvp.ko} KO · ${Math.round(recap.mvp.dmg)} dmg</span></div></div>` : ''}
+          ${recap.hasStats ? `<div class="kdabox" data-testid="recap-kda"><div class="k"><b data-testid="recap-k">${recap.kda.k}</b><small>KOs</small></div><div class="d"><b data-testid="recap-d">${recap.kda.d}</b><small>DEFEATED</small></div><div class="a"><b data-testid="recap-a">${recap.kda.a}</b><small>ASSISTS</small></div></div>` : ''}
           <p class="highlight" data-testid="recap-highlight"><i>${recap.highlight.icon}</i>${recap.highlight.text}</p>
           ${recap.hasStats ? `<ul class="dmgbars" data-testid="recap-damage">${recap.bars.map((r) => `<li class="${r.me ? 'me' : ''}"><i>${portrait(r.id)}</i><span>${r.name}</span><b style="--w:${r.pct}%"></b><em>${r.dmg} · ${r.ko} KO</em></li>`).join('')}</ul>` : ''}
         </div>` : '';
@@ -411,7 +460,7 @@ export function createMenus(root) {
         <p class="reason">${reason} · ${mmss(time)}</p>
         <div class="resgrid"><div class="rescol">${win ? `<div class="stars">${row}</div>` : ''}${earn}</div>${panel}</div>
         ${btns}`,
-      (el) => { on(el, '.again', onAgain); on(el, '.home', onHome); });
+      (el) => { on(el, '.home', onHome); });
     },
   };
 }

@@ -69,7 +69,10 @@ export const HERO = {
   gate: (slot, rank) => (slot < 2 ? 2 * rank - 2 : [0, 3, 5, 8][rank]),
   xpNeed: (lv) => 80 + 30 * (lv - 1) + 8 * (lv - 1) ** 2, // ~2600 total to lv 9 (was 880)
   xpRange: 9, xpHeroRange: 14, xp: { blobling: 14, zapper: 16, bigblob: 34, hero: 60, heroPerLevel: 10 },
-  baseHeal: { rate: 0.2 },
+  baseHeal: { rate: 0.2 }, // fountain: 20% max HP / s (full heal in ~5 s)
+  // v9 out-of-combat regen: base + perLevel HP/s once `delay` s have passed without taking damage (was a flat 40 HP/s after 3 s). Going home still matters.
+  regen: { base: 3, perLevel: 0.5, delay: 6 },
+  structMul: 1.3, // champions deal +30% to towers / the Nexus so they can really finish a base
 };
 
 // Bot difficulty, per bot (see game/setup.js): react = seconds between decisions, dmg = outgoing damage, cast = chance a wanted skill is
@@ -84,14 +87,14 @@ export const BOT = { returnHp: 0.9, groupDeficit: 2 };
 
 // Tiers per lane: outer -> inner -> inhib (each needs the one before it down), then two guardians and the Nexus. 3 x 3 lane towers + 2 guardians per team.
 export const TIERS = ['outer', 'inner', 'inhib'];
-export const TOWER = { range: 9, cd: 1.1, radius: 1.5, hp: { outer: 1700, inner: 1800, inhib: 1900, guard: 2200 }, armor: { outer: 8, inner: 10, inhib: 12, guard: 14 }, heroDmg: 70, heroPct: 0.06, minionDmg: 100, shield: 0.35, shieldR: 10 };
+export const TOWER = { range: 9, cd: 1.1, radius: 1.5, hp: { outer: 1700, inner: 1800, inhib: 1900, guard: 2200 }, armor: { outer: 8, inner: 10, inhib: 12, guard: 14 }, heroDmg: 70, heroPct: 0.06, minionDmg: 100, shield: 0.5, shieldR: 10 };
 // The Nexus: 2.5x a guardian's health plus heavy armor, its own laser, and a shield pulse the first time it is hit once exposed.
-export const CORE = { hp: 5500, armor: 40, radius: 2.4, range: 13, cd: 1.2, heroDmg: 100, heroPct: 0.08, minionDmg: 80, pulse: 3, pulseR: 9, pulseDr: 0.7 };
+export const CORE = { hp: 5000, armor: 20, radius: 2.4, range: 13, cd: 1.2, heroDmg: 100, heroPct: 0.08, minionDmg: 80, pulse: 3, pulseR: 9, pulseDr: 0.5 };
 
 // Gold: per-kill rewards, a small passive trickle, and the starting purse (auto-buys boots at the fountain).
 export const GOLD = {
-  start: 350, trickle: 1.6, minion: { blobling: 20, zapper: 24, bigblob: 60 }, minionShare: 0.35,
-  camp: 60, campTeam: 25, hero: 300, assist: 120, assistR: 14, tower: { outer: 150, inner: 175, inhib: 200, guard: 225 }, towerTeam: 50, towerR: 28,
+  start: 300, trickle: 1.2, minion: { blobling: 17, zapper: 20, bigblob: 50 }, minionShare: 0.35,
+  camp: 50, campTeam: 20, hero: 260, assist: 90, assistR: 14, tower: { outer: 130, inner: 150, inhib: 175, guard: 200 }, towerTeam: 40, towerR: 28,
 };
 
 // Epic bosses (neutral camp-type entities; see world/camps.js). first / respawn in seconds; buffs in match.js.

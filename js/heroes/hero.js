@@ -52,7 +52,7 @@ export class Hero {
     this.type = 'hero';
     this.team = team;
     this.slot = slot;
-    Object.assign(this, { hitY: 1.2, barY: 3.4, regen: 40 }, def.stats);
+    Object.assign(this, { hitY: 1.2, barY: 3.4 }, def.stats);
     this.barY *= HERO_SCALE;
     this.baseHp = def.stats.hp;
     this.basic = def.abilities.basic;
@@ -280,7 +280,10 @@ export class Hero {
     }
     if (this.shieldT > 0 && (this.shieldT -= dt) <= 0) this.shieldHp = 0;
 
-    if (this.sinceHit > 3 && this.hp < this.maxHp) this.hp = Math.min(this.maxHp, this.hp + this.regen * dt);
+    if (this.hp < this.maxHp) { // v9 regen: small gear regen always, a gentle out-of-combat trickle after HERO.regen.delay s; the fountain does the real healing
+      const rg = HERO.regen, r = (this.gear.regen ?? 0) + (this.sinceHit > rg.delay ? rg.base + rg.perLevel * (this.level - 1) : 0);
+      if (r > 0) this.hp = Math.min(this.maxHp, this.hp + r * dt);
+    }
     const fo = fountain(this.team);
     if (Math.hypot(this.x - fo.x, this.z - fo.z) < ARENA.fountainR) {
       this.boost = BOOST.t;
@@ -467,6 +470,7 @@ export class Hero {
       if (this.chg[i] > 0) { this.chg[i]--; cd = this.chg[i] > 0 ? 0.5 : ab.cd; }
       else { this.chg[i] = ab.charges - 1; this.chgT[i] = 3; this.chgFull[i] = ab.cd; cd = 0.5; }
     }
+    cd *= 1 - Math.min(0.4, this.gear.cdr ?? 0);
     this.cds[i] = cd;
     this.cdTotal[i] = cd;
     this.castAt[i] = ctx.time;

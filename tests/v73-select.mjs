@@ -59,7 +59,7 @@ async function open(device, name, shot) {
   page.on('pageerror', (e) => errors.push(`${name} pageerror: ${e.message}`));
   page.on('console', (m) => { if (['error', 'warning'].includes(m.type()) && !/favicon|WebSocket|ERR_/.test(m.text())) errors.push(`${name} console: ${m.text().slice(0, 300)}`); });
   await page.goto(BASE + '?gfx=low', { waitUntil: 'load', timeout: 90000 });
-  await tap(page, 'play-btn');
+  await tap(page, 'play-btn'); await tap(page, 'mode-ranked');
   await tid(page, 'setup-next').waitFor();
   await tap(page, 'setup-next');
   await tid(page, 'draft-title').waitFor();
@@ -148,7 +148,7 @@ for (const [dev, name, shot] of [[DESK, 'desktop-lobby', 'after-lobby-online'], 
   await ctx.addInitScript(() => { try { localStorage.setItem("starlane.unlockAll", "true"); } catch {} }); // v8: every champion open for tests
   page.on('pageerror', (e) => errors.push(`ipad pageerror: ${e.message}`));
   await page.goto(BASE + '?gfx=low', { waitUntil: 'load', timeout: 90000 });
-  await tap(page, 'play-btn'); await tid(page, 'setup-next').waitFor(); await tap(page, 'setup-next'); await tid(page, 'draft-title').waitFor();
+  await tap(page, 'play-btn'); await tap(page, 'mode-ranked'); await tid(page, 'setup-next').waitFor(); await tap(page, 'setup-next'); await tid(page, 'draft-title').waitFor();
   const ids = await page.$$eval('[data-testid^="champion-card-"]', (els) => els.map((e) => e.dataset.id));
   await tid(page, `champion-card-${ids[2]}`).click({ force: true });
   const g = await geo(page);

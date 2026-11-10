@@ -82,6 +82,7 @@ export class Match {
       if (t.type === 'camp') t.boss ? this._boss(t) : this._camp(t);
       else if (t.type === 'minion') { this._xp(t, HERO.xp[t.kind], HERO.xpRange); this._minionGold(t); }
       else if (t.type === 'hero') {
+        this._st(t).d++;
         this._xp(t, HERO.xp.hero + HERO.xp.heroPerLevel * t.level, HERO.xpHeroRange);
         this._heroGold(t);
         const k = t.killer;
@@ -119,11 +120,14 @@ export class Match {
     this.reset();
   }
 
-  _st(h) { let s = this.stats.get(h); if (!s) this.stats.set(h, (s = { dmg: 0, ko: 0 })); return s; }
+  _st(h) { let s = this.stats.get(h); if (!s) this.stats.set(h, (s = { dmg: 0, ko: 0, d: 0, a: 0 })); return s; }
+
+  // The local player's K / D / A (the host keeps the books; online guests only see zeros).
+  myKda() { const s = this.stats.get(this.hero); return { k: s?.ko ?? 0, d: s?.d ?? 0, a: s?.a ?? 0 }; }
 
   // Recap numbers for the result screen (see game/recap.js).
   recap(win) {
-    const rows = this.heroes.map((h) => { const s = this.stats.get(h) ?? { dmg: 0, ko: 0 }; return { id: h.id, name: h.def.name, team: h.team, me: h === this.hero, dmg: s.dmg, ko: s.ko }; });
+    const rows = this.heroes.map((h) => { const s = this.stats.get(h) ?? { dmg: 0, ko: 0, d: 0, a: 0 }; return { id: h.id, name: h.def.name, team: h.team, me: h === this.hero, dmg: s.dmg, ko: s.ko, d: s.d, a: s.a }; });
     return buildRecap(rows, { win, team: this.myTeam, destroyed: this.destroyed, towersLost: this.towersLost, firstStructureTeam: this.firstStructureTeam, maxBehind: this.maxBehind, time: this.time });
   }
 
@@ -283,7 +287,7 @@ export class Match {
   _heroGold(v) {
     const team = v.killer?.team ?? 1 - v.team, k = v.killer?.type === 'hero' ? v.killer : null;
     if (k) this._gold(k, GOLD.hero);
-    for (const h of this._near(team, v.x, v.z, GOLD.assistR)) if (h !== k) this._gold(h, GOLD.assist);
+    for (const h of this._near(team, v.x, v.z, GOLD.assistR)) if (h !== k) { this._gold(h, GOLD.assist); this._st(h).a++; }
   }
 
   _towerGold(t) {

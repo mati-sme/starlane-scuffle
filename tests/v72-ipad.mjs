@@ -57,7 +57,7 @@ for (const { name, lib, uaMode } of kinds) {
   await page.goto(BASE + '?gfx=low', { waitUntil: 'load', timeout: 90000 });
   const env = await page.evaluate(() => ({ platform: navigator.platform, mtp: navigator.maxTouchPoints, coarse: matchMedia('(pointer: coarse)').matches, touchClass: document.body.classList.contains('touch') }));
   console.log(`-- ${name}`, JSON.stringify(env));
-  await tap('play-btn');
+  await tap('play-btn'); await tap('mode-ranked');
   await page.locator('[data-testid="setup-next"]').tap({ force: true, timeout: 4000 }).catch(() => {});
   await page.locator('[data-testid="champion-card-lumen"]').tap({ force: true });
   await page.locator('[data-testid="ban-btn"]').tap({ force: true });

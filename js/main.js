@@ -58,6 +58,8 @@ let state = 'title'; // title | select | online | lobby | match | paused | resul
 let t = 0;
 let resultTimer = 0;
 let draftBans = []; // offline: champions banned this draft
+let coopSet = false;
+let mode = 'normal'; // normal (no bans, default) | ranked (ban phase first) | coop (2v2, no bans)
 let setup = defaultSetup(); // offline match setup (team sizes, side, bot levels); kept between matches
 const tutorial = new Tutorial(match, { onDone: () => { save.set('tutorialSeen', true); setFlag('tutorial'); checkBadges(); toTitle(); }, onSkip: () => { save.set('tutorialSeen', true); toTitle(); } });
 const BAN_SECS = 12, PICK_SECS = 30;
@@ -103,7 +105,7 @@ function leave(next) {
 function toTitle() {
   leaveRoom();
   leave('title');
-  menus.showTitle(() => toSetup(), () => toOnline(), () => menus.showProfile(toTitle), () => toSetup(true), () => startTutorial());
+  menus.showTitle(() => toModes(), () => toOnline(), () => menus.showProfile(toTitle), () => { mode = 'coop'; toSetup(true); }, () => startTutorial(), () => toStore());
 }
 
 // ---- online ----
@@ -271,10 +273,21 @@ function startTutorial() {
   tutorial.start();
 }
 
+// v9: mode select (Normal is the default and has no ban phase), then setup, then the draft.
+function toModes() {
+  leave('select');
+  menus.showModes({ onBack: toTitle, onPick: (m) => { mode = m; toSetup(m === 'coop'); } });
+}
+
+function toStore(tab = 'champs') {
+  leave('select');
+  menus.showStore({ tab, picked: null, onBack: toTitle });
+}
+
 // Offline match setup comes first: presets, team sizes, side and a level per bot; then the draft.
 function toSetup(coop = false) {
   leave('select');
-  if (coop) { setup.size = [2, 2]; setup.side = 0; } // 2v2 co-op: you + one bot buddy vs two bots (Easy / Mid / Hard still apply per bot)
+  if (coop) { setup.size = [2, 2]; setup.side = 0; coopSet = true; } else if (coopSet) { setup.size = [5, 5]; coopSet = false; } // 2v2 co-op: you + one bot buddy vs two bots (Easy / Mid / Hard still apply per bot)
   menus.showSetup({ setup, onChange: (s) => { setup = s; }, onNext: toSelect, onBack: toTitle });
 }
 
@@ -282,6 +295,13 @@ function toSetup(coop = false) {
 function toSelect() {
   leave('select');
   draftBans = [];
+  if (mode !== 'ranked') { // Normal / co-op: no ban phase, straight to picking among the champions you own
+    menus.showSelect({
+      phase: 'pick', picked, banned: [], spells: [...spells], onSpells: setSpells, secs: 0, note: 'Pick one of your champions. More are waiting in the Store!',
+      onPlay: startMatch, onHome: toTitle,
+    });
+    return;
+  }
   menus.showSelect({
     phase: 'ban', picked, spells: [...spells], secs: BAN_SECS, onBan: botBans, onHome: toTitle,
     onTimeout: (sel) => botBans(sel ?? pickOne(ROSTER.filter((id) => id !== picked))),
@@ -348,9 +368,7 @@ bus.on('end', (res) => {
   if (res.win && !online && setup.size[0] === 2 && setup.size[1] === 2) setFlag('win2v2');
   res.rewards.badges = checkBadges();
   document.body.classList.remove('playing');
-  resultTimer = setTimeout(() => menus.showResult(res, online
-    ? { onAgain: () => { if (net.slot === 0) net.send({ t: T.abort }); toLobby(); }, onHome: toTitle, againLabel: 'LOBBY', homeLabel: 'EXIT' }
-    : { onAgain: () => startMatch(picked), onHome: toSelect }), 1800);
+  resultTimer = setTimeout(() => menus.showResult(res, { onHome: toTitle, homeLabel: online ? 'EXIT' : 'HOME' }), 1800); // v9: Home only, no rematch from the recap
 });
 
 addEventListener('keydown', (e) => {

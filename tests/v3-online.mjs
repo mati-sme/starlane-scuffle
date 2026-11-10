@@ -179,7 +179,7 @@ async function joinRoomMidMatch(page, code) {
 await flow('D skill-up (offline)', async () => {
   const p = await newPlayer('solo');
   await load(p.page);
-  await tap(p.page, 'play-btn'); await p.page.locator('[data-testid="setup-next"]').click({ force: true, timeout: 4000 }).catch(() => {});
+  await tap(p.page, 'play-btn'); await tap(p.page, 'mode-ranked'); await p.page.locator('[data-testid="setup-next"]').click({ force: true, timeout: 4000 }).catch(() => {});
   // offline draft: ban one champion, then pick a free one
   await tid(p.page, 'ban-btn').waitFor({ state: 'visible' });
   const cards = await p.page.$$eval('[data-testid^="champion-card-"]', (els) => els.map((e) => e.dataset.id));

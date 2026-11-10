@@ -61,7 +61,7 @@ const until = (page, expr, ms = 30000) => page.waitForFunction(expr, null, { tim
 {
   const { ctx, page } = await open('offline');
   await page.goto(BASE + '?gfx=low', { waitUntil: 'load', timeout: 90000 });
-  await tap(page, 'play-btn'); await page.locator('[data-testid="setup-next"]').click({ force: true, timeout: 4000 }).catch(() => {});
+  await tap(page, 'play-btn'); await tap(page, 'mode-ranked'); await page.locator('[data-testid="setup-next"]').click({ force: true, timeout: 4000 }).catch(() => {});
   await tid(page, 'draft-title').waitFor();
   const ids = await page.$$eval('[data-testid^="champion-card-"]', (els) => els.map((e) => e.dataset.id));
   await tid(page, `champion-card-${ids[3]}`).click({ force: true });

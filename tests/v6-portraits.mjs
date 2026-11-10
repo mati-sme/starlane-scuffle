@@ -42,7 +42,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // All 24 card images + the detail portrait decoded from assets/portraits/.
 const imgs = () => page.evaluate(() => [...document.querySelectorAll('.hcard .pic img, .dport img')].map((i) => ({ src: i.getAttribute('src'), w: i.naturalWidth })));
 await page.goto(BASE + '?gfx=low', { waitUntil: 'load', timeout: 90000 });
-await tap('play-btn'); await page.locator('[data-testid="setup-next"]').click({ force: true, timeout: 4000 }).catch(() => {});
+await tap('play-btn'); await tap('mode-ranked'); await page.locator('[data-testid="setup-next"]').click({ force: true, timeout: 4000 }).catch(() => {});
 await page.locator('[data-testid="champion-card-lumen"]').click({ force: true }); await page.locator('[data-testid="ban-btn"]').click({ force: true }); // v6 draft: ban first (lumen), then pick
 await new Promise((r) => setTimeout(r, 300));
 await page.waitForFunction(() => [...document.querySelectorAll('.hcard .pic img')].every((i) => i.complete && i.naturalWidth > 0), null, { timeout: 20000 }).catch(() => {});
@@ -53,7 +53,7 @@ const desk = await browser.newContext({ viewport: { width: 1280, height: 720 } }
 await desk.addInitScript(() => { try { localStorage.setItem("starlane.unlockAll", "true"); } catch {} }); // v8: every champion open for tests
 const dp = await desk.newPage();
 await dp.goto(BASE + '?gfx=low', { waitUntil: 'load', timeout: 90000 });
-await dp.locator('[data-testid="play-btn"]').click({ force: true }); await dp.locator('[data-testid="setup-next"]').click({ force: true, timeout: 4000 }).catch(() => {});
+await dp.locator('[data-testid="play-btn"]').click({ force: true }); await dp.locator('[data-testid="mode-ranked"]').click({ force: true }); await dp.locator('[data-testid="setup-next"]').click({ force: true, timeout: 4000 }).catch(() => {});
 await dp.waitForFunction(() => [...document.querySelectorAll('.hcard .pic img')].every((i) => i.complete && i.naturalWidth > 0), null, { timeout: 20000 });
 await sleep(400);
 await dp.screenshot({ path: join(OUT, 'champ-select-portraits-desktop.png') });

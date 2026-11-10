@@ -30,6 +30,7 @@ export class Hud {
       <canvas id="mini" data-testid="minimap"></canvas>
       <div class="top" data-testid="scorebar">
         <div class="score"><b class="k0" data-testid="kills-blue">0</b><span class="clock" data-testid="clock">0:00</span><b class="k1" data-testid="kills-red">0</b></div>
+        <div class="kda" data-testid="player-kda" aria-label="Your kills, deaths, assists"><span>K / D / A</span><b data-testid="kda-k">0</b><i>/</i><b data-testid="kda-d">0</b><i>/</i><b data-testid="kda-a">0</b></div>
         <div class="pips"><div class="t0" data-testid="pips-blue"></div><div class="t1" data-testid="pips-red"></div></div>
       </div>
       <div class="buffs" data-testid="buffs"></div>
@@ -70,6 +71,7 @@ export class Hud {
     this.rs = -1;
     this.clock = root.querySelector('.clock');
     this.kills = [root.querySelector('.k0'), root.querySelector('.k1')];
+    this.kdaEls = ['k', 'd', 'a'].map((c) => root.querySelector(`[data-testid="kda-${c}"]`));
     this.pipEls = [0, 1].map((t) => root.querySelector(`.pips .t${t}`));
     this.pipKey = ['', ''];
     this.sec = -1;
@@ -207,6 +209,8 @@ export class Hud {
     const sec = Math.floor(m.time);
     if (sec !== this.sec) { this.sec = sec; this.clock.textContent = mmss(m.time); }
     this.clock.classList.toggle('storming', m.storm);
+    const kda = m.myKda();
+    ['k', 'd', 'a'].forEach((c, i) => { const v = String(kda[c]); if (this.kdaEls[i].textContent !== v) { this.kdaEls[i].textContent = v; this.kdaEls[i].classList.remove('bump'); void this.kdaEls[i].offsetWidth; this.kdaEls[i].classList.add('bump'); } });
     for (const t of [0, 1]) {
       const k = String(m.kills[t]);
       if (this.kills[t].textContent !== k) this.kills[t].textContent = k;

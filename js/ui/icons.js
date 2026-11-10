@@ -82,16 +82,7 @@ export const icons = {
   basic_spread: svg(`<path d="M8 32L58 10M8 32h50M8 32l50 22" ${LINE(6)}/><circle cx="8" cy="32" r="6" ${W}/>`),
 };
 
-// Gear glyphs: white on a colored plate (see ui/shop.js).
-export const ITEM_GLYPH = {
-  sword: '<polygon points="46,8 56,8 56,18 30,44 20,34" fill="#fff"/><polygon points="16,38 26,48 18,56 8,56 8,46" fill="#fff"/>',
-  heart: '<path d="M32 56L10 32C4 24 10 10 22 12 27 13 30 16 32 20 34 16 37 13 42 12 54 10 60 24 54 32Z" fill="#fff"/>',
-  shield: '<path d="M32 6L54 14V32C54 45 45 54 32 59 19 54 10 45 10 32V14Z" fill="#fff"/>',
-  bolt: '<polygon points="38,4 16,36 30,36 24,60 48,26 33,26" fill="#fff"/>',
-  boot: '<path d="M18 8H34V30L52 38V54H12V8Z" fill="#fff"/>',
-  star: `<polygon points="${STAR_PTS}" fill="#fff"/>`,
-};
-export const itemIcon = (it) => `<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" stroke="${INK}" stroke-width="3" stroke-linejoin="miter"><rect x="2" y="2" width="60" height="60" rx="8" fill="${it.color}"/>${ITEM_GLYPH[it.ic]}</svg>`;
+export { itemIcon } from './itemart.js';
 
 // Skill glyphs for wave 2 batch B kinds (heroes/wave2b.js).
 Object.assign(icons, {
