@@ -101,11 +101,13 @@ body.playing #abilities { display: block; }
 .sk { position: absolute; left: 50%; top: 50%; padding: 0; border-radius: 50%; border: 4px solid var(--ink); pointer-events: auto; touch-action: none; cursor: pointer; color: #fff; font-family: inherit;
   background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c, #FF8A3D) 55%, #fff), var(--c, #FF8A3D)); box-shadow: 0 6px 0 rgba(0,0,0,.35); transition: filter .2s; }
 .sk { border-width: 3px; box-shadow: 0 4px 0 rgba(0,0,0,.35); }
-.sk.s1, .sk.s2 { width: 56px; height: 56px; margin: -28px 0 0 -28px; }
+.sk.s1, .sk.s2, .sk.s3 { width: 54px; height: 54px; margin: -27px 0 0 -27px; }
 .sk.ult { width: 62px; height: 62px; margin: -31px 0 0 -31px; }
-.sk.s1 { translate: calc(var(--r) * -1) 0; }
-.sk.s2 { translate: calc(var(--r) * -.71) calc(var(--r) * -.71); }
-.sk.ult { translate: 0 calc(var(--r) * -1); }
+/* v9: four skills on an arc: Q W E sit left-to-up, the big ultimate R closes the arc above Attack */
+.sk.s1 { translate: -92px 6px; }
+.sk.s2 { translate: -84px -54px; }
+.sk.s3 { translate: -40px -98px; }
+.sk.ult { translate: 24px -104px; }
 .sk.down { scale: .95; filter: brightness(.82); box-shadow: 0 2px 0 rgba(0,0,0,.35); }
 .sk .face { position: absolute; inset: 15%; display: block; }
 .sk .cd { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(rgba(20,12,40,.68) calc(var(--p, 0) * 1%), transparent 0); }
@@ -133,8 +135,8 @@ body:not(.touch) .sk .key, body:not(.touch) .tgt .key, body:not(.touch) .recall 
 .sk.aiming.cancel::after { content: '\2715'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 800; color: #FF5566; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; }
 .tgt, .recall { position: absolute; left: 50%; top: 50%; padding: 8px; border-radius: 50%; border: 3px solid var(--ink); color: #fff; font-family: inherit; pointer-events: auto; touch-action: none; cursor: pointer; box-shadow: 0 4px 0 rgba(0,0,0,.35); transition: filter .2s; }
 .tgt { width: 40px; height: 40px; margin: -20px 0 0 -20px; }
-.tgt.minion { translate: -52px -144px; background: radial-gradient(circle at 35% 30%, #D8FF9E, #5BC13A); }
-.tgt.tower { translate: 0 -158px; background: radial-gradient(circle at 35% 30%, #BFE0FF, #3D8BE8); }
+.tgt.minion { translate: -78px -158px; background: radial-gradient(circle at 35% 30%, #D8FF9E, #5BC13A); }
+.tgt.tower { translate: -18px -178px; background: radial-gradient(circle at 35% 30%, #BFE0FF, #3D8BE8); }
 .tgt.down, .recall.down { scale: .95; filter: brightness(.82); box-shadow: 0 1px 0 rgba(0,0,0,.35); }
 .tgt svg, .recall .face svg { display: block; width: 100%; height: 100%; }
 .recall { width: 44px; height: 44px; margin: -22px 0 0 -22px; padding: 0; translate: -140px 14px; background: radial-gradient(circle at 35% 30%, #BFF7FF, #2BB6D9); }
@@ -164,9 +166,10 @@ body:not(.touch) .spell .key { display: flex; }
 .skup span { display: block; margin-top: -2px; }
 .skup::before { content: ''; position: absolute; inset: -9px; border-radius: 50%; } /* 26px disc + 9px slop each side = 44px thumb target */
 .skup:active { scale: .95; filter: brightness(.85); }
-.skup.s1 { translate: calc(var(--r) * -1) -32px; }
-.skup.s2 { translate: calc(var(--r) * -.71) calc(var(--r) * -.71 - 32px); }
-.skup.ult { translate: 0 calc(var(--r) * -1 - 36px); }
+.skup.s1 { translate: -70px -20px; }
+.skup.s2 { translate: -62px -78px; }
+.skup.s3 { translate: -18px -122px; }
+.skup.ult { translate: 50px -130px; }
 .sk.ranked::before { content: ''; position: absolute; inset: -3px; border-radius: 50%; border: 2px solid var(--gold); animation: shock .5s ease-out forwards; pointer-events: none; }
 @keyframes upfade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes upglow { 50% { opacity: .8; } }
@@ -815,3 +818,21 @@ h2 { font-style: normal; }
 .skinrow b { min-width: 90px; text-transform: uppercase; letter-spacing: .06em; }
 @media (max-height: 460px) { .screen.store .grid { grid-auto-rows: 96px; } .screen.store .detail { max-height: 100%; } .modecard { min-height: 108px; } .modecard span { display: none; } }
 @media (max-height: 460px) { .screen.store .detail .stats, .screen.store .detail .matchups, .screen.store .detail .dnote { display: none; } .screen.store .detail .dact { position: sticky; bottom: 0; } }
+
+
+/* ---------- v9: skill art + passive badge ---------- */
+.sk .face .skart { display: block; width: 100%; height: 100%; overflow: visible; }
+.sk .face { inset: -2px; }
+.sk { background: transparent !important; }
+.sk.ult.ready { box-shadow: 0 0 0 2px #FFD35C, 0 0 14px 2px rgba(255,211,92,.6); }
+.sk.locked .face { filter: grayscale(1) brightness(.55); }
+#passive { display: none; position: fixed; left: calc(14px + var(--sl)); top: calc(96px + var(--st)); width: 46px; height: 46px; padding: 0; border: 0; background: none; z-index: 4; pointer-events: auto; touch-action: none; font-family: inherit; color: #fff; filter: drop-shadow(0 3px 0 rgba(0,0,0,.4)); }
+body.playing #passive:not([hidden]) { display: block; }
+#passive .pic, #passive .pic svg { display: block; width: 100%; height: 100%; }
+#passive.ping .pic { animation: ding .45s ease-out; }
+#passive .ptip { display: none; position: absolute; left: 52px; top: 0; width: 190px; padding: 6px 9px; border-radius: 10px; border: 1px solid var(--line2); background: var(--glass); text-align: left; line-height: 1.2; }
+#passive .ptip b { display: block; font-size: 14px; } #passive .ptip small { font-size: 9px; letter-spacing: .14em; color: #FFD35C; } #passive .ptip em { display: block; font-style: normal; font-size: 12px; color: #C8D4EE; margin-top: 2px; }
+#passive.open .ptip, #passive:hover .ptip { display: block; }
+@media (max-height: 420px) { #passive { top: calc(86px + var(--st)); width: 40px; height: 40px; } }
+.skills li .si .skart { width: 100%; height: 100%; display: block; }
+.skills li.passive-row .si .psart { width: 100%; height: 100%; display: block; }

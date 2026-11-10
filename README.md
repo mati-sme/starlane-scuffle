@@ -7,7 +7,7 @@ Built with three.js, no build step. All art, icons and sound are procedural.
 
 - **Champions:** all 24 are unlocked from the start. Ban one, then pick one on the select screen (no champion appears twice in a match); your last pick is remembered. You get 4 bot allies and face 5 bot enemies. Both teams always have a blaster, a shooter and a support (each pair is split between the teams, your pick stays on Sunny); the melee slots are random. `?hero=<id>` picks your champion and `?bots=a,b,c,...` forces up to 9 ids (4 allies, then 5 enemies).
 - **Phone (landscape):** left thumb moves, the big button attacks and auto-aims, the three skill buttons cast Q / E / R. A gold `+` pops up above each skill button that can take a point; tap it to rank up.
-- **Desktop:** `WASD` / arrows move, right-click walks, `Space` (or left-click) attacks, `Q` `E` `R` cast skills, `Esc` pauses.
+- **Desktop:** arrow keys move, right-click walks, `Space` (or left-click) attacks, `Q` `W` `E` `R` cast the four skills (`R` is the ultimate), `1`-`4` rank them up, `Esc` pauses.
 - **Skill upgrades:** every level gives a point (max level 9). A small gold `+` appears above each skill button that can be ranked up (Wild Rift style); tap it. On desktop, `1` / `2` / `3` or `Ctrl+Q` / `Ctrl+E` / `Ctrl+R` rank up Q / E / R. Q and E go to rank 4, R to rank 3 (R rank 1 is free at level 3). Rank 2+ adds damage / healing and shortens the cooldown; the max rank adds a perk. Higher ranks need a minimum level (a skill below its gate shows no `+`). Upgrading never pauses the game.
 
 ## The match

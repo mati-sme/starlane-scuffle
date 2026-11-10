@@ -75,9 +75,10 @@ export const UNITS = {
 export const CAMP = { hp: 900, dmg: 30, cd: 1.2, range: 5, leash: 8, xp: 75, xpRange: 12, heal: 0.25, radius: 1.3, buffT: 12 };
 
 export const HERO = {
-  maxLevel: 9, ultLevel: 3, dmgPerLevel: 0.05, maxRank: [4, 4, 3],
-  // Q/E rank r needs level 2r-2; R rank 1 is free at level 3, R2 needs level 5, R3 level 8.
-  gate: (slot, rank) => (slot < 2 ? 2 * rank - 2 : [0, 3, 5, 8][rank]),
+  maxLevel: 9, ultLevel: 4, dmgPerLevel: 0.05, maxRank: [3, 3, 3, 3], // v9: Q W E (normal skills) + R (ultimate), rank 1-3 each
+  // Q / W / E start at rank 1 (usable from Lv 1); rank 2 needs Lv 2, rank 3 Lv 4. R rank 1 is free at Lv 4, R2 needs Lv 6, R3 Lv 8.
+  // 1 skill point per level from Lv 2 = 8 points = 6 normal ranks + R2 + R3: nothing is ever stuck waiting for a point.
+  gate: (slot, rank) => (slot < 3 ? 2 * (rank - 1) : [0, 4, 6, 8][rank]),
   xpNeed: (lv) => 80 + 30 * (lv - 1) + 8 * (lv - 1) ** 2, // ~2600 total to lv 9 (was 880)
   xpRange: 9, xpHeroRange: 14, xp: { blobling: 14, zapper: 16, bigblob: 34, hero: 60, heroPerLevel: 10 },
   baseHeal: { rate: 0.2 }, // fountain: 20% max HP / s (full heal in ~5 s)

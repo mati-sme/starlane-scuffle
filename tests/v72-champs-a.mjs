@@ -65,7 +65,7 @@ async function fire(id) {
   await start(id);
   await page.evaluate(() => {
     const m = window.__starlane.match, h = m.hero, foe = m.heroes.find((e) => e.team !== h.team), ally = m.heroes.find((e) => e.team === h.team && e !== h);
-    h.ranks = [4, 4, 3]; h.recalc(true);
+    h.ranks = [3, 3, 3, 3]; h.recalc(true);
     const pin = () => { foe.hp = foe.maxHp; foe.x = h.x + 3.5; foe.z = h.z + 0.5; foe.stun = 0; foe.cds = [99, 99, 99]; foe.noAttack = true; ally.hp = ally.maxHp * 0.4; ally.x = h.x + 2; ally.z = h.z - 1.5; };
     pin(); window.__t = setInterval(pin, 150);
   });
@@ -91,7 +91,7 @@ async function brawl(hero, bots, shot) {
   await start(hero, bots);
   await page.evaluate(() => {
     const m = window.__starlane.match;
-    m.heroes.forEach((h, i) => { h.ranks = [4, 4, 3]; h.recalc(true); h.x = (i < 5 ? -1 : 1) * 3; h.z = (i % 5 - 2) * 2; });
+    m.heroes.forEach((h, i) => { h.ranks = [3, 3, 3, 3]; h.recalc(true); h.x = (i < 5 ? -1 : 1) * 3; h.z = (i % 5 - 2) * 2; });
     window.__t = setInterval(() => { for (const h of m.heroes) { h.cds = [0, 0, 0]; h.hp = h.maxHp; } }, 3000);
   });
   await sleep(14000);

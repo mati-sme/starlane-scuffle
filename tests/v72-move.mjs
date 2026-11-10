@@ -111,20 +111,20 @@ await touch('touchEnd', 5, { x: SZ.x + 60, y: SZ.y }).catch(() => {});
 check('touch: new finger moves after zone hidden mid-drag', await walks(drag(6), lift(6)));
 
 // 2. keyboard: WASD after blur, and after visibilitychange + pause/resume
-check('keyboard: D moves', await walks(() => page.keyboard.down('KeyD'), () => page.keyboard.up('KeyD')));
-await page.keyboard.down('KeyD'); await S(() => window.dispatchEvent(new Event('blur'))); await sleep(100);
+check('keyboard: D moves', await walks(() => page.keyboard.down('ArrowRight'), () => page.keyboard.up('ArrowRight')));
+await page.keyboard.down('ArrowRight'); await S(() => window.dispatchEvent(new Event('blur'))); await sleep(100);
 check('keyboard: blur drops held keys', await IN((i) => i.keys.size === 0));
-await page.keyboard.up('KeyD');
-check('keyboard: W moves after blur', await walks(() => page.keyboard.down('KeyW'), () => page.keyboard.up('KeyW')));
-await page.keyboard.down('KeyA');
+await page.keyboard.up('ArrowRight');
+check('keyboard: W moves after blur', await walks(() => page.keyboard.down('ArrowUp'), () => page.keyboard.up('ArrowUp')));
+await page.keyboard.down('ArrowLeft');
 await S(() => document.dispatchEvent(new Event('visibilitychange'))); await sleep(100);
 check('keyboard: visibilitychange drops held keys', await IN((i) => i.keys.size === 0));
-await page.keyboard.up('KeyA');
+await page.keyboard.up('ArrowLeft');
 await page.keyboard.press('Escape'); await sleep(300);
 check('pause: state paused', await S(() => window.__starlane.state) === 'paused');
 await page.keyboard.press('Escape'); await sleep(300);
 check('pause: resumed to match', await S(() => window.__starlane.state) === 'match');
-check('keyboard: S moves after pause/resume', await walks(() => page.keyboard.down('KeyS'), () => page.keyboard.up('KeyS')));
+check('keyboard: S moves after pause/resume', await walks(() => page.keyboard.down('ArrowDown'), () => page.keyboard.up('ArrowDown')));
 check('touch: joystick moves after pause/resume', await walks(drag(7), lift(7)));
 
 // 3. mouse right-click walk after the pause cycle
@@ -138,11 +138,11 @@ await park(); await settle();
 await S(() => { import('/js/core/input.js').then(({ input }) => { input.recall = true; }); });
 await page.waitForFunction(() => window.__starlane.match.hero.recall > 0, null, { timeout: 5000 }).catch(() => {});
 check('recall: started', await S(() => window.__starlane.match.hero.recall > 0));
-await page.keyboard.down('KeyD');
+await page.keyboard.down('ArrowRight');
 await page.waitForFunction(() => window.__starlane.match.hero.recall === 0, null, { timeout: 5000 }).catch(() => {});
-await page.keyboard.up('KeyD');
+await page.keyboard.up('ArrowRight');
 check('recall: cancelled by moving', await S(() => window.__starlane.match.hero.recall === 0));
-check('recall: hero walks afterwards', await walks(() => page.keyboard.down('KeyA'), () => page.keyboard.up('KeyA')));
+check('recall: hero walks afterwards', await walks(() => page.keyboard.down('ArrowLeft'), () => page.keyboard.up('ArrowLeft')));
 
 // 5. forced death + respawn
 await park(); await settle();
@@ -154,7 +154,7 @@ await page.waitForFunction(() => window.__starlane.match.hero.alive, null, { tim
 await sleep(300);
 const h5 = await S(() => { const h = window.__starlane.match.hero; return { walkTo: h.walkTo, stun: h.stun, root: h.root, air: h.air, windup: h.windup, script: !!h.script }; });
 check('respawn: no leftover walkTo / cc / script', !h5.walkTo && !h5.stun && !h5.root && !h5.air && !h5.windup && !h5.script, JSON.stringify(h5));
-check('respawn: hero walks (keyboard)', await walks(() => page.keyboard.down('KeyD'), () => page.keyboard.up('KeyD')));
+check('respawn: hero walks (keyboard)', await walks(() => page.keyboard.down('ArrowRight'), () => page.keyboard.up('ArrowRight')));
 check('respawn: hero walks (touch)', await walks(drag(8), lift(8)));
 
 check('no page errors', errors.length === 0, errors.join(' | '));

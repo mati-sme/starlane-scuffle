@@ -20,6 +20,7 @@ export function dealDamage(t, amount, src, skill = false) {
   if (t.inMul) amount *= t.inMul; // season event: damage taken
   if (src) amount *= hitMul(src, t); // faction passives (Dark bonus, Water slow)
   if (t.buf?.dr) amount *= 1 - t.buf.dr.v;
+  if (t.buf?.pdr) amount *= 1 - t.buf.pdr.v; // passive damage reduction
   if (t.shielded && src?.type === 'hero') amount *= TOWER.shield; // backdoor: no friendly minions nearby
   const sb = sim.bonus[src?.team];
   if (sb) {
@@ -106,6 +107,7 @@ export function tickStatus(e, dt) {
   if (e.root > 0) e.root -= dt;
   if (e.slow > 0) e.slow -= dt;
   if (e.air > 0) e.air -= dt;
+  if (e.charm > 0) e.charm -= dt;
   const p = e.pull;
   if (!p) return;
   const dx = p.x - e.x, dz = p.z - e.z, d = Math.hypot(dx, dz), step = p.speed * dt;

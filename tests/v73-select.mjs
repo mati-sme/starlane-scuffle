@@ -77,7 +77,7 @@ async function open(device, name, shot) {
   await page.locator('[data-testid="champion-grid"]').evaluate((e) => { e.scrollTop = 0; });
   await tid(page, `champion-card-${ids[5]}`).click({ force: true });
   const d = await detailOk(page);
-  check(`${name}: detail pane filled (name, role, blurb, skills, stats, passive, matchups)`, d.name && d.role && d.blurb.length > 10 && d.skills === 4 && d.bars === 5 && d.vis && d.passive && d.matchups === 2, JSON.stringify(d));
+  check(`${name}: detail pane filled (name, role, blurb, skills, stats, passive, matchups)`, d.name && d.role && d.blurb.length > 10 && d.skills === 6 && d.bars === 5 && d.vis && d.passive && d.matchups === 2, JSON.stringify(d));
   check(`${name}: BAN button reachable inside viewport`, await page.evaluate(() => { const r = document.querySelector('[data-testid="ban-btn"]').getBoundingClientRect(); return r.bottom <= innerHeight && r.top >= 0; }));
   await tap(page, 'ban-btn');
   await page.waitForSelector('[data-testid="go-btn"]', { timeout: 3000 });
@@ -85,7 +85,7 @@ async function open(device, name, shot) {
   const pick = await page.locator('[data-testid^="champion-card-"]:not([disabled])').nth(3);
   await pick.click({ force: true });
   await sleep(500);
-  check(`${name}: pick-phase detail filled`, (await detailOk(page)).skills === 4);
+  check(`${name}: pick-phase detail filled`, (await detailOk(page)).skills === 6);
   if (shot && SHOTS) await page.screenshot({ path: `${SHOTS}/${shot}.png`, timeout: 120000 });
   return { ctx, page };
 }
@@ -116,11 +116,11 @@ async function lobby(device, name, shot) {
   check(`${name}: lobby grid is on screen (not collapsed)`, g.gh > 120 && g.bottom <= g.vh + 1, `${g.gh}`);
   const id = await page.$$eval('[data-testid^="lobby-champ-"]', (els) => els[7].dataset.id);
   await tid(page, `lobby-champ-${id}`).click({ force: true });
-  check(`${name}: tapping a lobby card updates the pane (ban select)`, (await detailOk(page)).skills === 4 && !(await tid(page, 'ban-btn').isDisabled()));
+  check(`${name}: tapping a lobby card updates the pane (ban select)`, (await detailOk(page)).skills === 6 && !(await tid(page, 'ban-btn').isDisabled()));
   await page.evaluate(() => window.__lobby('pick', null, null));
   await tid(page, `lobby-champ-${id}`).click({ force: true });
   const d = await detailOk(page);
-  check(`${name}: pick stage shows detail for picked champion`, d.name && d.role && d.skills === 4 && d.bars === 5 && d.vis, JSON.stringify(d));
+  check(`${name}: pick stage shows detail for picked champion`, d.name && d.role && d.skills === 6 && d.bars === 5 && d.vis, JSON.stringify(d));
   check(`${name}: banned stamp + taken stamp kept`, await page.evaluate(() => !!document.querySelector('.hcard.out.banned') && !!document.querySelector('.hcard.out.taken')));
   check(`${name}: room code, teams and spell chips present`, await page.evaluate(() => ['room-code', 'team-sunny', 'team-gloom', 'spell-chip-flash', 'copy-link', 'start-btn'].every((t) => document.querySelector(`[data-testid="${t}"]`))));
   await page.evaluate(() => window.__lobby('pick', null, 'bulwark'));

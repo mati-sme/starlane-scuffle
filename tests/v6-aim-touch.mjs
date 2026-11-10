@@ -122,7 +122,7 @@ await page.waitForFunction(() => window.__starlane.match.hero.cds[0] > 0, null, 
 check('Q cast; stick + attack still held', (await S(() => window.__starlane.match.hero.cds[0] > 0)) && await IN((i) => i.attackTouch && Math.hypot(i.stick.x, i.stick.y) > 0.3));
 await S(() => { const h = window.__starlane.match.hero; h.ranks[1] = 0; h.points = 3; });
 await sleep(300);
-const eup = await center('skill-up-e');
+const eup = await center('skill-up-w');
 await down(3, eup); await up(3); await sleep(250);
 check('finger D: level-up + spends a point while stick + attack held', (await S(() => window.__starlane.match.hero.ranks[1])) >= 1 && await IN((i) => i.attackTouch && Math.hypot(i.stick.x, i.stick.y) > 0.3));
 await down(4, rc); await sleep(100);

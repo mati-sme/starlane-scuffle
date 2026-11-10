@@ -58,7 +58,7 @@ await S(() => {
   m.heroes.forEach((h, i) => {
     const ally = h.team === 0, k = ally ? m.heroes.filter((q) => q.team === 0).indexOf(h) : m.heroes.filter((q) => q.team === 1).indexOf(h);
     h.x = h.px = (ally ? -7 : 2.5) + (k % 2) * (ally ? -2 : 2); h.z = h.pz = 7 + k * 2.2 - 4;
-    h.ranks = [2, 2, 1]; h.recalc(true);
+    h.ranks = [2, 2, 2, 1]; h.recalc(true);
     h.face = ally ? Math.PI / 2 : -Math.PI / 2;
   });
   m.minions.spawnWave?.(0, 0, ['blobling', 'blobling', 'zapper']);

@@ -68,7 +68,7 @@ for (const { name, lib, uaMode } of kinds) {
   await page.waitForFunction(() => window.__starlane.state === 'match', null, { timeout: 20000 }).catch(async (e) => { console.log('STATE', await page.evaluate(() => window.__starlane.state), await page.evaluate(() => document.body.innerText.slice(0, 200))); throw e; });
   await sleep(1200);
 
-  await page.evaluate(() => { const h = window.__starlane.match.hero; h.maxHp = h.hp = 99999; h.x = h.px = 0; h.z = h.pz = 0; h.level = 9; h.points = 3; h.ranks = [0, 0, 0]; });
+  await page.evaluate(() => { const h = window.__starlane.match.hero; h.maxHp = h.hp = 99999; h.x = h.px = 0; h.z = h.pz = 0; h.level = 9; h.points = 3; h.ranks = [0, 0, 0, 0]; });
   await sleep(200);
   check(`${name}: touch UI appears by itself (body.touch)`, await page.evaluate(() => document.body.classList.contains('touch')));
   check(`${name}: #touch visible`, await page.evaluate(() => getComputedStyle(document.getElementById('touch')).display !== 'none'));
@@ -92,7 +92,7 @@ for (const { name, lib, uaMode } of kinds) {
   // '+' with only pointerdown then pointercancel (clientX/Y = 0, no click) must still rank, once.
   for (const mode of ['cancel@0,0', 'down-only-then-up-elsewhere', 'plain-click']) {
     await sleep(700); // outside the click de-dupe window
-    await page.evaluate(() => { const h = window.__starlane.match.hero; h.points = 3; h.ranks = [0, 0, 0]; });
+    await page.evaluate(() => { const h = window.__starlane.match.hero; h.points = 3; h.ranks = [0, 0, 0, 0]; });
     await page.waitForSelector('[data-testid="skill-up-q"]:not([hidden])', { timeout: 8000 });
     await page.evaluate((m) => {
       const up = document.querySelector('[data-testid="skill-up-q"]');
@@ -108,9 +108,9 @@ for (const { name, lib, uaMode } of kinds) {
     check(`${name}: + ranks (${mode}), exactly once`, rank === 1, `rank=${rank}`);
   }
   // Real touch tap through the browser's own input pipeline (hit-test, synthesized events).
-  await page.evaluate(() => { const h = window.__starlane.match.hero; h.points = 3; h.ranks = [0, 0, 0]; });
+  await page.evaluate(() => { const h = window.__starlane.match.hero; h.points = 3; h.ranks = [0, 0, 0, 0]; });
   await sleep(100);
-  await page.locator('[data-testid="skill-up-e"]').tap({ force: true });
+  await page.locator('[data-testid="skill-up-w"]').tap({ force: true });
   await sleep(100);
   const rankE = await page.evaluate(() => window.__starlane.match.hero.ranks[1]);
   check(`${name}: real tap on + ranks E once`, rankE === 1, `rank=${rankE}`);

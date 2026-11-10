@@ -9,7 +9,7 @@ export const HEROES = Object.fromEntries(ROSTER_DEFS.map((d) => [d.id, {
   ...d,
   css: css(d.color),
   accentCss: css(d.accent),
-  abilities: { basic: d.basic, s1: d.s1, s2: d.s2, ult: d.ult },
+  abilities: { basic: d.basic, s1: d.s1, s2: d.s2, s3: d.s3, ult: d.ult, passive: d.passive },
   buildModel: (team) => buildChampion(d.model, d, team),
 }]));
 export const ROSTER = ROSTER_DEFS.map((d) => d.id);

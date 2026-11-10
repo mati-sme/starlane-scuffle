@@ -1,5 +1,6 @@
 // Title, champion select, pause and results screens (DOM overlays).
 import { icons } from './icons.js';
+import { skillArt, passiveArt } from './skillart.js';
 import { audio } from '../audio.js';
 import { PAL } from '../config.js';
 import { HEROES, ROSTER } from '../heroes/index.js';
@@ -60,15 +61,18 @@ const stamp = (kind) => (kind === 'banned' ? 'BANNED' : kind === 'taken' ? 'TAKE
 const bar = (label, v, text = '') => `<div class="stat"><span>${label}</span><i><b style="width:${Math.round(v * 100)}%"></b></i>${text ? `<em>${text}</em>` : ''}</div>`;
 const statBars = (def) => { const d = difficulty(def); return `<div class="stats" data-testid="detail-stats">${bar('HP', def.stats.hp / maxHp)}${bar('DMG', dps(def) / maxDps)}${bar('RNG', def.basic.range / maxRange)}${bar('SPD', def.stats.speed / maxSpeed)}${bar('HARD', d / 3, DIFF_NAME[d])}</div>`; };
 
-// Basic + Q / E / R rows of the detail strip.
+// Basic + Q / W / E / R rows of the detail strip, then the champion's combat passive.
 function skillRows(def) {
   const row = (key, ab, icon, test) =>
     `<li data-testid="${test}"><span class="si">${icon}</span><span class="sk-key">${key}</span><span class="sk-name">${ab.name}</span><small>${ab.tag ?? ab.kind}</small></li>`;
+  const art = (ab) => skillArt(ab.icon ?? ab.kind, ab, def, { medal: false });
   return row('', def.basic, icons[`basic_${def.basic.kind}`], 'detail-basic')
-    + row('Q', def.s1, icons[def.s1.kind], 'detail-q')
-    + row('E', def.s2, icons[def.s2.kind], 'detail-e')
-    + row('R', def.ult, icons[def.ult.kind], 'detail-r');
+    + row('Q', def.s1, art(def.s1), 'detail-q')
+    + row('W', def.s2, art(def.s2), 'detail-w')
+    + row('E', def.s3 ?? def.s2, art(def.s3 ?? def.s2), 'detail-e')
+    + row('R', def.ult, art(def.ult), 'detail-r');
 }
+const passiveRow = (def) => (def.passive ? `<ul class="skills passiveul"><li class="passive-row" data-testid="detail-champ-passive"><span class="si">${passiveArt(def.passive, def)}</span><span class="sk-key">P</span><span class="sk-name">${def.passive.name}</span><small>${def.passive.tag}</small></li></ul>` : '');
 
 // The champion detail pane (name, faction, class + blurb, role, passive, matchups, stat bars, skills). Shared by the offline draft and the online lobby.
 function detailBody(id) {
@@ -80,7 +84,8 @@ function detailBody(id) {
     ${statBars(def)}
     <p class="dnote" data-testid="detail-role-blurb"><b>${def.role[0].toUpperCase() + def.role.slice(1)}</b> — ${ROLE_BLURB[def.role] ?? ''}</p>
     <ul class="skills">${skillRows(def)}</ul>
-    <p class="dnote" data-testid="detail-passive"><b>${factionDef(id).passive}</b> — ${factionDef(id).blurb}</p>
+    ${passiveRow(def)}
+    <p class="dnote" data-testid="detail-passive"><b>${factionDef(id).passive}</b> (faction) — ${factionDef(id).blurb}</p>
     ${matchRows(id)}`;
 }
 
@@ -140,7 +145,7 @@ export function createMenus(root) {
         <div class="row"><button class="btn primary play" type="button" data-testid="play-btn">PLAY</button>
         <button class="btn coop" type="button" data-testid="coop-btn">2v2 CO-OP</button>
         <button class="btn online" type="button" data-testid="online-btn">PLAY ONLINE</button></div>
-        <p class="hint"><span class="mouse">WASD move · Space attack · Q W E R skills · 1 2 3 4 or Ctrl+Q/W/E/R rank up</span><span class="touchhint">Left thumb move · Right thumb attack · tap the gold + above a skill to level it</span></p>`,
+        <p class="hint"><span class="mouse">Arrows move · Space attack · Q W E R skills · 1 2 3 4 or Ctrl+Q/W/E/R rank up</span><span class="touchhint">Left thumb move · Right thumb attack · tap the gold + above a skill to level it</span></p>`,
       (el) => { on(el, '.play', onPlay); on(el, '.online', onOnline); on(el, '.coop', () => onCoop?.()); el.querySelector('[data-testid="profile-btn"]').addEventListener('click', () => onProfile?.()); el.querySelector('[data-testid="store-btn"]').addEventListener('click', () => onStore?.()); el.querySelector('[data-testid="tutorial-start"]').addEventListener('click', () => onTutorial?.()); });
     },
 

@@ -38,9 +38,9 @@ export function encodeSnap(match, seq, events) {
     h: match.heroes.map((h) => [
       r1(h.x), r1(h.z), r2(h.face), Math.round(h.hp), h.maxHp,
       (h.alive ? 1 : 0) | (h.hidden ? 2 : 0) | (h.stun > 0 ? 4 : 0) | (h.shieldHp > 0 && h.shieldT > 0 ? 8 : 0) | (h.burn ? 16 : 0),
-      h.level, Math.round(h.xp), h.points, h.ranks[0] | (h.ranks[1] << 3) | (h.ranks[2] << 6),
+      h.level, Math.round(h.xp), h.points, h.ranks[0] | (h.ranks[1] << 3) | (h.ranks[2] << 6) | (h.ranks[3] << 9), // v9: four 3-bit ranks
       r1(h.cds[0]), r1(h.cds[1]), r1(h.cds[2]), r1(h.respawn), r1(h.respawnTotal),
-      Math.floor(h.gold), h.items.map((id) => ITEM_IDS.indexOf(id)),
+      Math.floor(h.gold), h.items.map((id) => ITEM_IDS.indexOf(id)), r1(h.cds[3]), // v9: 4th cooldown appended (additive)
     ]),
     s: match.structures.map((x) => [Math.round(x.hp), (x.alive ? 1 : 0) | (x.vulnerable ? 2 : 0) | (x.shielded ? 4 : 0) | (x.pulseT > 0 ? 8 : 0)]),
     m: match.minions.list.filter((m) => m.alive).map((m) => [m.nid, m.team, KINDS.indexOf(m.kind), m.lane, r1(m.x), r1(m.z), Math.round(m.hp), r2(m.facing)]),
@@ -64,7 +64,7 @@ export function applySnap(match, s) {
 
   s.h.forEach((r, i) => {
     const h = match.heroes[i], me = h === match.hero;
-    const [x, z, face, hp, maxHp, f, level, xp, points, rk, c0, c1, c2, rs, rst, gold = 0, items = []] = r;
+    const [x, z, face, hp, maxHp, f, level, xp, points, rk, c0, c1, c2, rs, rst, gold = 0, items = [], c3 = 0] = r;
     const alive = !!(f & 1);
     if (!me) { h.tx = x; h.tz = z; h.face = face; }
     if (alive && !h.alive) { // respawn
@@ -78,7 +78,7 @@ export function applySnap(match, s) {
     if (alive && !me && h.tx !== undefined && Math.hypot(h.tx - h.x, h.tz - h.z) > 12) { h.x = h.px = h.tx; h.z = h.pz = h.tz; }
     if (level > h.level) bus.emit('levelUp', h);
     const spent = me && performance.now() - (match.lastSpend ?? 0) < 700;
-    const ranks = [rk & 7, (rk >> 3) & 7, (rk >> 6) & 7];
+    const ranks = [rk & 7, (rk >> 3) & 7, (rk >> 6) & 7, (rk >> 9) & 7];
     if (level !== h.level || (!spent && ranks.some((v, j) => v !== h.ranks[j]))) {
       h.level = level;
       if (!spent) h.ranks = ranks;
@@ -94,7 +94,7 @@ export function applySnap(match, s) {
       h.hidden = !!(f & 2);
       if (f & 4 && !(h.stun > 0)) h.stun = 0.3;
       if (f & 8) { h.shieldHp = 1; h.shieldT = 0.5; } else h.shieldT = 0;
-      h.cds[0] = c0; h.cds[1] = c1; h.cds[2] = c2;
+      h.cds[0] = c0; h.cds[1] = c1; h.cds[2] = c2; h.cds[3] = c3;
     }
     h.respawn = rs; h.respawnTotal = rst || 1;
     if (gold > h.gold + 0.5 && me) bus.emit('gold', { hero: h, amount: Math.round(gold - h.gold) });

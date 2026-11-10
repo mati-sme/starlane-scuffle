@@ -60,7 +60,7 @@ for (const id of NEW) {
     const m = window.__starlane.match;
     m.setHero(id, []);
     const h = m.hero, foe = m.heroes.find((e) => e.team !== h.team);
-    h.ranks = [4, 4, 3]; h.recalc(true);
+    h.ranks = [3, 3, 3, 3]; h.recalc(true);
     h.hp = h.maxHp * 0.5; // supports need someone hurt
     window.__why = [];
     const fire = h._fire.bind(h); // record why a wind-up did not turn into a cast
@@ -91,7 +91,7 @@ const wants = await page.evaluate((NEW) => {
     m.setHero('kade', group);
     for (const id of group) {
       const h = m.heroes.find((x) => x.id === id), foe = m.heroes.find((e) => e.team !== h.team), ally = m.heroes.find((a) => a.team === h.team && a !== h);
-      h.ranks = [4, 4, 3]; h.recalc(true); h.hp = h.maxHp * 0.5;
+      h.ranks = [3, 3, 3, 3]; h.recalc(true); h.hp = h.maxHp * 0.5;
       foe.x = h.x + 3; foe.z = h.z + 0.5; ally.x = h.x - 1; ally.z = h.z; ally.hp = ally.maxHp * 0.4;
       for (let i = 0; i < 3; i++) if (!h.brain._want(m, i, foe)) out.push(`${id}:${h.rs[i].kind}`);
     }
@@ -104,7 +104,7 @@ if (wants.length) errors.push(`bots never want: ${wants.join(' ')}`); else conso
 await page.evaluate((NEW) => {
   const m = window.__starlane.match;
   m.setHero(NEW[0], NEW.slice(1, 10));
-  m.heroes.forEach((h) => { h.ranks = [4, 4, 3]; h.recalc(true); h.x = (h.team ? 1 : -1) * 3; h.z = (h.slot - 2) * 2; h.gold = 0; });
+  m.heroes.forEach((h) => { h.ranks = [3, 3, 3, 3]; h.recalc(true); h.x = (h.team ? 1 : -1) * 3; h.z = (h.slot - 2) * 2; h.gold = 0; });
   window.__t = setInterval(() => { for (const h of m.heroes) { h.cds = [0, 0, 0]; h.hp = h.maxHp; h.gold = 0; if (h.brain) h.brain.retreat = h.brain.shopping = false; } }, 3000); // stay and fight, no shopping trips
 }, NEW);
 const gameWait = (sec) => page.evaluate((sec) => new Promise((r) => { const m = window.__starlane.match, t0 = m.time; const w = () => (m.time - t0 > sec ? r() : setTimeout(w, 100)); w(); }), sec);

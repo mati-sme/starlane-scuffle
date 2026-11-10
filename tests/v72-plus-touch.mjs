@@ -71,11 +71,11 @@ await S(() => {
   h.maxHp = h.hp = 99999;
   h.x = h.px = 0; h.z = h.pz = 0;
   h.level = 9; h.points = 3;
-  h.ranks = [0, 0, 0];
+  h.ranks = [0, 0, 0, 0];
   document.body.classList.add('touch');
 });
 await sleep(200);
-await S(() => { const h = window.__starlane.match.hero; h.points = 3; h.ranks = [0, 0, 0]; });
+await S(() => { const h = window.__starlane.match.hero; h.points = 3; h.ranks = [0, 0, 0, 0]; });
 await page.waitForSelector('[data-testid="skill-up-q"]:not([hidden])', { timeout: 8000 });
 
 // 1) Solo tap on '+' ranks the skill
@@ -99,7 +99,7 @@ await sleep(80);
 const stickHeld = await IN((input) => Math.hypot(input.stick.x, input.stick.y) > 0.2);
 check('stick: dragging', stickHeld);
 
-const eUp = await center('[data-testid="skill-up-e"]');
+const eUp = await center('[data-testid="skill-up-w"]');
 const ranksBefore = await S(() => window.__starlane.match.hero.ranks[1]);
 await down(21, eUp);
 await sleep(50);

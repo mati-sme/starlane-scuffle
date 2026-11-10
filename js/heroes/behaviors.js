@@ -13,6 +13,9 @@ import { meleeFx, lineFx, lineHit, projOpts, spreadFx, rich } from '../render/at
 import { inCover } from '../world/arena.js';
 import { WAVE2A_BEHAVIORS } from './wave2a_beh.js';
 import { WAVE2B_BEH } from './wave2b_beh.js';
+import { KITS_A } from './kits_a.js';
+import { KITS_B } from './kits_b.js';
+import { KITS_C } from './kits_c.js';
 
 const DEG = Math.PI / 180;
 // Ability VFX colors: a champion may override its body colors with `fx: { color, accent }` so skills stay distinct.
@@ -26,6 +29,8 @@ function affect(h, e, ab, o = {}) {
   const ox = o.x ?? h.x, oz = o.z ?? h.z;
   if (ab.stun) applyStatus(e, 'stun', ab.stun);
   if (ab.slow) applyStatus(e, 'slow', ab.slowT ?? 1.5);
+  if (ab.root) applyStatus(e, 'root', ab.root);
+  if (ab.charm) { applyStatus(e, 'charm', ab.charm); e.charmSrc = h; } // kid-safe 'dance': the target wanders toward the caster and cannot attack
   if (ab.air || o.air) { applyStatus(e, 'air', AIR); applyStatus(e, 'stun', AIR); }
   if (ab.knock) shove(e, o.kdx ?? e.x - ox, o.kdz ?? e.z - oz, ab.knock, 0.25);
   if (ab.pull) {
@@ -904,6 +909,6 @@ const BASICS = {
   },
 };
 
-Object.assign(BEHAVIORS, WAVE2A_BEHAVIORS, WAVE2B_BEH);
+Object.assign(BEHAVIORS, WAVE2A_BEHAVIORS, WAVE2B_BEH, KITS_A, KITS_B, KITS_C);
 
 export { BEHAVIORS, BASICS };

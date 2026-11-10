@@ -37,7 +37,7 @@ export class Bot {
   constructor(hero, level = 'mid') {
     this.h = hero;
     this.d = DIFFICULTY[level] ?? DIFFICULTY.mid;
-    this.it = { x: 0, z: 0, attack: true, cast: [false, false, false] };
+    this.it = { x: 0, z: 0, attack: true, cast: [false, false, false, false] };
     this.goal = { x: hero.x, z: hero.z, follow: null, keep: 0.5 };
     this.lane = 1;
     this.roamLane = 1;
@@ -57,10 +57,10 @@ export class Bot {
     Object.assign(this.goal, { x: this.h.x, z: this.h.z, follow: null, keep: 0.4 });
   }
 
-  // -> intent { x, z, attack, cast[3] } for Hero.update
+  // -> intent { x, z, attack, cast[4] } for Hero.update
   think(dt, ctx) {
     const it = this.it, h = this.h;
-    it.cast[0] = it.cast[1] = it.cast[2] = false;
+    it.cast[0] = it.cast[1] = it.cast[2] = it.cast[3] = false;
     if (!h.alive) return it;
     if (h.points > 0) this._spend();
     if ((this.t -= dt) <= 0) {
@@ -73,7 +73,7 @@ export class Bot {
 
   // Same rules as the player: R first when it is open, otherwise whichever of Q / E has fewer ranks.
   _spend() {
-    const h = this.h, order = h.ranks[0] <= h.ranks[1] ? [2, 0, 1] : [2, 1, 0];
+    const h = this.h, order = [3, ...[0, 1, 2].sort((a, c) => h.ranks[a] - h.ranks[c])]; // R first, then whichever normal skill has the fewest ranks
     for (const s of order) if (h.spendPoint(s)) return;
   }
 
@@ -191,7 +191,7 @@ export class Bot {
       g.x = p.x; g.z = p.z; g.keep = 0.4;
       this.state = 'retreat';
       if (foe && Math.hypot(foe.x - h.x, foe.z - h.z) < 5) { // escape-capable skill when someone is on our heels
-        for (let i = 1; i >= 0; i--) if (h.ranks[i] > 0 && h.cds[i] <= 0 && h.rs[i].kind !== 'nova') { it.cast[i] = Math.random() < this.d.cast; break; }
+        for (let i = 2; i >= 0; i--) if (h.ranks[i] > 0 && h.cds[i] <= 0 && h.rs[i].kind !== 'nova' && h.rs[i].kind !== 'totem' && !h.rs[i].noEscape) { it.cast[i] = Math.random() < this.d.cast; break; }
       }
       return;
     }
@@ -243,7 +243,7 @@ export class Bot {
       }
     }
 
-    for (let i = 0; i < 3; i++) if (h.ranks[i] > 0 && h.cds[i] <= 0 && !it.cast[i] && this._want(ctx, i, skillFoe) && Math.random() < this.d.cast) it.cast[i] = true;
+    for (let i = 0; i < 4; i++) if (h.ranks[i] > 0 && h.cds[i] <= 0 && !it.cast[i] && this._want(ctx, i, skillFoe) && Math.random() < this.d.cast) it.cast[i] = true;
   }
 
   // The next item is affordable and the bot has not shopped lately.
@@ -315,7 +315,7 @@ export class Bot {
 
   // Per-kind rule of thumb for when a skill is worth casting.
   _want(ctx, i, foe, as = null) {
-    const h = this.h, ab = as ?? h.rs[i], ult = i === 2, near = (e, r) => e && Math.hypot(e.x - h.x, e.z - h.z) - e.radius <= r;
+    const h = this.h, ab = as ?? h.rs[i], ult = i === 3, near = (e, r) => e && Math.hypot(e.x - h.x, e.z - h.z) - e.radius <= r;
     const cluster = (r, rad) => {
       const c = bestCluster(ctx, h.team, h.x, h.z, r, rad);
       return c && (c.hero || c.n >= (ult ? 3 : 2)) ? c : null;

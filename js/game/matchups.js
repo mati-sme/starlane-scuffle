@@ -10,7 +10,7 @@ const POKE = new Set(['beam', 'rain', 'missile', 'bolt', 'proj', 'line', 'spread
 const CC = ['stun', 'pull', 'root', 'knock', 'slow', 'air', 'tSlow'];
 const KEEP = ['heal', 'allyHeal', 'healPs', 'shield', 'allyShield', 'tHeal', 'selfDr', 'allyDr'];
 
-const kits = (d) => [d.s1, d.s2, d.ult];
+const kits = (d) => [d.s1, d.s2, d.s3, d.ult].filter(Boolean);
 const has = (a, keys) => keys.some((k) => a[k]);
 
 function traits(d) {

@@ -1,17 +1,19 @@
-// Q / E / R buttons on an arc around Attack: radial cooldown wipe, last-3-seconds digit,
-// ready bounce, gold glow + slam when R unlocks. Desktop: same buttons with Q / E / R hints.
+// Q / W / E / R buttons on an arc around Attack (R = ultimate) plus the champion's passive badge: radial cooldown wipe, last-3-seconds digit,
+// ready bounce, gold glow + slam when R unlocks. Desktop: same buttons with Q / W / E / R hints.
 // Wild Rift style ranking: a small gold + sits above each skill button that can take a point right now (tap = spendPoint).
 import { input } from '../core/input.js';
 import { bus } from '../core/bus.js';
 import { icons } from './icons.js';
 import { RECALL_T } from '../heroes/hero.js';
 import { SPELLS } from '../game/spells.js';
+import { skillArt, passiveArt } from './skillart.js';
+import { HERO } from '../config.js';
 
 const DRAG_START = 14; // px of drag before a press turns from a tap (quick-cast) into an aim
 const DRAG_FULL = 90;  // px of drag = full skill range
 const CANCEL_R = 26;   // px: letting go this close to the button's centre cancels the cast
 
-const SLOTS = [{ cls: 's1', key: 'Q' }, { cls: 's2', key: 'E' }, { cls: 'ult', key: 'R' }];
+const SLOTS = [{ cls: 's1', key: 'Q' }, { cls: 's2', key: 'W' }, { cls: 's3', key: 'E' }, { cls: 'ult', key: 'R' }];
 
 export class Abilities {
   constructor(match) {
@@ -53,6 +55,14 @@ export class Abilities {
     });
     this._extras();
     document.body.appendChild(this.root);
+    this.passive = document.createElement('button');
+    this.passive.type = 'button';
+    this.passive.id = 'passive';
+    this.passive.dataset.testid = 'passive-icon';
+    this.passive.innerHTML = '<span class="pic"></span><span class="ptip" data-testid="passive-tip"></span>';
+    this.passive.addEventListener('pointerdown', (e) => { e.preventDefault(); this.passive.classList.toggle('open'); });
+    document.body.appendChild(this.passive);
+    bus.on('cast', ({ hero }) => { if (hero === this.match.hero) { this.passive.classList.remove('ping'); void this.passive.offsetWidth; this.passive.classList.add('ping'); } });
     this.note = document.createElement('div');
     this.note.id = 'notarget';
     this.note.dataset.testid = 'no-target';
@@ -66,7 +76,7 @@ export class Abilities {
     bus.on('noCast', ({ hero, slot, why }) => { // a skill press that did nothing always says why
       if (hero !== match.hero) return;
       const el = this.btns[slot].el;
-      this.note.textContent = why === 'locked' ? 'Unlocks at Lv 3' : 'No target';
+      this.note.textContent = why === 'locked' ? `Unlocks at Lv ${HERO.ultLevel}` : 'No target';
       for (const [node, cls] of [[el, 'nope'], [this.note, 'pop']]) { node.classList.remove(cls); void node.offsetWidth; node.classList.add(cls); }
     });
   }
@@ -155,12 +165,20 @@ export class Abilities {
 
   setHero(hero) {
     this.root.style.setProperty('--c', hero.def.css);
-    this.btns.forEach((b, i) => { b.face.innerHTML = icons[hero.ab[i].kind]; b.p = b.n = -1; });
+    this.btns.forEach((b, i) => { b.face.innerHTML = skillArt(hero.ab[i].icon ?? hero.ab[i].kind, hero.ab[i], hero.def); b.el.title = `${SLOTS[i].key}: ${hero.ab[i].name}${hero.ab[i].tag ? ' (' + hero.ab[i].tag + ')' : ''}`; b.p = b.n = -1; });
+    const ps = hero.passive;
+    this.passive.hidden = !ps;
+    this.passive.classList.remove('open');
+    if (ps) {
+      this.passive.querySelector('.pic').innerHTML = passiveArt(ps, hero.def);
+      this.passive.querySelector('.ptip').innerHTML = `<b>${ps.name}</b><small>PASSIVE</small><em>${ps.tag}</em>`;
+      this.passive.setAttribute('aria-label', `Passive: ${ps.name}. ${ps.tag}`);
+    }
     this.spb.forEach((b, k) => { b.id = ''; b.p = b.n = -1; });
   }
 
   _slam() {
-    const el = this.btns[2].el;
+    const el = this.btns[3].el;
     el.classList.remove('slam');
     void el.offsetWidth;
     el.classList.add('slam');
@@ -186,7 +204,7 @@ export class Abilities {
       const left = locked ? 0 : Math.max(0, h.cds[i]);
       const p = left > 0 ? Math.round((left / (h.cdTotal[i] || 1)) * 1000) / 10 : 0;
       if (p !== b.p) { b.cd.style.setProperty('--p', p); b.p = p; }
-      const n = locked ? 'Lv3' : left > 0 && left <= 3 ? Math.ceil(left) : '';
+      const n = locked ? `Lv${HERO.ultLevel}` : left > 0 && left <= 3 ? Math.ceil(left) : '';
       if (n !== b.n) { b.num.textContent = n; b.n = n; }
       b.el.classList.toggle('locked', locked);
       b.el.classList.toggle('dead', !h.alive);

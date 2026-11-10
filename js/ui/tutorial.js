@@ -3,7 +3,7 @@
 import { bus } from '../core/bus.js';
 
 export const STEPS = [
-  { id: 'move', touch: 'Drag the left side of the screen to MOVE!', key: 'Use W A S D to MOVE!', emoji: '👆' },
+  { id: 'move', touch: 'Drag the left side of the screen to MOVE!', key: 'Use the ARROW KEYS to MOVE!', emoji: '👆' },
   { id: 'attack', touch: 'Hold the big red button to ATTACK!', key: 'Hold Space (or click) to ATTACK!', emoji: '⚔️' },
   { id: 'skill', touch: 'Tap the gold + to learn a skill, then tap it!', key: 'Press 1 to learn a skill, then Q!', emoji: '✨' },
   { id: 'goal', touch: 'Destroy the enemy towers, then their core. You did it — go win!', key: 'Destroy the enemy towers, then their core. You did it — go win!', emoji: '🏁' },

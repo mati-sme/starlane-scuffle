@@ -54,7 +54,7 @@ async function fire(id, shot) {
   await page.waitForFunction(() => window.__starlane.state === 'match', null, { timeout: 20000 });
   await page.evaluate(() => {
     const m = window.__starlane.match, h = m.hero, foe = m.heroes.find((e) => e.team !== h.team);
-    h.ranks = [4, 4, 3]; h.recalc(true);
+    h.ranks = [3, 3, 3, 3]; h.recalc(true);
     foe.x = h.x + 4; foe.z = h.z + 1;
     window.__t = setInterval(() => { foe.hp = foe.maxHp; foe.x = h.x + 4; foe.z = h.z + 1; foe.stun = 0; }, 100);
   });

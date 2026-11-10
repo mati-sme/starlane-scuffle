@@ -14,6 +14,7 @@ import { BEHAVIORS, BASICS } from './behaviors.js';
 import { rankStats } from './roster.js';
 import { gearStats, emptyGear } from '../game/gear.js';
 import { SPELLS, DEFAULT_SPELLS, castSpell, tickBurn, burnFx } from '../game/spells.js';
+import { tickPassive } from '../game/passives.js';
 
 // Screen-space axes projected onto the ground, derived from the camera offset.
 const FWD = new THREE.Vector2(-CAM.offset[0], -CAM.offset[2]).normalize();
@@ -56,7 +57,8 @@ export class Hero {
     this.barY *= HERO_SCALE;
     this.baseHp = def.stats.hp;
     this.basic = def.abilities.basic;
-    this.ab = [def.abilities.s1, def.abilities.s2, def.abilities.ult];
+    this.ab = [def.abilities.s1, def.abilities.s2, def.abilities.s3 ?? def.abilities.s2, def.abilities.ult]; // slots: 0 Q, 1 W, 2 E, 3 R (ultimate)
+    this.passive = def.abilities.passive ?? null;
     this.spells = [...DEFAULT_SPELLS]; // summoner spells (game/spells.js), set by the match
 
     this.model = def.buildModel(team);
@@ -71,7 +73,7 @@ export class Hero {
     this.holder.add(this.shadow, this.ring);
     scene.add(this.holder);
 
-    this.dome = makeDome(PAL.shield);
+    this.dome = makeDome(def.fx?.accent ?? PAL.shield); // shield bubble wears the champion's own accent colour
     this.beamMesh = this.ab.some((a) => a.kind === 'beam') ? makeBeam(def.accent) : null;
     scene.add(this.dome);
     if (this.beamMesh) scene.add(this.beamMesh);
@@ -89,7 +91,7 @@ export class Hero {
     this.level = 1;
     this.xp = 0;
     this.points = 0;
-    this.ranks = [1, 1, 0];
+    this.ranks = [1, 1, 1, 0];
     this.gold = GOLD.start;
     this.items = [];
     this.gear = emptyGear();
@@ -106,8 +108,8 @@ export class Hero {
     this.atkT = this.castT = this.charge = 0;
     this.castSlot = 0;
     this.cd = 0;
-    this.cds = [0, 0, 0];
-    this.cdTotal = [1, 1, 1];
+    this.cds = [0, 0, 0, 0];
+    this.cdTotal = [1, 1, 1, 1];
     this.spellCd = [0, 0];
     this.spellCdTotal = [1, 1];
     this.face = this.yaw = this.team === 0 ? Math.PI / 2 : -Math.PI / 2;
@@ -142,7 +144,7 @@ export class Hero {
     this.outMul = this.baseOut * (this.seasonOut ?? 1); // season event (game/seasons.js) is re-applied each frame by the match
     this.armor = g.armor;
     this.basicRange = this.basic.range + (this.nextBasic?.range ?? 0);
-    this.rs = this.ab.map((a, i) => rankStats(a, this.ranks[i]));
+    this.rs = this.ab.map((a, i) => rankStats(a, this.ranks[i], HERO.maxRank[i]));
     const max = Math.round(this.baseHp + this.hpLv * L + g.hp);
     this.hp = full ? max : this.hp + (max - (this.maxHp ?? max));
     this.maxHp = max;
@@ -164,7 +166,7 @@ export class Hero {
   levelUp() {
     this.level++;
     this.points++;
-    if (this.level === HERO.ultLevel && this.ranks[2] === 0) this.ranks[2] = 1;
+    if (this.level >= HERO.ultLevel && this.ranks[3] === 0) this.ranks[3] = 1;
     this.recalc(false);
     vfx.ring(this.x, 0.2, this.z, PAL.gold, 3.5, 0.5);
     particles.burst(this.x, 1, this.z, 14, { color: [PAL.gold, PAL.star], speed: 3, up: 4, size: 0.6, life: 0.8, frame: FRAME.sparkle, grav: 4 });
@@ -172,10 +174,10 @@ export class Hero {
     if (this.level === HERO.ultLevel) bus.emit('ultUnlock', this);
   }
 
-  // Can slot (0 Q, 1 E, 2 R) take a point right now? R rank 1 is only granted by level 3.
+  // Can slot (0 Q, 1 W, 2 E, 3 R) take a point right now? R rank 1 is only granted by its unlock level.
   canSpend(slot) {
     const r = this.ranks[slot];
-    return this.points > 0 && r < HERO.maxRank[slot] && (slot < 2 || r > 0) && this.level >= HERO.gate(slot, r + 1);
+    return this.points > 0 && r < HERO.maxRank[slot] && (slot < 3 || r > 0) && this.level >= HERO.gate(slot, r + 1);
   }
 
   spendPoint(slot) {
@@ -201,7 +203,7 @@ export class Hero {
     this.windup = 0;
     this.pend = -1;
     this.yOff = this.tilt = this.spin = 0;
-    this.stun = this.root = this.slow = this.air = 0;
+    this.stun = this.root = this.slow = this.air = this.charm = 0;
     this.pull = null;
     this.shieldHp = this.shieldT = 0;
     this.burn = null; this.burnVis = false;
@@ -211,8 +213,9 @@ export class Hero {
     this.hidden = this.untarget = false;
     this.nextBasic = null;
     this.beam = null;
-    this.chg = [0, 0, 0]; this.chgT = [0, 0, 0]; this.chgFull = [0, 0, 0];
-    this.castAt = [-99, -99, -99];
+    this.chg = [0, 0, 0, 0]; this.chgT = [0, 0, 0, 0]; this.chgFull = [0, 0, 0, 0];
+    this.castAt = [-99, -99, -99, -99];
+    this.ps = {}; // passive state (game/passives.js)
     this.swings = 0;
     this.recall = 0;
     this.manual = null;
@@ -235,7 +238,7 @@ export class Hero {
     return this;
   }
 
-  // it: { x, z (world move dir, |v| <= 1), attack, cast: [bool, bool, bool], aim?: [{ dx, dz, dist } | null x3], pref?: 0 auto | 1 minion | 2 structure, recall?: bool }
+  // it: { x, z (world move dir, |v| <= 1), attack, cast: [bool x4], aim?: [{ dx, dz, dist } | null x4], pref?: 0 auto | 1 minion | 2 structure, recall?: bool }
   update(dt, ctx, it) {
     this.px = this.x; this.pz = this.z;
     tickHitFx(this, dt);
@@ -258,7 +261,7 @@ export class Hero {
     }
     if (ctx.over) { this.moveAmt = 0; this.aim = null; return; }
 
-    for (let i = 0; i < 3; i++) if (this.cds[i] > 0) this.cds[i] -= dt;
+    for (let i = 0; i < 4; i++) if (this.cds[i] > 0) this.cds[i] -= dt;
     for (let i = 0; i < 2; i++) if (this.spellCd[i] > 0) this.spellCd[i] -= dt;
     tickBurn(this, dt);
     if (!this.alive) return;
@@ -271,11 +274,12 @@ export class Hero {
     tickStatus(this, dt);
     this.unstick(false); // watchdog: expired CC / script / channel cannot freeze this hero
     tickBuffs(this, dt);
+    tickPassive(this, dt, ctx);
     this.hidden = !!this.buf.hidden || this.brushHidden;
     this.untarget = !!this.buf.untarget;
     if (this.nextBasic && (this.nextBasic.t -= dt) <= 0) this.nextBasic = null;
     this.basicRange = this.basic.range + (this.nextBasic?.range ?? 0);
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
       if (this.chg[i] > 0 && (this.chgT[i] -= dt) <= 0) { this.chg[i] = 0; this.cds[i] = Math.max(this.cds[i], this.chgFull[i] - 3); }
     }
     if (this.shieldT > 0 && (this.shieldT -= dt) <= 0) this.shieldHp = 0;
@@ -308,7 +312,7 @@ export class Hero {
       this.windup -= dt;
       if (this.windup <= 0) this._fire(ctx);
     } else if (!stunned) {
-      for (let i = 2; i >= 0; i--) {
+      for (let i = 3; i >= 0; i--) {
         if (!it.cast[i]) continue;
         if (this._canCast(i)) { this._begin(i, ctx, it.aim?.[i]); break; }
         if (this.isPlayer && this.ranks[i] === 0) bus.emit('noCast', { hero: this, slot: i, why: 'locked' });
@@ -329,10 +333,14 @@ export class Hero {
       if (Math.hypot(this.walkTo.x - this.x, this.walkTo.z - this.z) < 0.3) this.walkTo = null;
     }
 
+    if (this.charm > 0 && this.charmSrc?.alive) { // charmed (a silly dance): drift toward whoever charmed us and cannot swing
+      [mx, mz] = this._toward(this.charmSrc.x, this.charmSrc.z);
+      this.noAttack = true; this.walkTo = null; this.moveMul *= 0.55;
+    }
     const locked = stunned || this.root > 0 || this.windup > 0;
     const mag = locked ? 0 : Math.min(1, Math.hypot(mx, mz));
     if (mag > 0.01) {
-      const sp = this.speed * (1 + buff(this, 'speed') + this.gear.speed + (sim.bonus[this.team].spd ?? 0)) * this.moveMul * (this.slow > 0 ? 0.55 : 1) * (this.boost > 0 ? BOOST.mul : 1);
+      const sp = this.speed * (1 + buff(this, 'speed') + buff(this, 'pspeed') + this.gear.speed + (sim.bonus[this.team].spd ?? 0)) * this.moveMul * (this.slow > 0 ? 0.55 : 1) * (this.boost > 0 ? BOOST.mul : 1);
       this.dirx = mx / mag; this.dirz = mz / mag;
       this.x += this.dirx * sp * mag * dt;
       this.z += this.dirz * sp * mag * dt;
@@ -484,7 +492,7 @@ export class Hero {
     if (this.nextBasic) { dmg += this.nextBasic.dmg; this.nextBasic = null; }
     delete this.buf.hidden;
     this.atkAge = 0;
-    this.cd = b.cd / (1 + buff(this, 'aspd') + this.gear.aspd);
+    this.cd = b.cd / (1 + buff(this, 'aspd') + buff(this, 'paspd') + this.gear.aspd);
     this.lunge = 1;
     this.faceHold = 0.3;
     bus.emit('swing', this);
@@ -549,7 +557,7 @@ export class Hero {
     if (this.castT > 0) { // release: thrust both arms toward the target
       const k = ease(Math.min(1, this.castT * 1.6));
       ax = lerp(ax, -1.7, k); az = lerp(az, 0.1, k); bx = lerp(bx, -1.45, k); bz = lerp(bz, -0.1, k);
-      twist += (this.castSlot === 2 ? 0.6 : 0.3) * Math.sin(Math.PI * this.castT);
+      twist += (this.castSlot === 3 ? 0.6 : 0.3) * Math.sin(Math.PI * this.castT);
     }
     A.rotation.set(ax, 0, az);
     B.rotation.set(bx, 0, bz);
@@ -578,7 +586,7 @@ export class Hero {
     } else this._wuFx = false;
     if (this._castFx) { // release burst at the hand; the ult also throws a light pillar and a big rune
       this._castFx = false;
-      const ult = this.castSlot === 2;
+      const ult = this.castSlot === 3;
       particles.burst(_hand.x, _hand.y, _hand.z, ult ? 26 : 14, { color: [fxc, fxa, 0xffffff], speed: ult ? 7 : 5, up: 2, size: 0.7, life: 0.45, frame: FRAME.sparkle, grav: 1 });
       vfx.flash(_hand.x, _hand.y, _hand.z, fxc, ult ? 2.4 : 1.5, 0.22);
       vfx.ring(this.rx, 0.25, this.rz, fxa, ult ? 5 : 3, 0.35);

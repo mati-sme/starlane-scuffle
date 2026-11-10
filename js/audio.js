@@ -210,7 +210,7 @@ function unlock() {
 for (const type of ['pointerdown', 'keydown']) addEventListener(type, unlock, { once: true, capture: true });
 
 bus.on('swing', (h) => play('swing', h, undefined, h));
-bus.on('cast', ({ hero, slot }) => play(slot === 2 ? 'ult' : 'skill', hero, undefined, hero));
+bus.on('cast', ({ hero, slot }) => play(slot === 3 ? 'ult' : 'skill', hero, undefined, hero));
 bus.on('hit', (t) => { if (t.type !== 'minion') play('tick', undefined, undefined, t); });
 bus.on('down', (t) => play(t.type === 'tower' || t.type === 'core' ? 'shatter' : 'poof', t.type === 'core', undefined, t));
 bus.on('levelUp', (h) => { if (h.isPlayer) play('level'); });

@@ -52,7 +52,7 @@ async function run(id, body) {
 // helper preamble shared by every check (runs in the page): maxed hero, a stunned enemy hero standing `d` ahead.
 const pre = `const m = window.__starlane.match, h = m.hero, foe = m.heroes.find((e) => e.team !== h.team);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  h.ranks = [4, 4, 3]; h.recalc(true); h.hp = h.maxHp; foe.maxHp = foe.hp = 5000; foe.stun = 5; foe.shieldHp = 0;
+  h.ranks = [3, 3, 3, 3]; h.recalc(true); h.hp = h.maxHp; foe.maxHp = foe.hp = 5000; foe.stun = 5; foe.shieldHp = 0;
   const put = (d) => { foe.x = h.x + d; foe.z = h.z; foe.stun = 5; };
   const cast = async (i, ms = 900, aim = null) => { h.cds[i] = 0; h._begin(i, m, aim); await sleep(ms); };
   const until = async (f, ms = 6000) => { for (let t = 0; t < ms && !f(); t += 50) await sleep(50); };`;

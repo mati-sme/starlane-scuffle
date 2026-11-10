@@ -49,7 +49,7 @@ await page.waitForFunction(() => window.__starlane.state === 'match', null, { ti
 await page.evaluate(() => {
   const m = window.__starlane.match;
   m.heroes.forEach((h, i) => {
-    h.ranks = [4, 4, 3]; h.recalc(true);
+    h.ranks = [3, 3, 3, 3]; h.recalc(true);
     h.x = (i < 5 ? -1 : 1) * 2.6 + (i % 2) * 0.6; h.z = (i % 5 - 2) * 1.8;
   });
   const p = m.hero; p.x = -2.6; p.z = 0; // player at the middle of the allied line so the camera frames the clash

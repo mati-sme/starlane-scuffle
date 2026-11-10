@@ -6,7 +6,7 @@ import { ARENA } from '../config.js';
 import { fountain } from '../world/arena.js';
 
 // Every price is base * COST_SCALE (tuned with tests/v90-pacing-sim.mjs so a full 7-item build lands near the 15:00 tie-break).
-export const COST_SCALE = 0.8;
+export const COST_SCALE = 0.7;
 const T = (id, o) => [id, { ...o, id, cost: Math.round((o.base * COST_SCALE) / 10) * 10 }];
 export const ITEMS = Object.fromEntries([
   // boots line

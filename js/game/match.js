@@ -29,9 +29,10 @@ import { AimPreview } from '../render/aimpreview.js';
 import { DEFAULT_SPELLS } from './spells.js';
 import { Seasons } from './seasons.js';
 import { tickFaction, seasonMods } from './factions.js';
+import { wirePassives } from './passives.js';
 
 const CONFETTI = [PAL.gold, PAL.sunny, PAL.gloom, PAL.heal, PAL.nebulaB, PAL.star];
-const IDLE = { x: 0, z: 0, attack: false, cast: [false, false, false], spell: [false, false] };
+const IDLE = { x: 0, z: 0, attack: false, cast: [false, false, false, false], spell: [false, false] };
 
 export class Match {
   constructor(scene, rig, map) {
@@ -53,12 +54,12 @@ export class Match {
     this.role = 'solo'; // solo | host | guest (online: see net/session.js)
     this.myTeam = 0;
     this.peerHero = null;
-    this.peerIn = { x: 0, z: 0, attack: false, cast: [false, false, false], spell: [false, false], spend: [false, false, false], aim: [null, null, null], pref: 0, recall: false, at: 0 };
-    this.peerIt = { x: 0, z: 0, attack: false, cast: [false, false, false], spell: [false, false], aim: [null, null, null], pref: 0, recall: false };
+    this.peerIn = { x: 0, z: 0, attack: false, cast: [false, false, false, false], spell: [false, false], spend: [false, false, false, false], aim: [null, null, null, null], pref: 0, recall: false, at: 0 };
+    this.peerIt = { x: 0, z: 0, attack: false, cast: [false, false, false, false], spell: [false, false], aim: [null, null, null, null], pref: 0, recall: false };
     this.outbox = null; // guest: { x, z, attack, cast[], spend[] } collected for the next input message
     this.snapAt = 0;
 
-    this.intent = { x: 0, z: 0, attack: false, cast: [false, false, false], spell: [false, false], aim: [null, null, null], pref: 0, recall: false };
+    this.intent = { x: 0, z: 0, attack: false, cast: [false, false, false, false], spell: [false, false], aim: [null, null, null, null], pref: 0, recall: false };
     this._dir = { dx: 0, dz: 1 };
     this._aim = { dx: 0, dz: 1, dist: 1 };
     this._screen = { x: 0, y: 0 };
@@ -67,6 +68,7 @@ export class Match {
     this._plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
     this._hit = new THREE.Vector3();
 
+    wirePassives(() => this);
     bus.on('hit', (t) => { if (t === this.hero) rig.shake(0.15); });
     bus.on('dmg', (e) => { // per-hero damage to heroes + structures, for the end-of-match recap (the host keeps the books)
       if (this.role !== 'guest' && e.src?.type === 'hero' && (e.t.type === 'hero' || e.t.type === 'tower' || e.t.type === 'core')) this._st(e.src).dmg += e.amount;
@@ -97,7 +99,7 @@ export class Match {
         }
       }
     });
-    bus.on('cast', ({ hero, slot }) => { if (slot === 2) rig.shake(hero === this.hero ? 0.4 : 0.2); });
+    bus.on('cast', ({ hero, slot }) => { if (slot === 3) rig.shake(hero === this.hero ? 0.4 : 0.2); });
 
     const q = new URLSearchParams(location.search), id = q.get('hero');
     this.setHero(Object.hasOwn(HEROES, id) ? id : ROSTER[0], q.get('bots')?.split(','));
@@ -139,7 +141,7 @@ export class Match {
   setOnline({ blue, red, me, peer = null, setup = defaultSetup() }, role) {
     setup = cleanSetup(setup);
     for (const h of this.heroes ?? []) h.dispose();
-    this.role = role; this.myTeam = me.team; this.outbox = role === 'guest' ? { x: 0, z: 0, attack: false, cast: [false, false, false], spell: [false, false], spend: [false, false, false], aim: [null, null, null], pref: 0, recall: false } : null;
+    this.role = role; this.myTeam = me.team; this.outbox = role === 'guest' ? { x: 0, z: 0, attack: false, cast: [false, false, false, false], spell: [false, false], spend: [false, false, false, false], aim: [null, null, null, null], pref: 0, recall: false } : null;
     sim.guest = role === 'guest';
     const human = (team, i) => (me.team === team && me.idx === i) || (peer && peer.team === team && peer.idx === i);
     const brain = (team, i) => (human(team, i) ? null : (hero) => new Bot(hero, setup.diff[team][i]));
@@ -159,12 +161,12 @@ export class Match {
     const p = this.peerIn;
     p.x = +m.x || 0; p.z = +m.z || 0; p.attack = !!m.a; p.at = performance.now();
     for (let i = 0; i < 2; i++) if (m.d & (1 << i)) p.spell[i] = true;
-    for (let i = 0; i < 3; i++) { if (m.c & (1 << i)) p.cast[i] = true; if (m.s & (1 << i)) p.spend[i] = true; }
+    for (let i = 0; i < 4; i++) { if (m.c & (1 << i)) p.cast[i] = true; if (m.s & (1 << i)) p.spend[i] = true; }
     p.pref = m.p === 1 || m.p === 2 ? m.p : 0;
     if (m.r) p.recall = true;
     if (Array.isArray(m.q)) { // aimed casts: [slot, angle (1/100 rad), distance (1/10)]
       for (const [slot, ang, dist] of m.q) {
-        if (!(slot >= 0 && slot < 3) || !Number.isFinite(ang) || !Number.isFinite(dist)) continue;
+        if (!(slot >= 0 && slot < 4) || !Number.isFinite(ang) || !Number.isFinite(dist)) continue;
         const a = ang / 100;
         p.aim[slot] = { dx: Math.sin(a), dz: Math.cos(a), dist: Math.min(30, Math.max(0, dist / 10)) };
       }
@@ -434,7 +436,7 @@ export class Match {
     it.dir = this._atkDir(hero);
     it.recall = input.recall; input.recall = false;
     for (let i = 0; i < 2; i++) { it.spell[i] = input.spell[i]; input.spell[i] = false; }
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
       it.cast[i] = input.cast[i]; input.cast[i] = false;
       it.aim[i] = it.cast[i] && input.aimCast[i] ? this._aimed(input.aimCast[i], hero, i) : null;
       input.aimCast[i] = null;
@@ -443,7 +445,7 @@ export class Match {
     if (this.outbox) {
       const o = this.outbox;
       o.x = it.x; o.z = it.z; o.attack = it.attack;
-      for (let i = 0; i < 3; i++) if (it.cast[i]) { o.cast[i] = true; o.aim[i] = it.aim[i]; }
+      for (let i = 0; i < 4; i++) if (it.cast[i]) { o.cast[i] = true; o.aim[i] = it.aim[i]; }
       o.pref = it.pref;
       if (it.recall) o.recall = true;
       for (let i = 0; i < 2; i++) if (it.spell[i]) o.spell[i] = true;
@@ -582,7 +584,7 @@ export class Match {
     it.pref = stale ? 0 : p.pref;
     it.recall = p.recall; p.recall = false;
     for (let i = 0; i < 2; i++) { it.spell[i] = p.spell[i]; p.spell[i] = false; }
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
       it.cast[i] = p.cast[i]; p.cast[i] = false;
       it.aim[i] = it.cast[i] ? p.aim[i] : null; p.aim[i] = null;
       if (p.spend[i]) { this.peerHero.spendPoint(i); p.spend[i] = false; }

@@ -191,7 +191,7 @@ export class Hud {
     if (!ab || v.z > 1 || Math.abs(v.x) > 1.05 || Math.abs(v.y) > 1.05) return;
     const el = this.calls[this.callAt++ % this.calls.length];
     el.textContent = ab.name;
-    el.className = `callout go ${slot === 2 ? 'ult' : ''} ${hero.team === me.team ? 'ally' : 'foe'}`;
+    el.className = `callout go ${slot === 3 ? 'ult' : ''} ${hero.team === me.team ? 'ally' : 'foe'}`;
     el.style.left = `${((v.x * 0.5 + 0.5) * this.w).toFixed(0)}px`;
     el.style.top = `${((-v.y * 0.5 + 0.5) * this.h).toFixed(0)}px`;
   }

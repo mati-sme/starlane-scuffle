@@ -15,17 +15,21 @@ export const WAVE2B = [
     s1: { name: 'Stone Gaze', kind: 'gaze', as: 'cone', tag: 'stun who looks', cd: 10, range: 6.5, arc: 70, dmg: 55, stun: 1.1, slowT: 1.8, perk: { at: 4, arc: 95, stun: 1.5 } },
     s2: { name: 'Crystal Molt', kind: 'molt', as: 'nova', tag: 'shield, then shatter', cd: 12, shield: 260, dur: 2.5, radius: 3.6, dmg: 80, slow: true, slowT: 1.5, perk: { at: 4, shield: 380, radius: 4.4 } },
     ult: { name: 'Geode Prison', kind: 'geode', as: 'blast', tag: 'crystal cage', cd: 45, range: 8, radius: 3.4, delay: 0.5, dmg: 120, dur: 3, perk: { at: 3, dur: 4.5, dmg: 180 } },
+    s3: { name: 'Shard Row', kind: 'quake', tag: 'crystal line stun', cd: 10, count: 4, gap: 2.2, radius: 1.6, dmg: 55, stun: 0.6, perk: { at: 3, count: 5, stun: 0.9 } },
+    passive: { name: 'Stone Skin', tag: 'Stand still for a moment and take less damage.', kind: 'stillGuard', after: 1.0, dr: 0.25 },
   },
   {
     id: 'keel', name: 'Keel', title: 'Prow Warden', role: 'tank', color: 0x2E3A4A, accent: 0xC9963A,
     taunt: 'Steady as she goes. Nobody gets past this prow!',
-    fx: { color: 0x6FE3D8, accent: 0xFFD27A, frame: 3, amb: { color: 0xBFF6F0, vy: 0.6, size: 0.3, life: 0.7, rate: 0.18, drift: 0.6, frame: 0 } },
+    fx: { color: 0xFFC83D, accent: 0xFFF0B8, frame: 3, amb: { color: 0xFFC83D, vy: 0.6, size: 0.3, life: 0.7, rate: 0.18, drift: 0.6, frame: 0 } },
     model: { wave: 'b', style: 'stomp' },
     stats: { hp: 1160, hpLv: 94, speed: 5.7, radius: 0.92 },
     basic: { name: 'Rivet Ram', kind: 'melee', style: 'slam', range: 2.6, dmg: 46, cd: 1.0, cleave: 90, color: 0x8FF0E0 },
     s1: { name: 'Full Steam', kind: 'plow', as: 'dash', tag: 'carry + crash', cd: 10, range: 7, width: 2.2, dmg: 60, endStun: 0.7, perk: { at: 4, range: 9, endStun: 1.0 } },
     s2: { name: 'Foghorn', kind: 'foghorn', as: 'cone', tag: 'blast + brace', cd: 11, range: 6, arc: 80, dmg: 50, knock: 3.5, selfDr: 0.35, drT: 3, perk: { at: 4, selfDr: 0.5, slow: true, slowT: 1.5 } },
     ult: { name: 'Drop Anchor', kind: 'anchor', as: 'blast', tag: 'chain leash', cd: 45, range: 9, radius: 3, delay: 0.55, dmg: 150, stun: 0.6, leash: 3.5, dur: 4, perk: { at: 3, dur: 6, leash: 3 } },
+    s3: { name: 'Bulkhead', kind: 'field', tag: 'solid steel wall', cd: 13, wall: 6.5, solid: true, dur: 3.5, perk: { at: 3, dur: 5, wall: 8, allySpd: 0.25 } },
+    passive: { name: 'Watertight', tag: 'When badly hurt you get a big shield.', kind: 'lowShield', hp: 0.35, shield: 220, t: 3, cool: 25 },
   },
   // ───────────── BRUISERS ─────────────
   {
@@ -38,6 +42,8 @@ export const WAVE2B = [
     s1: { name: 'Tongs Toss', kind: 'toss', as: 'hook', tag: 'grab + flip', cd: 9, range: 4.5, width: 1.4, dmg: 70, behind: 3, stun: 0.5, perk: { at: 4, dmg: 110, splash: 2.2 } },
     s2: { name: 'Red Hot', kind: 'temper', as: 'buff', tag: 'hot swings', cd: 11, hits: 3, bonus: 45, burnR: 2, dur: 6, shield: 100, perk: { at: 4, hits: 5 } },
     ult: { name: 'Anvil Drop', kind: 'anvilfall', as: 'blast', tag: 'falling anvil', cd: 42, range: 8, radius: 3, delay: 0.8, dmg: 200, stun: 1.0, block: 4, perk: { at: 3, radius: 3.8, block: 6 } },
+    s3: { name: 'Hammer Hop', kind: 'leap', tag: 'jump + smash', cd: 11, range: 6.5, dur: 0.5, height: 3, radius: 2.4, dmg: 65, knock: 2.5, perk: { at: 3, radius: 3, dmg: 95, stun: 0.6 } },
+    passive: { name: 'Third Strike', tag: 'Every third basic hit lands an extra thump.', kind: 'nthHit', n: 3, bonus: 40, slow: 0.4 },
   },
   {
     id: 'cyclone', name: 'Cyclone', title: 'Storm Brawler', role: 'bruiser', color: 0x48586B, accent: 0xE8F4FF,
@@ -49,6 +55,8 @@ export const WAVE2B = [
     s1: { name: 'Updraft', kind: 'updraft', as: 'nova', tag: 'suck up + launch', cd: 9, radius: 3.2, pull: 2, dmg: 65, perk: { at: 4, radius: 4, dmg: 95 } },
     s2: { name: 'Eye of the Storm', kind: 'eye', as: 'whirl', tag: 'wind-wall ring', cd: 12, r: 3.6, dur: 3.5, dps: 60, push: 1.2, allyDr: 0.2, perk: { at: 4, dur: 5, allyDr: 0.3 } },
     ult: { name: 'Twister', kind: 'twister', as: 'dash', tag: 'carry tornado', cd: 42, range: 10, radius: 2.8, dur: 1.8, dps: 120, perk: { at: 3, radius: 3.5, dps: 170 } },
+    s3: { name: 'Razor Gale', kind: 'boomerang', tag: 'wind out and back', cd: 9, range: 8, width: 1.6, dmg: 55, dur: 1.3, slow: true, slowT: 1.0, perk: { at: 3, range: 10, dmg: 80 } },
+    passive: { name: 'Momentum', tag: 'Each hit makes you run a little faster.', kind: 'hitHaste', speed: 0.06, t: 2.5, max: 5 },
   },
   // ───────────── ASSASSINS ─────────────
   {
@@ -61,6 +69,8 @@ export const WAVE2B = [
     s1: { name: 'Parasol Drift', kind: 'drift', as: 'leap', tag: 'float, untouchable', cd: 8, range: 7, dur: 0.75, height: 2.6, radius: 2.2, dmg: 60, slow: true, slowT: 1.2, perk: { at: 4, range: 9, dmg: 90 } },
     s2: { name: 'Umbra Pool', kind: 'umbra', as: 'trap', tag: 'hide in shadow', cd: 12, range: 6, r: 2.8, dur: 5, nextDmg: 70, perk: { at: 4, dur: 7, nextDmg: 110 } },
     ult: { name: 'Eclipse', kind: 'eclipse', as: 'blast', tag: 'blind zone', cd: 42, range: 8, radius: 4.5, delay: 0.3, dur: 3.5, dmg: 90, perk: { at: 3, radius: 5.5, dur: 4.5 } },
+    s3: { name: 'Umbral Step', kind: 'blink', tag: 'slip behind, stab', cd: 10, range: 7, dmg: 75, slow: true, slowT: 1.2, perk: { at: 3, dmg: 110, resetOnKill: 3 } },
+    passive: { name: 'Ambush', tag: 'Your first hit on a new target hurts extra.', kind: 'firstStrike', bonus: 0.4, cool: 6 },
   },
   {
     id: 'pounce', name: 'Pounce', title: 'Circus Prowler', role: 'assassin', color: 0xC8A25A, accent: 0x2FB5A8,
@@ -72,6 +82,8 @@ export const WAVE2B = [
     s1: { name: 'Pounce', kind: 'pounce', as: 'leap', tag: 'leap + pin', cd: 8, range: 7, dur: 0.4, height: 2.2, dmg: 75, root: 1.0, perk: { at: 4, root: 1.4, dmg: 105 } },
     s2: { name: 'Hoop Vault', kind: 'vault', as: 'dash', aim: 'move', tag: 'flip + hoop trap', cd: 9, range: 5.5, radius: 2.2, dmg: 40, slow: true, slowT: 1.5, perk: { at: 4, dmg: 70, resetBasic: true } },
     ult: { name: 'Nine Lives', kind: 'ninelives', as: 'buff', tag: 'undying frenzy', cd: 45, dur: 4, undyingT: 4, spd: 0.35, aspd: 0.5, refresh: 1.2, perk: { at: 3, dur: 6, undyingT: 6 } },
+    s3: { name: 'Spotlight', kind: 'mark', tag: 'mark the target', cd: 9, range: 9, width: 1.0, dmg: 40, markT: 5, slow: true, slowT: 1.2, perk: { at: 3, dmg: 70, stun: 0.5 } },
+    passive: { name: 'Landing Pose', tag: 'Takedowns heal you and speed up your skills.', kind: 'killHeal', heal: 0.15, cdr: 3 },
   },
   // ───────────── BLASTERS ─────────────
   {
@@ -84,29 +96,35 @@ export const WAVE2B = [
     s1: { name: 'Tailstreak', kind: 'tailstreak', as: 'bolt', tag: 'icy trail line', cd: 8, range: 11, width: 1.6, dmg: 85, pierce: true, trail: { dur: 2.5, dps: 25, w: 1.4 }, perk: { at: 4, trail: { dur: 4, dps: 35, w: 1.8 } } },
     s2: { name: 'Constellation', kind: 'constellation', as: 'blast', tag: 'star links', cd: 10, range: 8, radius: 3, delay: 0.7, dmg: 70, stun: 0.8, perk: { at: 4, radius: 3.8, stun: 1.1 } },
     ult: { name: 'Impact Event', kind: 'impact', as: 'blast', tag: 'one huge comet', cd: 48, range: 11, radius: 5.2, delay: 1.5, dmg: 140, core: 2, coreMul: 2, knock: 3, fieldAfter: { dur: 3, slow: true, dps: 25 }, perk: { at: 3, radius: 6.2, coreMul: 2.6 } },
+    s3: { name: 'Starfall', kind: 'rain', tag: 'shower of stars', cd: 12, range: 9, radius: 3.8, blastR: 1.6, count: 5, dur: 1.6, dmg: 45, perk: { at: 3, count: 8, dmg: 60 } },
+    passive: { name: 'Starstruck', tag: 'After a skill your next basic shot hits harder.', kind: 'castEmpower', dmg: 35, t: 4 },
   },
   {
     id: 'mycel', name: 'Mycel', title: 'Spore Sage', role: 'blaster', color: 0x6B3A5A, accent: 0xF2E6C8,
     taunt: 'Spores of luck, grow where I go!',
-    fx: { color: 0x6FF7E6, accent: 0xF2C6FF, frame: 0, amb: { color: 0x9DFFE8, vy: 0.35, size: 0.4, life: 1.4, rate: 0.12, drift: 0.7, frame: 0 } },
+    fx: { color: 0xE06AFF, accent: 0xFFB0F0, frame: 0, amb: { color: 0xE06AFF, vy: 0.35, size: 0.4, life: 1.4, rate: 0.12, drift: 0.7, frame: 0 } },
     model: { wave: 'b', style: 'base' },
     stats: { hp: 690, hpLv: 58, speed: 5.8, radius: 0.68 },
     basic: { name: 'Spore Puff', kind: 'proj', range: 7, dmg: 38, cd: 0.9, speed: 10, arc: 0.7, splash: 1.6, size: 1.7, halo: 3.0, core: 0.2, tail: 0.3, frame: 0, color: 0x9DFFE8 },
     s1: { name: 'Puffball Patch', kind: 'puffballs', as: 'trap', tag: 'spore mines', cd: 10, range: 7, n: 3, spread: 2, radius: 2.4, trigger: 1.2, dur: 14, dmg: 55, slow: true, slowT: 2, fieldAfter: { dur: 2.5, dps: 25, slow: true }, perk: { at: 4, n: 4 } },
     s2: { name: 'Mycelium Web', kind: 'network', as: 'nova', tag: 'threads, then root', cd: 11, radius: 5, breakR: 7, dur: 2, dps: 40, root: 1.2, perk: { at: 4, root: 1.6, dps: 60 } },
     ult: { name: 'Fairy Ring', kind: 'fairyring', as: 'vortex', tag: 'swirl, then sleep', cd: 45, range: 9, radius: 4.8, dur: 3, dps: 50, swirl: 3.5, endStun: 1.3, perk: { at: 3, radius: 5.8, endStun: 1.8 } },
+    s3: { name: 'Shroom Sentry', kind: 'turret', tag: 'spore turret', cd: 12, range: 4, dur: 9, tRange: 6.5, tDmg: 20, tCd: 0.8, max: 1, perk: { at: 3, max: 2, dur: 12 } },
+    passive: { name: 'Sticky Spores', tag: 'Your basic hits slow the target down.', kind: 'hitSlow', t: 1.0 },
   },
   // ───────────── SHOOTERS ─────────────
   {
     id: 'harpoon', name: 'Harpoon', title: 'Line Whaler', role: 'shooter', color: 0xD9A42B, accent: 0x1F3550,
     taunt: 'There she blows! Reel them in!',
-    fx: { color: 0x7FE3FF, accent: 0xF4E2B8, frame: 0, amb: { color: 0xBFF4FF, vy: 0.9, size: 0.3, life: 0.5, rate: 0.16, drift: 1, frame: 0 } },
+    fx: { color: 0xFFA64D, accent: 0xFFE0B0, frame: 0, amb: { color: 0xFFA64D, vy: 0.9, size: 0.3, life: 0.5, rate: 0.16, drift: 1, frame: 0 } },
     model: { wave: 'b', style: 'base' },
     stats: { hp: 760, hpLv: 63, speed: 6.0, radius: 0.74 },
     basic: { name: 'Barb Shot', kind: 'proj', range: 8, dmg: 50, cd: 0.9, speed: 30, arc: 0, size: 0.7, tail: 2.8, core: 0.7, frame: 2, color: 0x9FEFFF },
     s1: { name: 'Line Shot', kind: 'lineshot', as: 'missile', tag: 'leash, then reel', cd: 9, range: 10, speed: 26, width: 1.0, dmg: 70, leash: 2.0, reel: 4, perk: { at: 4, dmg: 100, stun: 0.5 } },
     s2: { name: 'Cast Off', kind: 'castoff', as: 'dash', aim: 'move', tag: 'kick away + jump', cd: 9, range: 6, radius: 2.6, knock: 3, dmg: 40, perk: { at: 4, aspd: 0.6, aspdT: 3 } },
     ult: { name: 'Leviathan Volley', kind: 'skewer', as: 'bolt', tag: 'dragging harpoons', cd: 45, range: 11, count: 3, spread: 30, speed: 22, width: 1.4, dmg: 120, stun: 0.8, perk: { at: 3, count: 5, spread: 44 } },
+    s3: { name: 'Sea Mine', kind: 'trap', tag: 'hidden mine', cd: 11, range: 7, radius: 2.4, trigger: 1.3, dmg: 70, stun: 0.8, dur: 14, perk: { at: 3, radius: 3, stun: 1.0 } },
+    passive: { name: 'Sea Legs', tag: 'Casting a skill makes you sail faster.', kind: 'castHaste', speed: 0.2, t: 1.5 },
   },
   {
     id: 'loom', name: 'Loom', title: 'Thread Sniper', role: 'shooter', color: 0x2E3A7A, accent: 0xF2B134,
@@ -118,6 +136,8 @@ export const WAVE2B = [
     s1: { name: 'Tripwire', kind: 'tripwire', as: 'trap', tag: 'snare thread', cd: 9, range: 8, len: 6, dur: 8, dmg: 70, root: 1.2, perk: { at: 4, len: 8, root: 1.6 } },
     s2: { name: 'Stitch', kind: 'stitch', as: 'bolt', tag: 'sew foes together', cd: 9, range: 10, width: 1.2, pierce: true, dmg: 60, slow: true, slowT: 1.5, perk: { at: 4, stun: 0.6 } },
     ult: { name: 'Silk Snipe', kind: 'snipe', as: 'bolt', tag: 'charged long shot', cd: 40, range: 20, width: 1.3, delay: 1.0, dmg: 200, far: 0.06, perk: { at: 3, pierce: true, far: 0.08 } },
+    s3: { name: 'Bobbin Bounce', kind: 'ricochet', tag: 'bouncing spool', cd: 10, range: 10, width: 1.0, bounces: 3, bounceR: 5, dmg: 70, falloff: 0.8, perk: { at: 3, bounces: 5 } },
+    passive: { name: 'Hidden Weaver', tag: 'You run faster while hiding in bushes.', kind: 'brushSpeed', speed: 0.25 },
   },
   // ───────────── SUPPORTS ─────────────
   {
@@ -130,6 +150,8 @@ export const WAVE2B = [
     s1: { name: 'Two Verses', kind: 'verse', as: 'buff', tag: 'valor / rest', cd: 9, allyR: 7, dur: 4, spd: 0.25, aspd: 0.3, healPs: 30, perk: { at: 4, spd: 0.35, healPs: 50 } },
     s2: { name: 'Hushing Bell', kind: 'hush', as: 'blast', tag: 'silence', cd: 12, range: 8, radius: 3, delay: 0.45, dmg: 50, hush: 1.6, slow: true, slowT: 1.6, perk: { at: 4, radius: 3.8, hush: 2.2 } },
     ult: { name: 'Grand Chorus', kind: 'chorus', as: 'buff', tag: 'channel sanctuary', cd: 50, allyR: 9, heal: 60, allyHeal: 60, dur: 2.5, healPs: 90, allyDr: 0.3, radius: 6, dmg: 100, knock: 4, perk: { at: 3, healPs: 130, undying: true } },
+    s3: { name: 'Lullaby', kind: 'nova', tag: 'silly sleepy dance', cd: 13, radius: 3.4, dmg: 40, charm: 1.2, perk: { at: 3, radius: 4.2, charm: 1.6 } },
+    passive: { name: 'Steady Beat', tag: 'Nearby friends run a little faster.', kind: 'auraHaste', r: 6, speed: 0.1 },
   },
   {
     id: 'grove', name: 'Grove', title: 'Tree Doctor', role: 'support', color: 0xD8D0BC, accent: 0xE89A2C,
@@ -141,5 +163,7 @@ export const WAVE2B = [
     s1: { name: 'Sap Splint', kind: 'splint', as: 'tether', tag: 'shield into heal', cd: 10, range: 8, allyShield: 160, dur: 3, convert: 1.0, perk: { at: 4, allyShield: 240 } },
     s2: { name: 'Prune', kind: 'prune', as: 'cone', tag: 'strip shields, heal', cd: 8, range: 4.5, arc: 100, dmg: 70, healPer: 45, slow: true, slowT: 1.2, perk: { at: 4, healPer: 70 } },
     ult: { name: 'Heartwood', kind: 'heartwood', as: 'field', tag: 'plant a great tree', cd: 50, range: 8, r: 5, radius: 3, dmg: 60, root: 1.2, dur: 6, healPs: 60, perk: { at: 3, healPs: 90, dur: 8 } },
+    s3: { name: 'Spring Pool', kind: 'field', tag: 'healing puddle', cd: 13, range: 7, r: 3.5, dur: 5, healPs: 40, place: 'ally', perk: { at: 3, healPs: 65, r: 4.2 } },
+    passive: { name: 'Fresh Air', tag: 'Friends nearby slowly heal.', kind: 'auraRegen', r: 6, hps: 6 },
   },
 ];

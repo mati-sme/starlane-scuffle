@@ -6,9 +6,9 @@ export const input = {
   attackKey: false,
   attackMouse: false,
   walkClick: null, // {x, y} in NDC, consumed by the match
-  cast: [false, false, false], // skill 1 / skill 2 / ult pressed since the last sim step (consumed by the match)
-  spend: [false, false, false], // 1 / 2 / 3 or Ctrl+Q / E / R pressed: rank up Q / E / R (consumed by the match)
-  aimCast: [null, null, null], // drag-aimed casts waiting with cast[]: { sx, sy, frac } screen drag, or { mouse: true } (consumed with cast[])
+  cast: [false, false, false, false], // Q / W / E / R (ult) pressed since the last sim step (consumed by the match)
+  spend: [false, false, false, false], // 1 / 2 / 3 / 4 or Ctrl+Q / W / E / R pressed: rank up Q / E / R (consumed by the match)
+  aimCast: [null, null, null, null], // drag-aimed casts waiting with cast[]: { sx, sy, frac } screen drag, or { mouse: true } (consumed with cast[])
   aiming: null, // live skill aim while a skill button / Q E R is held: { slot, sx, sy, frac, cancel, mouse }
   atkAim: null, // live basic-attack aim while Attack is dragged: { sx, sy, frac, dragged } (touch) or { mouse: true } (Shift + attack key)
   mouse: null, // last mouse position in NDC { x, y } (desktop aim)
@@ -32,12 +32,12 @@ export function resetInput() {
   window.dispatchEvent(new Event('starlane:inputreset'));
 }
 
+// v9: Q W E R are the four skills, so keyboard movement is the arrow keys (right-click also walks).
 const AXIS = {
-  KeyW: [0, 1], ArrowUp: [0, 1], KeyS: [0, -1], ArrowDown: [0, -1],
-  KeyA: [-1, 0], ArrowLeft: [-1, 0], KeyD: [1, 0], ArrowRight: [1, 0],
+  ArrowUp: [0, 1], ArrowDown: [0, -1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
 };
 
-const CAST_KEYS = { KeyQ: 0, KeyE: 1, KeyR: 2 };
+const CAST_KEYS = { KeyQ: 0, KeyW: 1, KeyE: 2, KeyR: 3 };
 
 // Fills out.x / out.y; returns true when there is any movement intent.
 export function readMove(out) {
@@ -79,6 +79,7 @@ export function initInput(canvas) {
     else if (e.code === 'Digit1' || e.code === 'Numpad1') input.spend[0] = true;
     else if (e.code === 'Digit2' || e.code === 'Numpad2') input.spend[1] = true;
     else if (e.code === 'Digit3' || e.code === 'Numpad3') input.spend[2] = true;
+    else if (e.code === 'Digit4' || e.code === 'Numpad4') input.spend[3] = true;
   });
   window.addEventListener('keyup', (e) => {
     input.keys.delete(e.code);
