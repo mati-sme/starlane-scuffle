@@ -697,3 +697,15 @@ h2 { font-style: normal; }
 .quest.done { border-color: #5CE08A; } .quest.done i { border-color: #5CE08A; }
 .questdone { margin: 0; font-weight: 800; font-size: 17px; color: #8FFFB0; text-shadow: 0 2px 0 var(--ink); animation: pop .5s cubic-bezier(.3,1.8,.5,1) both; display: flex; align-items: center; gap: 5px; }
 @media (max-height: 460px) { .quests > b { display: none; } .quest { font-size: 10px; padding: 1px 6px; } .questdone { font-size: 13px; } .title .hint { display: none; } }
+
+/* v8.2 skins */
+.skins { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin: 6px 0; }
+.skins > span { font-size: 11px; letter-spacing: .14em; color: rgba(255,255,255,.7); font-weight: 700; text-transform: uppercase; }
+.skinchip { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; min-width: 52px; padding: 3px 5px; border: 2px solid rgba(255,255,255,.3); background: rgba(10,16,34,.8); color: #fff; font-family: inherit; font-weight: 700; cursor: pointer; }
+.skinchip i { width: 20px; height: 20px; border-radius: 50%; background: var(--sw); border: 2px solid #fff; }
+.skinchip small { font-size: 10px; letter-spacing: .06em; }
+.skinchip em { font-style: normal; font-size: 10px; color: var(--gold); display: inline-flex; align-items: center; gap: 2px; }
+.skinchip em svg { width: 10px; height: 10px; }
+.skinchip.on { border-color: var(--gold); background: rgba(70,52,8,.8); }
+.skinchip:disabled { opacity: .45; cursor: default; }
+@media (max-height: 460px) { .skinchip { min-width: 40px; padding: 1px 3px; } .skinchip i { width: 13px; height: 13px; } .skins > span { font-size: 9px; } }

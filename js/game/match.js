@@ -7,7 +7,8 @@ import { input, readMove } from '../core/input.js';
 import { particles, FRAME } from '../render/particles.js';
 import { vfx } from '../render/vfx.js';
 import { Hero, screenToWorld } from '../heroes/hero.js';
-import { HEROES, ROSTER } from '../heroes/index.js';
+import { HEROES, ROSTER, skinnedDef } from '../heroes/index.js';
+import { equipped } from './skins.js';
 import { addBuff, heal, sim, tickStatus, tickHitFx, poof } from './combat.js';
 import { composeTeams } from './compose.js';
 import { cleanSetup, defaultSetup } from './setup.js';
@@ -104,7 +105,7 @@ export class Match {
     const { blue, red } = composeTeams(id, bots ?? [], banned, setup.size, setup.side);
     const brain = (team, i) => (team === setup.side && i === 0 ? null : (hero) => new Bot(hero, setup.diff[team][i]));
     const roster = [...blue.map((k, i) => [k, 0, i, brain(0, i)]), ...red.map((k, i) => [k, 1, i, brain(1, i)])];
-    this.heroes = roster.map(([k, team, slot, brain]) => new Hero(this.scene, HEROES[k], team, slot, brain));
+    this.heroes = roster.map(([k, team, slot, brain]) => new Hero(this.scene, team === setup.side && slot === 0 ? skinnedDef(k, equipped(k)) : HEROES[k], team, slot, brain)); // the player wears their equipped colours
     this.hero = this.heroAt(setup.side, 0);
     this.hero.spells = [...spells];
     this.heroId = id;
@@ -125,7 +126,7 @@ export class Match {
     const human = (team, i) => (me.team === team && me.idx === i) || (peer && peer.team === team && peer.idx === i);
     const brain = (team, i) => (human(team, i) ? null : (hero) => new Bot(hero, setup.diff[team][i]));
     const roster = [...blue.map((k, i) => [k, 0, i, brain(0, i)]), ...red.map((k, i) => [k, 1, i, brain(1, i)])];
-    this.heroes = roster.map(([k, team, slot, brain]) => new Hero(this.scene, HEROES[k], team, slot, brain));
+    this.heroes = roster.map(([k, team, slot, brain]) => new Hero(this.scene, team === me.team && slot === me.idx ? skinnedDef(k, equipped(k)) : HEROES[k], team, slot, brain)); // my own colours (each player sees their own skin)
     this.hero = this.heroAt(me.team, me.idx);
     this.peerHero = peer ? this.heroAt(peer.team, peer.idx) : null;
     this.hero.spells = [...(me.spells ?? DEFAULT_SPELLS)];

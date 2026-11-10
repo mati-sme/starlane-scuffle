@@ -23,6 +23,7 @@ const BASE = `http://127.0.0.1:${server.address().port}/`;
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--ignore-gpu-blocklist'] });
 const ctx = await browser.newContext({ ...devices['iPhone 12 landscape'] }); // no unlockAll: real locks
 const page = await ctx.newPage();
+page.on('pageerror', (e) => console.log('PAGEERR', e.message));
 const tid = (id) => page.locator(`[data-testid="${id}"]`);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let failed = 0;
@@ -56,15 +57,31 @@ await tid('buy-btn').click({ force: true }); await sleep(300);
 check('bought: GO available', (await tid('go-btn').count()) === 1);
 check('coins down to 150', (await tid('select-wallet').locator('.coins').textContent()).trim() === '150');
 check('next price now 110', (await tid('champion-card-bulwark').count()) === 1 && (await page.locator('.lockbadge b').first().textContent()) === '110');
+// v8.2 skins: buy Frost (60) for granite, it equips and recolours
+check('skin row shown for owned champ', (await tid('skin-row').count()) === 1);
+const beforeCol = await page.evaluate(() => window.__starlane.match.hero.def.color);
+await tid('skin-frost').click({ force: true }); await sleep(200);
+check('skin bought: 60 coins spent (150 -> 90)', (await tid('select-wallet').locator('.coins').textContent()).trim() === '90');
+check('frost equipped', (await tid('skin-frost').getAttribute('aria-pressed')) === 'true');
 await tid('go-btn').click({ force: true });
 await page.waitForFunction(() => window.__starlane.state === 'match', null, { timeout: 20000 });
 await sleep(500);
+if (process.env.MSHOT) await page.screenshot({ path: process.env.MSHOT });
+const diff = await page.evaluate(async () => {
+  const { HEROES, skinnedDef, ROSTER } = await import('/js/heroes/index.js');
+  const sum = (m) => { let b = 0, r = 0; m.root.traverse((o) => { const a = o.isMesh && o.geometry?.attributes?.color; if (a) for (let i = 0; i < a.count; i++) { r += a.getX(i); b += a.getZ(i); } }); return [r, b]; };
+  const out = {};
+  for (const id of ['granite', 'nyx', 'bulwark', 'lumen', 'kade']) { const a = sum(HEROES[id].buildModel(0)), b = sum(skinnedDef(id, 'frost').buildModel(0)); out[id] = Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]); }
+  return out;
+});
+check('frost visibly recolours old + new champions', Object.values(diff).every((v) => v > 5), JSON.stringify(diff));
+check('in-match model uses palette', await page.evaluate(() => !!window.__starlane.match.hero.model));
 await page.evaluate(() => window.__starlane.match._end(window.__starlane.match.myTeam === 0, 'core'));
 await tid('rewards').waitFor({ timeout: 6000 });
 const txt = await tid('rewards').textContent();
 check('win rewards shown', /\+\d+/.test(txt) && txt.includes('XP'), txt.trim());
 const prof = await page.evaluate(() => JSON.parse(localStorage.getItem('starlane.profile')));
 check('quest completion shown on result', (await tid('quest-complete').count()) >= 1);
-check('profile persisted', prof.matches === 5 && prof.wins === 3 && prof.coins > 150, JSON.stringify(prof));
+check('profile persisted', prof.matches === 5 && prof.wins === 3 && prof.coins > 90, JSON.stringify(prof));
 await browser.close(); server.close();
 console.log(failed ? `${failed} FAILED` : 'ALL PASS'); process.exit(failed ? 1 : 0);

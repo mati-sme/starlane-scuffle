@@ -9,6 +9,7 @@ import { factionDef } from '../game/factions.js';
 import { ROLE_BLURB } from '../game/roles.js';
 import { matchupsOf } from '../game/matchups.js';
 import { LEVELS, MAX_TEAM, applyPreset, presetOf, summary } from '../game/setup.js';
+import { PALETTES, SKIN_IDS, SKIN_PRICE, equipped, ownsSkin, equip, buySkin, portraitShift } from '../game/skins.js';
 import { view as questView } from '../game/quests.js';
 import { profile, isOwned, nextPrice, buyChampion, xpNeeded } from '../game/progress.js';
 
@@ -16,7 +17,8 @@ const hex = (n) => '#' + n.toString(16).padStart(6, '0');
 const mmss = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
 const upper = (s) => s.toUpperCase();
 // Rendered bust of the champion's model (scripts/make-portraits.mjs).
-const portrait = (id) => `<img src="assets/portraits/${id}.png" alt="" draggable="false" decoding="async">`;
+const skinFilter = (id) => { const k = equipped(id); return k === 'default' ? '' : ` style="filter:hue-rotate(${portraitShift(HEROES[id], k)}deg) saturate(1.15)"`; };
+const portrait = (id) => `<img src="assets/portraits/${id}.png" alt="" draggable="false" decoding="async"${skinFilter(id)}>`;
 
 // Mini portrait for matchup rows; a missing image (champions from unmerged branches) leaves the coloured disc.
 const mini = (id) => `<i class="mp" title="${HEROES[id].name}" style="--c:${HEROES[id].css}"><img src="assets/portraits/${id}.png" alt="${HEROES[id].name}" draggable="false" loading="lazy" onerror="this.remove()"></i>`;
@@ -43,6 +45,12 @@ const LOCK = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"
 const COIN = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#FFC83D" stroke="#7a5200" stroke-width="2"/><circle cx="12" cy="12" r="5.5" fill="none" stroke="#C98F00" stroke-width="2"/></svg>';
 const wallet = () => { const p = profile(); return `<span class="lvl-pill" data-testid="player-level">LV ${p.level}</span><span class="coins" data-testid="player-coins">${COIN}<b>${p.coins}</b></span>`; };
 const lockBadge = () => `<span class="lockbadge" data-testid="lock-badge">${LOCK}<b>${nextPrice()}</b>${COIN}</span>`;
+
+// Colour chooser: the default (free) + 3 palettes. Owned ones equip; the others cost SKIN_PRICE coins.
+const skinRow = (id) => `<div class="skins" data-testid="skin-row"><span>Colors</span>${['default', ...SKIN_IDS].map((k) => {
+  const own = ownsSkin(id, k), on = equipped(id) === k, price = !own && profile().coins < SKIN_PRICE;
+  return `<button type="button" class="skinchip ${on ? 'on' : ''} ${own ? '' : 'buyable'}" data-skin="${k}" data-testid="skin-${k}" aria-pressed="${on}" ${price ? 'disabled' : ''} style="--sw:${PALETTES[k]?.swatch ?? '#9AA3B8'}"><i></i><small>${k === 'default' ? 'Classic' : PALETTES[k].name}</small>${own ? '' : `<em>${SKIN_PRICE}${COIN}</em>`}</button>`;
+}).join('')}</div>`;
 
 const HELP = 'First ban one champion you don\'t want anyone to play, then pick yours.';
 // Greyed, stamped card state: 'banned' (nobody can play it) or 'taken' (someone already picked it).
@@ -216,7 +224,15 @@ export function createMenus(root) {
           }
           const def = HEROES[sel];
           el.style.setProperty('--sel', def.css);
-          detail.innerHTML = `${detailBody(sel)}<div class="dact">${act()}</div>`;
+          detail.innerHTML = `${detailBody(sel)}${!banning && isOwned(sel) ? skinRow(sel) : ''}<div class="dact">${act()}</div>`;
+          for (const b of detail.querySelectorAll('.skinchip')) b.addEventListener('click', () => {
+            const k = b.dataset.skin;
+            if (!ownsSkin(sel, k) && k !== 'default') { if (!buySkin(sel, k).ok) return; } else equip(sel, k);
+            audio.sfx('skill', { def: HEROES[sel], isPlayer: true });
+            const card = el.querySelector(`.hcard[data-id="${sel}"] .pic`); if (card) card.innerHTML = portrait(sel);
+            el.querySelector('.wallet').innerHTML = wallet();
+            fill();
+          });
           detail.querySelector('.go')?.addEventListener('click', () => (banning ? onBan(sel) : onPlay(sel)));
           detail.querySelector('.buy:not(:disabled)')?.addEventListener('click', () => {
             const r = buyChampion(sel);
