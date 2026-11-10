@@ -390,16 +390,27 @@ export function createMenus(root) {
       (el) => { on(el, '.resume', onResume); on(el, '.home', onHome); });
     },
 
-    showResult({ win, stars, time, reason, rewards }, { onAgain, onHome, againLabel = 'PLAY AGAIN', homeLabel = 'CHAMPIONS' }) {
+    // Recap screen: result + stars, what you earned (coins / XP / level-up / quests / badges) and the match recap (MVP, damage + KO bars, one highlight).
+    showResult({ win, stars, time, reason, rewards, recap }, { onAgain, onHome, againLabel = 'PLAY AGAIN', homeLabel = 'CHAMPIONS' }) {
       const row = [0, 1, 2].map((i) => `<i class="${i < stars ? 'on' : ''}" style="--i:${i}">${icons.star(i < stars ? hex(PAL.gold) : '#2B3550')}</i>`).join('');
       const btns = `<div class="row"><button class="btn primary again" type="button" data-testid="again-btn">${againLabel}</button><button class="btn home" type="button" data-testid="champions-btn">${homeLabel}</button></div>`;
+      const earn = rewards ? `
+          <p class="rewards" data-testid="rewards"><span data-testid="reward-coins">+${rewards.coins} ${COIN}</span><span data-testid="reward-xp">+${rewards.xp} XP</span></p>
+          <div class="xpbar slim" data-testid="recap-xp"><i style="width:${Math.round((rewards.xpInto / rewards.xpToNext) * 100)}%"></i><em>LV ${rewards.level} · ${rewards.xpInto}/${rewards.xpToNext}</em></div>
+          <div class="notices">${rewards.levelsGained ? `<p class="questdone" data-testid="level-up">⬆ LEVEL UP! LV ${rewards.level} · +${rewards.bonus} ${COIN}</p>` : ''}
+          ${(rewards.badges ?? []).map((b) => `<p class="questdone" data-testid="badge-new">${b.icon} NEW BADGE: ${b.name}</p>`).join('')}
+          ${(rewards.quests ?? []).map((q) => `<p class="questdone" data-testid="quest-complete">★ QUEST DONE: ${q.text} · +${q.coins} ${COIN}</p>`).join('')}</div>` : '';
+      const panel = recap ? `
+        <div class="recap" data-testid="recap">
+          ${recap.mvp ? `<div class="mvp" data-testid="recap-mvp"><i class="mvpic">${portrait(recap.mvp.id)}</i><div><small>TEAM MVP</small><b>${recap.mvp.name}${recap.mvp.me ? ' (you!)' : ''}</b><span>${recap.mvp.ko} KO · ${Math.round(recap.mvp.dmg)} dmg</span></div></div>` : ''}
+          <p class="highlight" data-testid="recap-highlight"><i>${recap.highlight.icon}</i>${recap.highlight.text}</p>
+          ${recap.hasStats ? `<ul class="dmgbars" data-testid="recap-damage">${recap.bars.map((r) => `<li class="${r.me ? 'me' : ''}"><i>${portrait(r.id)}</i><span>${r.name}</span><b style="--w:${r.pct}%"></b><em>${r.dmg} · ${r.ko} KO</em></li>`).join('')}</ul>` : ''}
+        </div>` : '';
       show(win ? 'result win modal' : 'result lose modal', `
         <h2 data-testid="result-title">${win ? 'Victory' : 'Defeat'}</h2>
         <p class="reason">${reason} · ${mmss(time)}</p>
-        ${win ? `<div class="stars">${row}</div>` : ''}
-        ${rewards ? `<p class="rewards" data-testid="rewards">+${rewards.coins} ${COIN} · +${rewards.xp} XP${rewards.levelsGained ? ` · <b data-testid="level-up">LEVEL UP! LV ${rewards.level} (+${rewards.bonus} ${COIN})</b>` : ''}</p>` : ''}
-        ${(rewards?.badges ?? []).map((b) => `<p class="questdone" data-testid="badge-new">${b.icon} NEW BADGE: ${b.name}</p>`).join('')}
-        ${(rewards?.quests ?? []).map((q) => `<p class="questdone" data-testid="quest-complete">★ QUEST DONE: ${q.text} · +${q.coins} ${COIN}</p>`).join('')}${btns}`,
+        <div class="resgrid"><div class="rescol">${win ? `<div class="stars">${row}</div>` : ''}${earn}</div>${panel}</div>
+        ${btns}`,
       (el) => { on(el, '.again', onAgain); on(el, '.home', onHome); });
     },
   };

@@ -9,6 +9,7 @@ import { vfx } from '../render/vfx.js';
 import { Hero, screenToWorld } from '../heroes/hero.js';
 import { HEROES, ROSTER, skinnedDef } from '../heroes/index.js';
 import { equipped } from './skins.js';
+import { buildRecap } from './recap.js';
 import { addBuff, heal, sim, tickStatus, tickHitFx, poof } from './combat.js';
 import { composeTeams } from './compose.js';
 import { cleanSetup, defaultSetup } from './setup.js';
@@ -67,13 +68,16 @@ export class Match {
     this._hit = new THREE.Vector3();
 
     bus.on('hit', (t) => { if (t === this.hero) rig.shake(0.15); });
+    bus.on('dmg', (e) => { // per-hero damage to heroes + structures, for the end-of-match recap (the host keeps the books)
+      if (this.role !== 'guest' && e.src?.type === 'hero' && (e.t.type === 'hero' || e.t.type === 'tower' || e.t.type === 'core')) this._st(e.src).dmg += e.amount;
+    });
     bus.on('dmg', (e) => { if (e.t === this.hero && e.amount >= e.t.maxHp * 0.12) rig.shake(0.3); });
     bus.on('down', (t) => {
       if (t.type === 'hero' && t.killer === this.hero) rig.shake(0.3);
       if (t.type === 'tower' || t.type === 'core') rig.shake(0.4);
       if (this.role === 'guest') return; // the host keeps the books
       if (t.type === 'tower' && t.team === this.myTeam) this.towersLost++;
-      if (t.type === 'tower' || t.type === 'core') this.destroyed[1 - t.team]++;
+      if (t.type === 'tower' || t.type === 'core') { this.destroyed[1 - t.team]++; if (this.firstStructureTeam < 0) this.firstStructureTeam = 1 - t.team; }
       if (t.type === 'tower') this._towerGold(t);
       if (t.type === 'camp') t.boss ? this._boss(t) : this._camp(t);
       else if (t.type === 'minion') { this._xp(t, HERO.xp[t.kind], HERO.xpRange); this._minionGold(t); }
@@ -84,6 +88,8 @@ export class Match {
         if (k?.type === 'hero') {
           this.kills[k.team]++;
           if (k === this.hero) this.myKills++;
+          this._st(k).ko++;
+          const behind = this.kills[1 - this.myTeam] - this.kills[this.myTeam]; if (behind > this.maxBehind) this.maxBehind = behind;
           bus.emit('takedown', { killer: k, victim: t });
           const w = k.rs[0].resetOnKill; // Phase Step perk: a takedown soon after the cast refreshes it
           if (w && this.time - k.castAt[0] <= w) k.cds[0] = 0;
@@ -111,6 +117,14 @@ export class Match {
     this.heroId = id;
     assignLanes(this.heroes);
     this.reset();
+  }
+
+  _st(h) { let s = this.stats.get(h); if (!s) this.stats.set(h, (s = { dmg: 0, ko: 0 })); return s; }
+
+  // Recap numbers for the result screen (see game/recap.js).
+  recap(win) {
+    const rows = this.heroes.map((h) => { const s = this.stats.get(h) ?? { dmg: 0, ko: 0 }; return { id: h.id, name: h.def.name, team: h.team, me: h === this.hero, dmg: s.dmg, ko: s.ko }; });
+    return buildRecap(rows, { win, team: this.myTeam, destroyed: this.destroyed, towersLost: this.towersLost, firstStructureTeam: this.firstStructureTeam, maxBehind: this.maxBehind, time: this.time });
   }
 
   // The hero at index `idx` of `team` (team sizes vary, so never compute a flat index).
@@ -175,7 +189,7 @@ export class Match {
     this.over = false;
     this.towersLost = 0;
     this.kills = [0, 0];
-    this.myKills = 0;
+    this.myKills = 0; this.maxBehind = 0; this.firstStructureTeam = -1; this.stats = new Map();
     this.destroyed = [0, 0];
     this.reason = '';
     this._shT = 0;
@@ -635,7 +649,7 @@ export class Match {
     for (const h of this.heroes) h.celebrate = (h.team === 0) === team0Wins;
     this.rig.follow(this.cores[team0Wins ? 1 : 0]);
     this.rig.lead.set(0, 0, 0);
-    bus.emit('end', { win, stars, time: this.time, reason: this.reason, kills: this.kills, destroyed: this.destroyed, myKills: this.myKills, team: this.myTeam });
+    bus.emit('end', { win, stars, time: this.time, reason: this.reason, kills: this.kills, destroyed: this.destroyed, myKills: this.myKills, team: this.myTeam, recap: this.recap(win) });
   }
 
   // state: 'title' | 'match' | 'results'

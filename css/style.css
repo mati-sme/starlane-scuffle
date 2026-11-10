@@ -745,3 +745,24 @@ h2 { font-style: normal; }
 @media (max-height: 460px) { #tutorial { top: 8%; padding: 4px 8px; } #tutorial .tut-emoji { font-size: 20px; } #tutorial .tut-btn { height: 28px; font-size: 11px; } }
 #tutorial { top: 27%; max-width: min(46vw, 520px); }
 @media (max-height: 460px) { #tutorial { top: 27%; } }
+
+/* v8.6 recap */
+.resgrid { display: flex; align-items: center; justify-content: center; gap: 18px; max-width: 96vw; }
+.rescol { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.rewards span { padding: 2px 10px; border: 2px solid var(--gold); background: rgba(10,16,34,.8); display: inline-flex; align-items: center; gap: 4px; }
+.xpbar.slim { height: 18px; width: 220px; } .xpbar.slim em { font-size: 11px; }
+.recap { display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; min-width: min(46vw, 340px); border: 2px solid rgba(255,255,255,.3); background: rgba(10,16,34,.82); }
+.mvp { display: flex; align-items: center; gap: 10px; }
+.mvpic { width: 52px; height: 52px; border: 2px solid var(--gold); overflow: hidden; flex: none; } .mvpic img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; display: block; }
+.mvp div { display: flex; flex-direction: column; line-height: 1.15; } .mvp small { color: var(--gold); letter-spacing: .2em; font-size: 10px; font-weight: 800; } .mvp b { font-size: 20px; text-transform: uppercase; } .mvp span { font-size: 12px; color: rgba(255,255,255,.8); }
+.highlight { margin: 0; font-size: 15px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 6px; } .highlight i { font-style: normal; font-size: 20px; }
+.dmgbars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.dmgbars li { display: grid; grid-template-columns: 22px 70px 1fr auto; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; }
+.dmgbars li i { width: 22px; height: 22px; overflow: hidden; } .dmgbars li i img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.dmgbars li b { height: 8px; background: linear-gradient(90deg, #3DA5FF var(--w), rgba(255,255,255,.12) var(--w)); }
+.dmgbars li.me span { color: var(--gold); } .dmgbars li em { font-style: normal; color: rgba(255,255,255,.75); font-size: 11px; }
+@media (max-height: 460px) { .resgrid { gap: 10px; } .recap { padding: 4px 8px; gap: 3px; } .mvpic { width: 36px; height: 36px; } .mvp b { font-size: 14px; } .highlight { font-size: 11px; } .dmgbars li { font-size: 9px; grid-template-columns: 16px 56px 1fr auto; } .dmgbars li i { width: 16px; height: 16px; } .dmgbars li b { height: 5px; } .xpbar.slim { height: 14px; width: 170px; } .rewards { font-size: 12px; } .screen.result h2 { font-size: 34px; } .result .reason { font-size: 12px; } .stars, .stars i { height: 34px; width: 34px; } }
+.questdone svg, .rewards svg, .highlight svg, .quest svg { width: 16px !important; height: 16px !important; flex: none; }
+.notices { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; max-width: 44vw; }
+.notices .questdone { font-size: 12px; padding: 1px 8px; border: 1px solid rgba(143,255,176,.5); background: rgba(10,16,34,.7); }
+@media (max-height: 460px) { .notices .questdone { font-size: 10px; padding: 0 6px; } }

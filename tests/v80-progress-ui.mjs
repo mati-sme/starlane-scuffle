@@ -80,9 +80,12 @@ const diff = await page.evaluate(async () => {
 });
 check('frost visibly recolours old + new champions', Object.values(diff).every((v) => v > 5), JSON.stringify(diff));
 check('in-match model uses palette', await page.evaluate(() => !!window.__starlane.match.hero.model));
+await page.evaluate(() => { const m = window.__starlane.match; m._st(m.hero).dmg = 700; m._st(m.hero).ko = 2; m.myKills = 2; });
 await page.evaluate(() => window.__starlane.match._end(window.__starlane.match.myTeam === 0, 'core'));
 await tid('rewards').waitFor({ timeout: 6000 });
 const txt = await tid('rewards').textContent();
+check('recap: MVP + highlight + damage bars + xp bar', (await tid('recap-mvp').count()) === 1 && (await tid('recap-highlight').textContent()).length > 5 && (await page.locator('[data-testid="recap-damage"] li').count()) >= 1 && (await tid('recap-xp').count()) === 1);
+if (process.env.RSHOT) await page.screenshot({ path: process.env.RSHOT });
 check('win rewards shown', /\+\d+/.test(txt) && txt.includes('XP'), txt.trim());
 const prof = await page.evaluate(() => JSON.parse(localStorage.getItem('starlane.profile')));
 check('quest completion shown on result', (await tid('quest-complete').count()) >= 1);
