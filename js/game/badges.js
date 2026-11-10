@@ -16,6 +16,7 @@ export const BADGES = [
   { id: 'wins-5', icon: '⭐', name: 'Winner', hint: 'Win 5 matches', test: (p) => p.wins >= 5 },
   { id: 'level-5', icon: '🚀', name: 'Level 5', hint: 'Reach level 5', test: (p) => p.level >= 5 },
   { id: 'kos-25', icon: '💥', name: 'KO Pro', hint: 'Get 25 KOs', test: (p) => p.kills >= 25 },
+  { id: 'win-2v2', icon: '🤝', name: 'Buddy Win', hint: 'Win a 2v2 co-op', test: () => flag('win2v2') },
   { id: 'three-stars', icon: '🌟', name: 'Triple Star', hint: 'Win with 3 stars', test: () => flag('threeStar') },
 ];
 

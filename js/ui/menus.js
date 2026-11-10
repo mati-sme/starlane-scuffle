@@ -129,7 +129,7 @@ export function createMenus(root) {
   return {
     hideAll() { clearInterval(tick); root.innerHTML = ''; },
 
-    showTitle(onPlay, onOnline, onProfile) {
+    showTitle(onPlay, onOnline, onProfile, onCoop) {
       const row = ROSTER.map((id, i) => `<i style="--i:${i};--c:${HEROES[id].css}">${portrait(id)}</i>`).join('');
       show('title modal', `
         <div class="kicker">TEAM ARENA · 5 v 5</div>
@@ -138,9 +138,10 @@ export function createMenus(root) {
         <div class="wallet" data-testid="title-wallet">${wallet()}<button class="small profbtn" type="button" data-testid="profile-btn">PROFILE</button></div>
         <div class="quests" data-testid="quests-panel"><b>TODAY'S QUESTS</b>${questView().map((q) => `<span class="quest ${q.done ? 'done' : ''}" data-testid="quest-${q.id}"><i>${q.done ? '✓' : ''}</i>${q.text}<em>${q.done ? 'DONE' : `${q.prog}/${q.goal}`}</em><small>+${q.coins}</small>${COIN}</span>`).join('')}</div>
         <div class="row"><button class="btn primary play" type="button" data-testid="play-btn">PLAY</button>
+        <button class="btn coop" type="button" data-testid="coop-btn">2v2 CO-OP</button>
         <button class="btn online" type="button" data-testid="online-btn">PLAY ONLINE</button></div>
         <p class="hint"><span class="mouse">WASD move · Space attack · Q E R skills · 1 2 3 or Ctrl+Q/E/R rank up</span><span class="touchhint">Left thumb move · Right thumb attack · tap the gold + above a skill to level it</span></p>`,
-      (el) => { on(el, '.play', onPlay); on(el, '.online', onOnline); el.querySelector('.profbtn').addEventListener('click', () => onProfile?.()); });
+      (el) => { on(el, '.play', onPlay); on(el, '.online', onOnline); on(el, '.coop', () => onCoop?.()); el.querySelector('.profbtn').addEventListener('click', () => onProfile?.()); });
     },
 
 
@@ -183,6 +184,7 @@ export function createMenus(root) {
           <h2 data-testid="setup-title">Match setup</h2>
           <p class="hint">${readOnly ? 'The host picked this match. ' : ''}Easy is gentle, Mid is classic, Hard is sharp. Tap a bot to change it.</p>
           <div class="presets" data-testid="setup-presets">${LEVELS.map((l) => `<button type="button" class="btn preset ${l} ${preset === l ? 'on' : ''}" data-l="${l}" data-testid="preset-${l}" aria-pressed="${preset === l}" ${readOnly ? 'disabled' : ''}>${cap(l).toUpperCase()}</button>`).join('')}</div>
+          ${online ? '' : `<div class="row coopline"><button type="button" class="btn coopset ${setup.size[0] === 2 && setup.size[1] === 2 ? 'on' : ''}" data-testid="preset-2v2" aria-pressed="${setup.size[0] === 2 && setup.size[1] === 2}">2v2 CO-OP: you + a bot buddy</button></div>`}
           ${online ? '' : `<div class="teampick sidepick"><span>You play</span><button type="button" class="tbtn t0 ${setup.side === 0 ? 'on' : ''}" data-side="0" data-testid="side-0">SUNNY</button><button type="button" class="tbtn t1 ${setup.side === 1 ? 'on' : ''}" data-side="1" data-testid="side-1">GLOOM</button></div>`}
           <div class="sides">${col(0)}<span class="vs">VS</span>${col(1)}</div>
           <p class="hint" data-testid="setup-summary">${summary(setup, preset)}</p>
@@ -195,6 +197,7 @@ export function createMenus(root) {
         for (const b of el.querySelectorAll('.preset')) b.addEventListener('click', () => { applyPreset(setup, b.dataset.l); redraw(); });
         for (const b of el.querySelectorAll('.lvl')) b.addEventListener('click', () => { setup.diff[+b.dataset.t][+b.dataset.i] = b.dataset.l; redraw(); });
         for (const b of el.querySelectorAll('.size')) b.addEventListener('click', () => { const t = +b.dataset.t; setup.size[t] = Math.min(MAX_TEAM, Math.max(1, setup.size[t] + +b.dataset.d)); redraw(); });
+        el.querySelector('.coopset')?.addEventListener('click', () => { setup.size = [2, 2]; redraw(); });
         for (const b of el.querySelectorAll('[data-side]')) b.addEventListener('click', () => { setup.side = +b.dataset.side; redraw(); });
       };
       show('setup modal', '<button class="small home" type="button" aria-label="Back" data-testid="setup-back">' + icons.home + '</button>' + body(), wire);

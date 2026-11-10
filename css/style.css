@@ -727,3 +727,10 @@ h2 { font-style: normal; }
 .badge b { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; } .badge small { font-size: 10px; color: rgba(255,255,255,.75); }
 .badge.on { opacity: 1; filter: none; border-color: var(--gold); background: rgba(70,52,8,.7); }
 @media (max-height: 460px) { .profile { gap: 4px; } .badge { width: 88px; padding: 2px; } .badge i { font-size: 20px; } .badge b { font-size: 10px; } .badge small { font-size: 8px; } .pstats li { padding: 1px 8px; min-width: 70px; } .pstats b { font-size: 16px; } .xpbar { height: 18px; } }
+
+/* v8.4 2v2 co-op */
+.title .btn.coop { height: clamp(52px, 14vh, 72px); font-size: clamp(16px, 4.4vh, 22px); border-color: #5CE08A; }
+.btn.coopset { height: 34px; font-size: 14px; letter-spacing: .06em; border-color: #5CE08A; }
+.btn.coopset.on { background: linear-gradient(180deg, #2f7a4a, #17402a); }
+@media (max-height: 460px) { .btn.coopset { height: 26px; font-size: 11px; } }
+.profbtn.small { position: static !important; width: auto !important; min-width: 0 !important; height: 30px !important; padding: 0 12px !important; font-size: 12px; font-weight: 800; letter-spacing: .1em; white-space: nowrap; color: #fff; clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); }

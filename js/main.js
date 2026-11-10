@@ -100,7 +100,7 @@ function leave(next) {
 function toTitle() {
   leaveRoom();
   leave('title');
-  menus.showTitle(toSetup, () => toOnline(), () => menus.showProfile(toTitle));
+  menus.showTitle(() => toSetup(), () => toOnline(), () => menus.showProfile(toTitle), () => toSetup(true));
 }
 
 // ---- online ----
@@ -252,8 +252,9 @@ net.on('welcome', (m) => {
 });
 
 // Offline match setup comes first: presets, team sizes, side and a level per bot; then the draft.
-function toSetup() {
+function toSetup(coop = false) {
   leave('select');
+  if (coop) { setup.size = [2, 2]; setup.side = 0; } // 2v2 co-op: you + one bot buddy vs two bots (Easy / Mid / Hard still apply per bot)
   menus.showSetup({ setup, onChange: (s) => { setup = s; }, onNext: toSelect, onBack: toTitle });
 }
 
@@ -324,6 +325,7 @@ bus.on('end', (res) => {
   res.rewards.quests = progressMatch(res); // daily quests finished by this match: their coins are paid now and shown on the result screen
   for (const q of res.rewards.quests) addCoins(q.coins);
   if (res.win && res.stars >= 3) setFlag('threeStar');
+  if (res.win && !online && setup.size[0] === 2 && setup.size[1] === 2) setFlag('win2v2');
   res.rewards.badges = checkBadges();
   document.body.classList.remove('playing');
   resultTimer = setTimeout(() => menus.showResult(res, online
