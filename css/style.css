@@ -685,3 +685,15 @@ h2 { font-style: normal; }
 .btn.buy { white-space: nowrap; font-size: 15px; padding: 0 12px; }
 .btn.buy svg { width: 18px !important; height: 18px !important; flex: none; }
 @media (max-height: 460px) { .sel-wallet { left: 52px; top: 3px; } }
+
+/* v8.1 daily quests */
+.quests { display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; max-width: 96vw; }
+.quests > b { font-size: 11px; letter-spacing: .2em; color: var(--gold); width: 100%; text-align: center; }
+.quest { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border: 2px solid rgba(255,255,255,.35); background: rgba(10,16,34,.78); font-size: 13px; font-weight: 700; color: #fff; }
+.quest i { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.5); font-style: normal; font-size: 11px; line-height: 10px; text-align: center; color: #8FFFB0; }
+.quest em { font-style: normal; font-size: 11px; color: rgba(255,255,255,.7); }
+.quest small { color: var(--gold); font-weight: 800; }
+.quest svg { width: 13px; height: 13px; }
+.quest.done { border-color: #5CE08A; } .quest.done i { border-color: #5CE08A; }
+.questdone { margin: 0; font-weight: 800; font-size: 17px; color: #8FFFB0; text-shadow: 0 2px 0 var(--ink); animation: pop .5s cubic-bezier(.3,1.8,.5,1) both; display: flex; align-items: center; gap: 5px; }
+@media (max-height: 460px) { .quests > b { display: none; } .quest { font-size: 10px; padding: 1px 6px; } .questdone { font-size: 13px; } .title .hint { display: none; } }

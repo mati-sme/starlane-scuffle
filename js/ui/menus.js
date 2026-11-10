@@ -9,6 +9,7 @@ import { factionDef } from '../game/factions.js';
 import { ROLE_BLURB } from '../game/roles.js';
 import { matchupsOf } from '../game/matchups.js';
 import { LEVELS, MAX_TEAM, applyPreset, presetOf, summary } from '../game/setup.js';
+import { view as questView } from '../game/quests.js';
 import { profile, isOwned, nextPrice, buyChampion, xpNeeded } from '../game/progress.js';
 
 const hex = (n) => '#' + n.toString(16).padStart(6, '0');
@@ -126,6 +127,7 @@ export function createMenus(root) {
         <h1><span>Starlane</span><span>Scuffle</span></h1>
         <div class="parade">${row}</div>
         <div class="wallet" data-testid="title-wallet">${wallet()}</div>
+        <div class="quests" data-testid="quests-panel"><b>TODAY'S QUESTS</b>${questView().map((q) => `<span class="quest ${q.done ? 'done' : ''}" data-testid="quest-${q.id}"><i>${q.done ? '✓' : ''}</i>${q.text}<em>${q.done ? 'DONE' : `${q.prog}/${q.goal}`}</em><small>+${q.coins}</small>${COIN}</span>`).join('')}</div>
         <div class="row"><button class="btn primary play" type="button" data-testid="play-btn">PLAY</button>
         <button class="btn online" type="button" data-testid="online-btn">PLAY ONLINE</button></div>
         <p class="hint"><span class="mouse">WASD move · Space attack · Q E R skills · 1 2 3 or Ctrl+Q/E/R rank up</span><span class="touchhint">Left thumb move · Right thumb attack · tap the gold + above a skill to level it</span></p>`,
@@ -358,7 +360,8 @@ export function createMenus(root) {
         <h2 data-testid="result-title">${win ? 'Victory' : 'Defeat'}</h2>
         <p class="reason">${reason} · ${mmss(time)}</p>
         ${win ? `<div class="stars">${row}</div>` : ''}
-        ${rewards ? `<p class="rewards" data-testid="rewards">+${rewards.coins} ${COIN} · +${rewards.xp} XP${rewards.levelsGained ? ` · <b data-testid="level-up">LEVEL UP! LV ${rewards.level} (+${rewards.bonus} ${COIN})</b>` : ''}</p>` : ''}${btns}`,
+        ${rewards ? `<p class="rewards" data-testid="rewards">+${rewards.coins} ${COIN} · +${rewards.xp} XP${rewards.levelsGained ? ` · <b data-testid="level-up">LEVEL UP! LV ${rewards.level} (+${rewards.bonus} ${COIN})</b>` : ''}</p>` : ''}
+        ${(rewards?.quests ?? []).map((q) => `<p class="questdone" data-testid="quest-complete">★ QUEST DONE: ${q.text} · +${q.coins} ${COIN}</p>`).join('')}${btns}`,
       (el) => { on(el, '.again', onAgain); on(el, '.home', onHome); });
     },
   };

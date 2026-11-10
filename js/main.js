@@ -23,7 +23,8 @@ import { T, randomCode, cleanCode, shareLink } from './net/protocol.js';
 import { composeOnline, seeded } from './game/compose.js';
 import { DEFAULT_SPELLS, cleanSpells } from './game/spells.js';
 import { cleanSetup, defaultSetup } from './game/setup.js';
-import { isOwned, awardMatch, FREE_CHAMPS } from './game/progress.js';
+import { isOwned, awardMatch, addCoins, FREE_CHAMPS } from './game/progress.js';
+import { progressMatch } from './game/quests.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -319,6 +320,8 @@ function resume() {
 bus.on('end', (res) => {
   state = 'results';
   res.rewards = awardMatch(res); // XP + coins (local only; the online lobby doesn't need to know)
+  res.rewards.quests = progressMatch(res); // daily quests finished by this match: their coins are paid now and shown on the result screen
+  for (const q of res.rewards.quests) addCoins(q.coins);
   document.body.classList.remove('playing');
   resultTimer = setTimeout(() => menus.showResult(res, online
     ? { onAgain: () => { if (net.slot === 0) net.send({ t: T.abort }); toLobby(); }, onHome: toTitle, againLabel: 'LOBBY', homeLabel: 'EXIT' }

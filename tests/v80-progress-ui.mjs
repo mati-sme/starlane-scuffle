@@ -29,6 +29,8 @@ let failed = 0;
 const check = (n, ok, x = '') => { if (!ok) failed++; console.log(`${ok ? 'PASS' : 'FAIL'} ${n} ${x}`); };
 
 await page.goto(BASE + '?gfx=low', { waitUntil: 'load', timeout: 90000 });
+check('title lists 3 daily quests', (await page.locator('[data-testid="quests-panel"] .quest').count()) === 3);
+if (process.env.TSHOT) await page.screenshot({ path: process.env.TSHOT });
 check('title shows level 1', (await tid('player-level').first().textContent()).includes('1'));
 check('title shows 0 coins', (await tid('player-coins').first().textContent()).trim() === '0');
 await tid('play-btn').click({ force: true }); await tid('setup-next').click({ force: true, timeout: 4000 }).catch(() => {});
@@ -62,6 +64,7 @@ await tid('rewards').waitFor({ timeout: 6000 });
 const txt = await tid('rewards').textContent();
 check('win rewards shown', /\+\d+/.test(txt) && txt.includes('XP'), txt.trim());
 const prof = await page.evaluate(() => JSON.parse(localStorage.getItem('starlane.profile')));
+check('quest completion shown on result', (await tid('quest-complete').count()) >= 1);
 check('profile persisted', prof.matches === 5 && prof.wins === 3 && prof.coins > 150, JSON.stringify(prof));
 await browser.close(); server.close();
 console.log(failed ? `${failed} FAILED` : 'ALL PASS'); process.exit(failed ? 1 : 0);

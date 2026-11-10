@@ -634,7 +634,7 @@ export class Match {
     for (const h of this.heroes) h.celebrate = (h.team === 0) === team0Wins;
     this.rig.follow(this.cores[team0Wins ? 1 : 0]);
     this.rig.lead.set(0, 0, 0);
-    bus.emit('end', { win, stars, time: this.time, reason: this.reason, kills: this.kills, destroyed: this.destroyed, myKills: this.myKills });
+    bus.emit('end', { win, stars, time: this.time, reason: this.reason, kills: this.kills, destroyed: this.destroyed, myKills: this.myKills, team: this.myTeam });
   }
 
   // state: 'title' | 'match' | 'results'
