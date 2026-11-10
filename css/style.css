@@ -664,3 +664,24 @@ h2 { font-style: normal; }
 /* lobby: keep the 48-card list cheap to paint (the game scene keeps rendering behind it) */
 .screen.lobby { backdrop-filter: none; }
 .lobby .hcard:not(.mini):not(.sel) .pic img { filter: none; opacity: .85; }
+
+/* v8 progression: wallet strip, locked champion cards */
+.wallet { display: flex; align-items: center; gap: 8px; justify-content: center; }
+.lvl-pill, .coins { display: inline-flex; align-items: center; gap: 5px; padding: 3px 12px; border: 2px solid rgba(255,255,255,.55); background: rgba(10,16,34,.8); font-weight: 800; font-size: 15px; letter-spacing: .08em; color: #fff; clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); }
+.lvl-pill { color: var(--sunny); border-color: var(--sunny); }
+.coins { color: var(--gold); border-color: var(--gold); }
+.sel-wallet { position: absolute; top: 8px; right: 12px; z-index: 4; transform: scale(.85); transform-origin: right top; }
+.hcard.lockd .pic img { filter: grayscale(1) brightness(.5) !important; }
+.hcard.lockd { border-color: rgba(255,255,255,.25); }
+.lockbadge { position: absolute; left: 50%; top: 38%; z-index: 3; translate: -50% -50%; display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border: 2px solid var(--gold); background: rgba(8,10,20,.86); color: var(--gold); font-weight: 900; font-size: 13px; white-space: nowrap; pointer-events: none; }
+.lockbadge svg { flex: none; }
+.btn.buy:disabled { opacity: .55; cursor: default; }
+.btn.buy { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.hint.need { margin-top: 4px; font-size: 13px; color: var(--gold); }
+.rewards { margin: 0; font-size: 20px; font-weight: 800; color: var(--gold); text-shadow: 0 2px 0 var(--ink); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.rewards b { color: #8FFFB0; }
+@media (max-height: 460px) { .lockbadge { font-size: 9px; padding: 1px 4px; border-width: 1px; } .lockbadge svg { width: 9px; height: 9px; } .lvl-pill, .coins { font-size: 11px; padding: 1px 8px; } .sel-wallet { top: 4px; right: 8px; } .rewards { font-size: 15px; } }
+.sel-wallet { right: auto; left: 64px; top: 6px; transform-origin: left top; }
+.btn.buy { white-space: nowrap; font-size: 15px; padding: 0 12px; }
+.btn.buy svg { width: 18px !important; height: 18px !important; flex: none; }
+@media (max-height: 460px) { .sel-wallet { left: 52px; top: 3px; } }

@@ -29,6 +29,7 @@ await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const BASE = `http://127.0.0.1:${server.address().port}/`;
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--ignore-gpu-blocklist'] });
 const ctx = await browser.newContext({ ...devices['iPhone 12 landscape'] });
+await ctx.addInitScript(() => { try { localStorage.setItem("starlane.unlockAll", "true"); } catch {} }); // v8: every champion open for tests
 const page = await ctx.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
@@ -49,6 +50,7 @@ await page.locator('[data-testid="champion-card-nyx"]').click({ force: true }); 
 const list = await imgs();
 await page.screenshot({ path: join(OUT, 'champ-select-portraits.png') });
 const desk = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+await desk.addInitScript(() => { try { localStorage.setItem("starlane.unlockAll", "true"); } catch {} }); // v8: every champion open for tests
 const dp = await desk.newPage();
 await dp.goto(BASE + '?gfx=low', { waitUntil: 'load', timeout: 90000 });
 await dp.locator('[data-testid="play-btn"]').click({ force: true }); await dp.locator('[data-testid="setup-next"]').click({ force: true, timeout: 4000 }).catch(() => {});

@@ -9,6 +9,7 @@ import { factionDef } from '../game/factions.js';
 import { ROLE_BLURB } from '../game/roles.js';
 import { matchupsOf } from '../game/matchups.js';
 import { LEVELS, MAX_TEAM, applyPreset, presetOf, summary } from '../game/setup.js';
+import { profile, isOwned, nextPrice, buyChampion, xpNeeded } from '../game/progress.js';
 
 const hex = (n) => '#' + n.toString(16).padStart(6, '0');
 const mmss = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
@@ -35,6 +36,12 @@ const medHp = [...ROSTER.map((id) => HEROES[id].stats.hp)].sort((a, b) => a - b)
 const DIFF_BASE = { tank: 1, bruiser: 1, support: 2, shooter: 2, blaster: 2, assassin: 3 };
 const difficulty = (def) => Math.min(3, (DIFF_BASE[def.role] ?? 2) + (def.basic.range >= 6 && def.stats.hp <= medHp ? 1 : 0));
 const DIFF_NAME = ['', 'Easy', 'Mid', 'Hard'];
+
+// Coins + level strip (title / select). Re-read from the profile every time it is drawn.
+const LOCK = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M7 10V8a5 5 0 0 1 10 0v2h1.5A1.5 1.5 0 0 1 20 11.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 20.5v-9A1.5 1.5 0 0 1 5.5 10zm2.5 0h5V8a2.5 2.5 0 0 0-5 0z"/></svg>';
+const COIN = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#FFC83D" stroke="#7a5200" stroke-width="2"/><circle cx="12" cy="12" r="5.5" fill="none" stroke="#C98F00" stroke-width="2"/></svg>';
+const wallet = () => { const p = profile(); return `<span class="lvl-pill" data-testid="player-level">LV ${p.level}</span><span class="coins" data-testid="player-coins">${COIN}<b>${p.coins}</b></span>`; };
+const lockBadge = () => `<span class="lockbadge" data-testid="lock-badge">${LOCK}<b>${nextPrice()}</b>${COIN}</span>`;
 
 const HELP = 'First ban one champion you don\'t want anyone to play, then pick yours.';
 // Greyed, stamped card state: 'banned' (nobody can play it) or 'taken' (someone already picked it).
@@ -118,6 +125,7 @@ export function createMenus(root) {
         <div class="kicker">TEAM ARENA · 5 v 5</div>
         <h1><span>Starlane</span><span>Scuffle</span></h1>
         <div class="parade">${row}</div>
+        <div class="wallet" data-testid="title-wallet">${wallet()}</div>
         <div class="row"><button class="btn primary play" type="button" data-testid="play-btn">PLAY</button>
         <button class="btn online" type="button" data-testid="online-btn">PLAY ONLINE</button></div>
         <p class="hint"><span class="mouse">WASD move · Space attack · Q E R skills · 1 2 3 or Ctrl+Q/E/R rank up</span><span class="touchhint">Left thumb move · Right thumb attack · tap the gold + above a skill to level it</span></p>`,
@@ -166,21 +174,24 @@ export function createMenus(root) {
 
     // Offline draft. phase 'ban': tap a champion, BAN it. phase 'pick': banned champions are stamped and locked, tap one, GO.
     // secs: countdown, then onTimeout(selected id or null). note: one line under the help text.
-    showSelect({ phase = 'pick', picked, banned = [], spells = [], secs = 0, note = '', onBan, onPlay, onTimeout, onHome, onSpells }) {
+    showSelect({ phase = 'pick', picked, banned = [], spells = [], secs = 0, note = '', onBan, onPlay, onTimeout, onHome, onSpells, onBuy }) {
       const banning = phase === 'ban';
       const out = new Set(banned);
-      let sel = banning ? null : out.has(picked) ? ROSTER.find((id) => !out.has(id)) : ROSTER.includes(picked) ? picked : ROSTER[0];
-      const cards = ROSTER.map((id) => {
-        const def = HEROES[id], gone = out.has(id);
-        return `<button type="button" class="hcard ${gone ? 'out banned' : ''}" data-id="${id}" data-testid="champion-card-${id}" data-stamp="${gone ? stamp('banned') : ''}" aria-pressed="false" ${gone ? 'disabled' : ''} style="--c:${def.css}">
+      const usable = (id) => !out.has(id) && isOwned(id); // you can only play champions you own
+      let sel = banning ? null : usable(picked) && ROSTER.includes(picked) ? picked : ROSTER.find(usable) ?? ROSTER[0];
+      const cardHtml = (id) => {
+        const def = HEROES[id], gone = out.has(id), locked = !isOwned(id);
+        return `<button type="button" class="hcard ${gone ? 'out banned' : ''} ${locked && !gone ? 'lockd' : ''}" data-id="${id}" data-testid="champion-card-${id}" data-locked="${locked}" data-stamp="${gone ? stamp('banned') : ''}" aria-pressed="false" ${gone ? 'disabled' : ''} style="--c:${def.css}">
           <span class="pic">${portrait(id)}</span><b>${def.name}</b>
-          <span class="role"><i>${icons.role(def.role)}</i>${upper(def.role)}</span>${chip(id)}</button>`;
-      }).join('');
+          <span class="role"><i>${icons.role(def.role)}</i>${upper(def.role)}</span>${chip(id)}${locked && !gone ? lockBadge() : ''}</button>`;
+      };
+      const cards = ROSTER.map(cardHtml).join('');
       show(`select modal ${banning ? 'banmode' : ''}`, `
         <button class="small home" type="button" aria-label="Back" data-testid="select-back">${icons.home}</button>
         <h2 class="sel-title" data-testid="draft-title">${banning ? 'Ban — tap to ban' : 'Pick — tap to choose'}</h2>
         <p class="hint draft-help" data-testid="draft-help">${banning ? HELP : note || 'Banned champions are locked. Now pick yours!'}</p>
         <span class="timer" data-testid="draft-timer"></span>
+        <div class="wallet sel-wallet" data-testid="select-wallet">${wallet()}</div>
         ${banning ? '' : spellPick(spells)}
         <div class="selwrap">
           <div class="grid" data-testid="champion-grid">${cards}</div>
@@ -188,6 +199,14 @@ export function createMenus(root) {
         </div>`,
       (el) => {
         const list = [...el.querySelectorAll('.hcard')], detail = el.querySelector('.detail');
+        const act = () => {
+          if (banning) return '<button class="btn ban go" type="button" data-testid="ban-btn">BAN</button>';
+          if (isOwned(sel)) return '<button class="btn primary go" type="button" data-testid="go-btn">GO</button>';
+          const price = nextPrice(), need = price - profile().coins;
+          return need > 0
+            ? `<button class="btn buy" type="button" data-testid="buy-btn" disabled>${LOCK} ${price} ${COIN}</button><p class="hint need" data-testid="buy-need">${need} more coins — play a match!</p>`
+            : `<button class="btn primary buy" type="button" data-testid="buy-btn">UNLOCK ${price} ${COIN}</button>`;
+        };
         const fill = () => {
           if (!sel) {
             detail.innerHTML = '<p class="dtitle">Tap a champion you don\'t want anyone to play.</p><div class="dact"><button class="btn ban go" type="button" data-testid="ban-btn" disabled>BAN</button></div>';
@@ -195,29 +214,43 @@ export function createMenus(root) {
           }
           const def = HEROES[sel];
           el.style.setProperty('--sel', def.css);
-          detail.innerHTML = `${detailBody(sel)}
-            <div class="dact">${banning ? '<button class="btn ban go" type="button" data-testid="ban-btn">BAN</button>' : '<button class="btn primary go" type="button" data-testid="go-btn">GO</button>'}</div>`;
-          on(detail, '.go', () => (banning ? onBan(sel) : onPlay(sel)));
+          detail.innerHTML = `${detailBody(sel)}<div class="dact">${act()}</div>`;
+          detail.querySelector('.go')?.addEventListener('click', () => (banning ? onBan(sel) : onPlay(sel)));
+          detail.querySelector('.buy:not(:disabled)')?.addEventListener('click', () => {
+            const r = buyChampion(sel);
+            if (!r.ok) return;
+            audio.sfx('skill', { def: HEROES[sel], isPlayer: true });
+            const i = list.findIndex((c) => c.dataset.id === sel);
+            list[i].outerHTML = cardHtml(sel); // refresh this card + every price badge (the next unlock costs more)
+            for (const c of el.querySelectorAll('.lockbadge b')) c.textContent = nextPrice();
+            list.splice(0, list.length, ...el.querySelectorAll('.hcard'));
+            wireCards();
+            el.querySelector('.wallet').innerHTML = wallet();
+            onBuy?.(sel);
+            mark(); fill();
+          });
         };
         const mark = () => list.forEach((c) => {
           const on = c.dataset.id === sel;
           c.classList.toggle('sel', on);
           c.setAttribute('aria-pressed', String(on));
         });
-        mark(); fill();
-        for (const c of list) {
-          c.addEventListener('click', () => {
-            sel = c.dataset.id;
-            mark(); fill();
-            c.classList.remove('jump');
-            void c.offsetWidth;
-            c.classList.add('jump');
-            audio.sfx('skill', { def: HEROES[sel], isPlayer: true });
-          });
-        }
+        const wireCards = () => {
+          for (const c of list) {
+            c.addEventListener('click', () => {
+              sel = c.dataset.id;
+              mark(); fill();
+              c.classList.remove('jump');
+              void c.offsetWidth;
+              c.classList.add('jump');
+              audio.sfx('skill', { def: HEROES[sel], isPlayer: true });
+            });
+          }
+        };
+        mark(); fill(); wireCards();
         if (!banning) wireSpells(el, spells, onSpells);
         on(el, '.home', onHome);
-        countdown(el, secs && performance.now() + secs * 1000, () => onTimeout?.(sel));
+        countdown(el, secs && performance.now() + secs * 1000, () => onTimeout?.(sel && (banning || usable(sel)) ? sel : null));
       });
     },
 
@@ -255,10 +288,10 @@ export function createMenus(root) {
         <span class="tm">${TEAM_NAME[p.team]}</span>${p.ban ? `<span class="bn" data-testid="player-ban-${p.slot}">Ban: ${HEROES[p.ban]?.name ?? p.ban}</span>` : ''}<span class="ch">${p.hero ? `<i>${portrait(p.hero)}</i>${HEROES[p.hero].name}` : '…'}</span></li>`;
       const sel = banning ? banSel : mine?.hero;
       const cards = ROSTER.map((id) => {
-        const st = state(id), gone = !!st, def = HEROES[id];
-        return `<button type="button" class="hcard ${id === sel ? 'sel' : ''} ${gone ? `out ${st}` : ''}" data-id="${id}" data-testid="lobby-champ-${id}" data-stamp="${stamp(st)}" aria-pressed="${id === sel}" style="--c:${def.css}" ${gone || (banning && mine?.ban) ? 'disabled' : ''}>
+        const st = state(id), gone = !!st, def = HEROES[id], locked = !banning && !isOwned(id) && !gone; // online: you can only pick champions you own (bans are open to all)
+        return `<button type="button" class="hcard ${id === sel ? 'sel' : ''} ${gone ? `out ${st}` : ''} ${locked ? 'lockd' : ''}" data-id="${id}" data-testid="lobby-champ-${id}" data-locked="${locked}" data-stamp="${stamp(st)}" aria-pressed="${id === sel}" style="--c:${def.css}" ${gone || locked || (banning && mine?.ban) ? 'disabled' : ''}>
           <span class="pic">${portrait(id)}</span><b>${def.name}</b>
-          <span class="role"><i>${icons.role(def.role)}</i>${upper(def.role)}</span>${chip(id)}</button>`;
+          <span class="role"><i>${icons.role(def.role)}</i>${upper(def.role)}</span>${chip(id)}${locked ? `<span class="lockbadge">${LOCK}</span>` : ''}</button>`;
       }).join('');
       const canStart = isHost && phase === 'lobby' && stage === 'pick' && two && players.every((p) => p.connected && p.hero);
       const help = !banning ? 'Banned champions are locked. Now pick yours!' : mine?.ban ? (two && !other?.ban ? 'Waiting for your friend to ban…' : '') : HELP;
@@ -318,13 +351,14 @@ export function createMenus(root) {
       (el) => { on(el, '.resume', onResume); on(el, '.home', onHome); });
     },
 
-    showResult({ win, stars, time, reason }, { onAgain, onHome, againLabel = 'PLAY AGAIN', homeLabel = 'CHAMPIONS' }) {
+    showResult({ win, stars, time, reason, rewards }, { onAgain, onHome, againLabel = 'PLAY AGAIN', homeLabel = 'CHAMPIONS' }) {
       const row = [0, 1, 2].map((i) => `<i class="${i < stars ? 'on' : ''}" style="--i:${i}">${icons.star(i < stars ? hex(PAL.gold) : '#2B3550')}</i>`).join('');
       const btns = `<div class="row"><button class="btn primary again" type="button" data-testid="again-btn">${againLabel}</button><button class="btn home" type="button" data-testid="champions-btn">${homeLabel}</button></div>`;
       show(win ? 'result win modal' : 'result lose modal', `
         <h2 data-testid="result-title">${win ? 'Victory' : 'Defeat'}</h2>
         <p class="reason">${reason} · ${mmss(time)}</p>
-        ${win ? `<div class="stars">${row}</div>` : ''}${btns}`,
+        ${win ? `<div class="stars">${row}</div>` : ''}
+        ${rewards ? `<p class="rewards" data-testid="rewards">+${rewards.coins} ${COIN} · +${rewards.xp} XP${rewards.levelsGained ? ` · <b data-testid="level-up">LEVEL UP! LV ${rewards.level} (+${rewards.bonus} ${COIN})</b>` : ''}</p>` : ''}${btns}`,
       (el) => { on(el, '.again', onAgain); on(el, '.home', onHome); });
     },
   };

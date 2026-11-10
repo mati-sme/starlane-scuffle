@@ -36,6 +36,7 @@ const tap = (page, id) => tid(page, id).click({ force: true });
 const errors = [];
 const browser = await chromium.launch(process.env.DEFAULT_GL ? {} : { args: ['--use-gl=angle', '--use-angle=swiftshader', '--ignore-gpu-blocklist'] });
 const ctx = await browser.newContext({ ...devices['iPhone 12 landscape'] });
+await ctx.addInitScript(() => { try { localStorage.setItem("starlane.unlockAll", "true"); } catch {} }); // v8: every champion open for tests
 const page = await ctx.newPage();
 page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
 await page.goto(BASE + '?gfx=low', { waitUntil: 'load', timeout: 90000 });

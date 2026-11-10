@@ -54,6 +54,7 @@ const detailOk = async (page) => {
 };
 async function open(device, name, shot) {
   const ctx = await browser.newContext(device);
+  await ctx.addInitScript(() => { try { localStorage.setItem("starlane.unlockAll", "true"); } catch {} }); // v8: every champion open for tests
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push(`${name} pageerror: ${e.message}`));
   page.on('console', (m) => { if (['error', 'warning'].includes(m.type()) && !/favicon|WebSocket|ERR_/.test(m.text())) errors.push(`${name} console: ${m.text().slice(0, 300)}`); });
@@ -92,6 +93,7 @@ async function open(device, name, shot) {
 // fake two-player online lobby straight through menus.showLobby
 async function lobby(device, name, shot) {
   const ctx = await browser.newContext(device);
+  await ctx.addInitScript(() => { try { localStorage.setItem("starlane.unlockAll", "true"); } catch {} }); // v8: every champion open for tests
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push(`${name} pageerror: ${e.message}`));
   await page.goto(BASE + '?gfx=low', { waitUntil: 'load', timeout: 90000 });
@@ -143,6 +145,7 @@ for (const [dev, name, shot] of [[DESK, 'desktop-lobby', 'after-lobby-online'], 
   try { const w = await launch(pw.webkit); b = w; note = 'webkit'; } catch { /* host libs missing */ }
   const dev = devices['iPad Pro 11 landscape'];
   const ctx = await b.newContext(dev), page = await ctx.newPage();
+  await ctx.addInitScript(() => { try { localStorage.setItem("starlane.unlockAll", "true"); } catch {} }); // v8: every champion open for tests
   page.on('pageerror', (e) => errors.push(`ipad pageerror: ${e.message}`));
   await page.goto(BASE + '?gfx=low', { waitUntil: 'load', timeout: 90000 });
   await tap(page, 'play-btn'); await tid(page, 'setup-next').waitFor(); await tap(page, 'setup-next'); await tid(page, 'draft-title').waitFor();

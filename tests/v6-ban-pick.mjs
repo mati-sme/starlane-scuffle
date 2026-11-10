@@ -46,6 +46,7 @@ const text = (page, id) => tid(page, id).textContent();
 const has = async (page, id, str) => (await text(page, id)).toLowerCase().includes(str.toLowerCase());
 async function open(name) {
   const ctx = await browser.newContext({ ...devices['iPhone 12 landscape'] });
+  await ctx.addInitScript(() => { try { localStorage.setItem("starlane.unlockAll", "true"); } catch {} }); // v8: every champion open for tests
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push(`${name} pageerror: ${e.message}`));
   page.on('console', (m) => { if (m.type() === 'error' && !/favicon|WebSocket|ERR_/.test(m.text())) errors.push(`${name} console: ${m.text().slice(0, 300)}`); });

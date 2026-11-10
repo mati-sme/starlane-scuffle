@@ -82,6 +82,7 @@ export class Match {
         const k = t.killer;
         if (k?.type === 'hero') {
           this.kills[k.team]++;
+          if (k === this.hero) this.myKills++;
           bus.emit('takedown', { killer: k, victim: t });
           const w = k.rs[0].resetOnKill; // Phase Step perk: a takedown soon after the cast refreshes it
           if (w && this.time - k.castAt[0] <= w) k.cds[0] = 0;
@@ -173,6 +174,7 @@ export class Match {
     this.over = false;
     this.towersLost = 0;
     this.kills = [0, 0];
+    this.myKills = 0;
     this.destroyed = [0, 0];
     this.reason = '';
     this._shT = 0;
@@ -632,7 +634,7 @@ export class Match {
     for (const h of this.heroes) h.celebrate = (h.team === 0) === team0Wins;
     this.rig.follow(this.cores[team0Wins ? 1 : 0]);
     this.rig.lead.set(0, 0, 0);
-    bus.emit('end', { win, stars, time: this.time, reason: this.reason, kills: this.kills, destroyed: this.destroyed });
+    bus.emit('end', { win, stars, time: this.time, reason: this.reason, kills: this.kills, destroyed: this.destroyed, myKills: this.myKills });
   }
 
   // state: 'title' | 'match' | 'results'

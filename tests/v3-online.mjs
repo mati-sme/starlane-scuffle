@@ -46,6 +46,7 @@ function watch(page, name) {
 async function newPlayer(name) {
   // iPhone 12 landscape (844x390): the game is landscape-only, portrait shows the rotate-phone overlay.
   const ctx = await browser.newContext({ ...devices['iPhone 12 landscape'] });
+  await ctx.addInitScript(() => { try { localStorage.setItem("starlane.unlockAll", "true"); } catch {} }); // v8: every champion open for tests
   open.push(ctx);
   const page = await ctx.newPage();
   watch(page, name);

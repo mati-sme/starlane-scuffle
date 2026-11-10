@@ -23,6 +23,7 @@ import { T, randomCode, cleanCode, shareLink } from './net/protocol.js';
 import { composeOnline, seeded } from './game/compose.js';
 import { DEFAULT_SPELLS, cleanSpells } from './game/spells.js';
 import { cleanSetup, defaultSetup } from './game/setup.js';
+import { isOwned, awardMatch, FREE_CHAMPS } from './game/progress.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -58,7 +59,8 @@ let setup = defaultSetup(); // offline match setup (team sizes, side, bot levels
 const BAN_SECS = 12, PICK_SECS = 30;
 const pickOne = (ids) => ids[(Math.random() * ids.length) | 0];
 let picked = save.get('hero', ROSTER[0]);
-if (!ROSTER.includes(picked)) picked = ROSTER[0];
+if (!ROSTER.includes(picked) || !isOwned(picked)) picked = ROSTER.find(isOwned) ?? ROSTER[0]; // a champion you do not own (yet) can't be your pick
+const owned = () => ROSTER.filter(isOwned);
 let spells = cleanSpells(save.get('spells')) ?? [...DEFAULT_SPELLS]; // summoner spells: Flash + Barrier unless changed
 const setSpells = (s) => { spells = s; save.set('spells', s); };
 
@@ -138,6 +140,7 @@ function renderLobby() {
   const stage = L.stage ?? 'pick', bans = L.bans ?? []; // an older worker has no draft: straight to picking
   const me = myPick(), other = L.players.find((p) => p.slot !== net.slot);
   const free = () => ROSTER.filter((id) => !bans.includes(id) && id !== other?.hero);
+  const pickable = () => free().filter(isOwned); // locked champions are never auto-picked either
   const send = (patch) => {
     if (me) Object.assign(me, patch); // optimistic; the room echoes it back
     net.send({ t: T.pick, ...patch });
@@ -147,7 +150,7 @@ function renderLobby() {
   if (online.draftKey !== draftKey) { online.draftKey = draftKey; online.timedOut = false; }
   menus.showLobby({ code: online.code, link: shareLink(online.code), me: net.slot, players: L.players, phase: L.phase, stage, bans, banSel: online.banSel, spells: [...(cleanSpells(me?.spells) ?? spells)], deadline: L.left ? online.leftAt + L.left * 1000 : 0, conn: net.status, error: online.error, setup: cleanSetup(L.setup) }, {
     onTeam: (team) => send({ team }),
-    onHero: (hero) => { online.error = ''; picked = hero; save.set('hero', hero); send({ hero }); },
+    onHero: (hero) => { if (!isOwned(hero)) return; online.error = ''; picked = hero; save.set('hero', hero); send({ hero }); },
     onBanSel: (id) => { online.banSel = id; renderLobby(); },
     onBan: (ban) => { online.error = ''; send({ ban }); },
     onSpells: (s) => { setSpells(s); send({ spells: s }); },
@@ -158,7 +161,7 @@ function renderLobby() {
         if (me && !me.ban) send({ ban: online.banSel && free().includes(online.banSel) ? online.banSel : pickOne(free().filter((id) => id !== picked)) });
         setTimeout(() => net.send({ t: T.stage }), 1500);
       } else if (me && !me.hero) {
-        const id = free().includes(picked) ? picked : pickOne(free());
+        const id = pickable().includes(picked) ? picked : pickOne(pickable().length ? pickable() : free().filter((k) => FREE_CHAMPS.includes(k)));
         picked = id;
         send({ hero: id });
       }
@@ -217,6 +220,11 @@ net.on('welcome', (m) => {
   online.leftAt = performance.now();
   const mp = m.players.find((p) => p.slot === net.slot);
   if (mp && !online.spSent && cleanSpells(mp.spells)?.join() !== spells.join()) { online.spSent = true; net.send({ t: T.pick, spells }); } // once: tell the room my saved spells
+  if (mp?.hero && !isOwned(mp.hero) && !online.fixSent) { // a champion I do not own: switch to one I do
+    online.fixSent = true;
+    const alt = owned().find((id) => !(m.bans ?? []).includes(id) && id !== m.players.find((p) => p.slot !== net.slot)?.hero);
+    if (alt) { picked = alt; net.send({ t: T.pick, hero: alt }); }
+  }
   if (m.stage === 'pick') online.banSel = null;
   if (state === 'online') { state = 'lobby'; document.body.classList.remove('playing'); }
   renderLobby();
@@ -263,12 +271,13 @@ function botBans(id) {
   const names = draftBans.slice(1).map((k) => HEROES[k].name).join(' and ');
   menus.showSelect({
     phase: 'pick', picked, banned: draftBans, spells: [...spells], onSpells: setSpells, secs: PICK_SECS, note: `The bots banned ${names}. Banned champions are locked.`,
-    onPlay: startMatch, onTimeout: (sel) => startMatch(sel), onHome: toTitle,
+    onPlay: startMatch, onTimeout: (sel) => startMatch(sel ?? undefined), onHome: toTitle,
   });
 }
 
 function startMatch(id = picked) {
   clearTimeout(resultTimer);
+  if (!ROSTER.includes(id) || !isOwned(id) || draftBans.includes(id)) id = owned().find((k) => !draftBans.includes(k)) ?? FREE_CHAMPS[0];
   picked = id;
   save.set('hero', id);
   match.setHero(id, undefined, draftBans, spells, setup); // fresh heroes + a fresh random bot line-up each match
@@ -309,6 +318,7 @@ function resume() {
 
 bus.on('end', (res) => {
   state = 'results';
+  res.rewards = awardMatch(res); // XP + coins (local only; the online lobby doesn't need to know)
   document.body.classList.remove('playing');
   resultTimer = setTimeout(() => menus.showResult(res, online
     ? { onAgain: () => { if (net.slot === 0) net.send({ t: T.abort }); toLobby(); }, onHome: toTitle, againLabel: 'LOBBY', homeLabel: 'EXIT' }

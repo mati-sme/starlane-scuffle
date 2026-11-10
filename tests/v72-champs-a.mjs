@@ -32,6 +32,7 @@ const BASE = `http://127.0.0.1:${server.address().port}/`;
 const NEW = ['granite', 'tidewall', 'embermaw', 'quill', 'wisp', 'razor', 'solace', 'brine', 'longshot', 'aurora', 'petal', 'beacon'];
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--ignore-gpu-blocklist'] });
 const ctx = await browser.newContext({ ...devices['iPhone 12 landscape'] });
+await ctx.addInitScript(() => { try { localStorage.setItem("starlane.unlockAll", "true"); } catch {} }); // v8: every champion open for tests
 const page = await ctx.newPage();
 const errors = [], results = [];
 const check = (name, ok, info = '') => { results.push(ok); console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${info ? ' — ' + info : ''}`); };

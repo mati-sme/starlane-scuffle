@@ -43,6 +43,7 @@ for (const { name, lib, uaMode } of kinds) {
   const opts = { ...dev };
   if (uaMode === 'desktop') opts.userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15';
   const ctx = await browser.newContext(opts);
+  await ctx.addInitScript(() => { try { localStorage.setItem("starlane.unlockAll", "true"); } catch {} }); // v8: every champion open for tests
   if (uaMode === 'desktop') await ctx.addInitScript(() => { Object.defineProperty(navigator, 'platform', { get: () => 'MacIntel' }); Object.defineProperty(navigator, 'maxTouchPoints', { get: () => 5 }); });
   const page = await ctx.newPage();
   const errors = [];

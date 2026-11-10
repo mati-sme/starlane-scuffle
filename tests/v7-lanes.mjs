@@ -39,6 +39,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const tap = (page, id) => page.locator(`[data-testid="${id}"]`).click({ force: true });
 
 const ctx = await browser.newContext({ ...devices['iPhone 12 landscape'] });
+
+await ctx.addInitScript(() => { try { localStorage.setItem("starlane.unlockAll", "true"); } catch {} }); // v8: every champion open for tests
 const page = await ctx.newPage();
 page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
 page.on('console', (m) => { if (m.type() === 'error' && !/favicon|WebSocket|ERR_/.test(m.text())) errors.push(`console: ${m.text().slice(0, 300)}`); });
