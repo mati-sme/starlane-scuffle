@@ -103,9 +103,13 @@ export class GameRoom extends DurableObject {
     let s = this.s;
     if (!s) {
       if (!m.create) return this._err(ws, 'noroom', 'No such room');
-      s = this.s = { code, phase: 'lobby', seed: 0, players: [], created: Date.now(), emptySince: null, stage: 'ban', stageEnd: null };
+      s = this.s = { code, phase: 'lobby', seed: 0, players: [], created: Date.now(), emptySince: null, stage: 'pick', stageEnd: null };
+      const created = cleanSetup(m.setup);
+      if (created) s.setup = created;
     } else if (m.create && !s.players.length) {
       s.phase = 'lobby'; // stale empty room under a recycled code
+      const created = cleanSetup(m.setup);
+      if (created) s.setup = created;
       this._draft();
     }
 
@@ -135,9 +139,9 @@ export class GameRoom extends DurableObject {
   // New draft: nobody has banned or picked yet. The timer only runs when two humans are here to race it.
   _draft() {
     const s = this.s;
-    s.stage = 'ban';
+    s.stage = s.setup?.mode === 'ranked' ? 'ban' : 'pick'; // v9: Normal / co-op skip the ban phase
     for (const p of s.players) { p.ban = null; p.hero = null; }
-    this._timer(BAN_MS);
+    this._timer(s.stage === 'ban' ? BAN_MS : PICK_MS);
   }
 
   _timer(ms) { this.s.stageEnd = this.s.players.length === 2 ? Date.now() + ms : null; }
@@ -185,7 +189,9 @@ export class GameRoom extends DurableObject {
     if (this.s.phase !== 'lobby') return;
     const setup = cleanSetup(m.setup);
     if (!setup) return;
+    const prev = this.s.setup?.mode;
     this.s.setup = setup;
+    if (setup.mode && setup.mode !== prev) this._draft();
     await this._save();
     this._lobby();
   }
@@ -295,12 +301,16 @@ export class GameRoom extends DurableObject {
 const clean = (v, n) => String(v ?? '').replace(/[^\w \-.]/g, '').trim().slice(0, n);
 
 // -> a well-formed setup, or null when `raw` is not one (the room then keeps what it had).
+const MODES = ['normal', 'ranked', 'coop'];
+
 function cleanSetup(raw) {
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.size) || !Array.isArray(raw.diff)) return null;
   const n = (v) => Math.min(5, Math.max(1, Math.round(+v) || 5));
-  return {
+  const out = {
     size: [n(raw.size[0]), n(raw.size[1])],
     side: raw.side === 1 ? 1 : 0,
     diff: [0, 1].map((t) => Array.from({ length: 5 }, (_, i) => (LEVELS.includes(raw.diff[t]?.[i]) ? raw.diff[t][i] : 'mid'))),
   };
+  if (MODES.includes(raw.mode)) out.mode = raw.mode;
+  return out;
 }

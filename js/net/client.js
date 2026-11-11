@@ -28,10 +28,10 @@ export class NetClient {
   forget(code = this.code) { try { localStorage.removeItem(key(code)); } catch { /* storage blocked */ } }
 
   // create: first connect makes the room; otherwise join (or resume when a token is stored for this code).
-  connect(code, { create = false, name = '' } = {}) {
+  connect(code, { create = false, name = '', setup = null } = {}) {
     this.close();
     this.code = code;
-    this._hello = { t: T.hello, code, create, name };
+    this._hello = { t: T.hello, code, create, name, ...(setup ? { setup } : {}) };
     this._wantOpen = true;
     this.tries = 0;
     this._open();

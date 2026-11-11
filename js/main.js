@@ -136,7 +136,7 @@ function connectRoom(code, create, tries) {
   online = { code, lobby: null, error: '', tries, banSel: null, leftAt: 0, draftKey: '', timedOut: false };
   save.set('lastRoom', code); // reload / reopen the app can resume this room
   menus.showOnline({ code: create ? '' : code, busy: true, error: 'Connecting…', onCreate() {}, onJoin() {}, onBack: toTitle });
-  net.connect(code, { create });
+  net.connect(code, { create, setup: create ? { ...cleanSetup(setup), mode } : undefined });
 }
 
 const myPick = () => online?.lobby?.players.find((p) => p.slot === net.slot);
@@ -276,7 +276,7 @@ function startTutorial() {
 // v9: mode select (Normal is the default and has no ban phase), then setup, then the draft.
 function toModes() {
   leave('select');
-  menus.showModes({ onBack: toTitle, onPick: (m) => { mode = m; toSetup(m === 'coop'); } });
+  menus.showModes({ onBack: toTitle, onPick: (m) => { mode = m; setup.mode = m; toSetup(m === 'coop'); } });
 }
 
 function toStore(tab = 'champs') {

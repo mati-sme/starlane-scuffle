@@ -4,7 +4,7 @@
 export const LEVELS = ['easy', 'mid', 'hard'];
 export const MAX_TEAM = 5;
 
-export const defaultSetup = () => ({ size: [MAX_TEAM, MAX_TEAM], side: 0, diff: [Array(MAX_TEAM).fill('mid'), Array(MAX_TEAM).fill('mid')] });
+export const defaultSetup = () => ({ size: [MAX_TEAM, MAX_TEAM], side: 0, diff: [Array(MAX_TEAM).fill('mid'), Array(MAX_TEAM).fill('mid')], mode: 'normal' });
 
 // Anything missing or malformed falls back to today's 5v5 Mid.
 export function cleanSetup(raw) {
@@ -13,6 +13,7 @@ export function cleanSetup(raw) {
   if (Array.isArray(raw.size)) out.size = [0, 1].map((t) => Math.min(MAX_TEAM, Math.max(1, Math.round(+raw.size[t]) || MAX_TEAM)));
   if (raw.side === 1) out.side = 1;
   if (Array.isArray(raw.diff)) for (const t of [0, 1]) for (let i = 0; i < MAX_TEAM; i++) { const l = raw.diff[t]?.[i]; if (LEVELS.includes(l)) out.diff[t][i] = l; }
+  if (raw.mode === 'ranked' || raw.mode === 'coop' || raw.mode === 'normal') out.mode = raw.mode;
   return out;
 }
 

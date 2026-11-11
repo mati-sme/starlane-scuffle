@@ -173,7 +173,7 @@ body:not(.touch) .spell .key { display: flex; }
 .sk.ranked::before { content: ''; position: absolute; inset: -3px; border-radius: 50%; border: 2px solid var(--gold); animation: shock .5s ease-out forwards; pointer-events: none; }
 @keyframes upfade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes upglow { 50% { opacity: .8; } }
-#lvinfo { display: none; position: fixed; left: calc(14px + var(--sl)); top: calc(100px + var(--st)); z-index: 4; pointer-events: none; max-width: 118px; }
+#lvinfo { display: none; position: fixed; left: calc(14px + var(--sl)); top: calc(108px + var(--st)); z-index: 4; pointer-events: none; max-width: 118px; }
 body.playing #lvinfo { display: block; }
 .lvpill { position: relative; display: flex; align-items: center; gap: 6px; padding: 2px 8px 6px; border: 2px solid var(--ink); background: rgba(11,16,32,.8); color: #fff; font-weight: 700; }
 .lvpill .lv { font-size: 13px; }
@@ -183,7 +183,7 @@ body.playing #lvinfo { display: block; }
 .lvpill .xpb i { display: block; height: 100%; width: 0; background: var(--gold); transition: width .2s; }
 .lvpill.bump { animation: ding .5s cubic-bezier(.3, 1.6, .5, 1); }
 .lvtoast, .xpgain { position: absolute; left: 0; pointer-events: none; opacity: 0; white-space: nowrap; font-weight: 700; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; }
-.lvtoast { top: auto; bottom: calc(100% + 4px); left: 0; font-size: 13px; color: var(--gold); max-width: 140px; white-space: normal; line-height: 1.15; }
+.lvtoast { top: calc(100% + 6px); bottom: auto; left: 0; font-size: 13px; color: var(--gold); max-width: 118px; white-space: normal; line-height: 1.15; }
 .xpgain { top: 54px; font-size: 14px; color: #fff; }
 .lvtoast.pop { animation: toast 2s ease-out; }
 .xpgain.pop { animation: toast 1s ease-out; }
@@ -191,7 +191,7 @@ body.playing #lvinfo { display: block; }
 @media (max-height: 420px) {
   .skup { width: 24px; height: 24px; margin: -12px 0 0 -12px; font-size: 18px; }
   .skup::before { inset: -10px; }
-  #lvinfo { left: calc(12px + var(--sl)); top: calc(88px + var(--st)); }
+  #lvinfo { left: calc(12px + var(--sl)); top: calc(104px + var(--st)); }
 }
 
 /* ---------- screens ---------- */
