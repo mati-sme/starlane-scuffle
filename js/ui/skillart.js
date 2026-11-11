@@ -44,15 +44,23 @@ export function skillArt(kind, ab, def, { medal = true } = {}) {
   const c1 = css(def.fx?.color ?? def.color), c2 = css(def.fx?.accent ?? def.accent);
   const cat = skillCategory(ab ?? { kind }), id = `${def.id}-${kind}`;
   const glyph = icons[kind] ?? icons.bolt;
+  const hi = mix(c1, '#FFFFFF', 0.55), lo = mix(c1, INK, 0.55), rim = mix(c2, '#FFFFFF', 0.35);
+  const g = glyph.replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '');
   return `<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" class="skart cat-${cat}" data-kind="${kind}" data-cat="${cat}">
-    <defs><radialGradient id="sg-${id}" cx=".5" cy=".3" r=".8"><stop offset="0" stop-color="${mix(c1, '#FFFFFF', 0.4)}"/><stop offset=".6" stop-color="${c1}"/><stop offset="1" stop-color="${mix(c1, '#0B1020', 0.55)}"/></radialGradient>
-    <radialGradient id="sl-${id}"><stop offset="0" stop-color="${c2}" stop-opacity=".95"/><stop offset="1" stop-color="${c2}" stop-opacity="0"/></radialGradient></defs>
-    <circle cx="32" cy="32" r="30" fill="url(#sg-${id})"/>
-    ${PATTERN[cat](mix(c2, '#FFFFFF', 0.25))}
-    <circle cx="32" cy="32" r="22" fill="url(#sl-${id})"/>
-    <circle cx="32" cy="32" r="29" fill="none" stroke="${mix(c2, '#FFFFFF', 0.2)}" stroke-width="1.6" opacity=".8"/>
-    <g style="filter:drop-shadow(0 1.5px 0 ${INK})"><svg x="11" y="9" width="42" height="42" viewBox="0 0 64 64" overflow="visible" style="color:#fff">${glyph.replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '')}</svg></g>
-    ${medal ? `<g transform="translate(40 40)"><circle cx="8" cy="8" r="9" fill="${INK}" opacity=".85" stroke="${mix(c2, '#FFFFFF', 0.3)}" stroke-width="1.2"/>${MEDAL[cat]}</g>` : ''}
+    <defs>
+      <radialGradient id="sg-${id}" cx=".35" cy=".28" r=".85"><stop offset="0" stop-color="${hi}"/><stop offset=".45" stop-color="${c1}"/><stop offset="1" stop-color="${lo}"/></radialGradient>
+      <linearGradient id="rim-${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${rim}"/><stop offset=".5" stop-color="${mix(c2, INK, 0.2)}"/><stop offset="1" stop-color="${mix(c2, INK, 0.55)}"/></linearGradient>
+      <radialGradient id="well-${id}" cx=".5" cy=".42" r=".5"><stop offset="0" stop-color="${mix(c2, '#FFFFFF', 0.12)}" stop-opacity=".35"/><stop offset="1" stop-color="${INK}" stop-opacity=".15"/></radialGradient>
+    </defs>
+    <circle cx="32" cy="33.5" r="29.5" fill="${INK}" opacity=".35"/>
+    <circle cx="32" cy="32" r="29.5" fill="url(#rim-${id})"/>
+    <circle cx="32" cy="32" r="26.5" fill="url(#sg-${id})"/>
+    <g opacity=".28">${PATTERN[cat](mix(c2, '#FFFFFF', 0.4))}</g>
+    <circle cx="32" cy="32" r="21" fill="url(#well-${id})"/>
+    <path d="M18 15a18 18 0 0 1 18-2" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity=".22"/>
+    <circle cx="32" cy="32" r="26.2" fill="none" stroke="#fff" stroke-opacity=".18" stroke-width="1.2"/>
+    <g style="filter:drop-shadow(0 2px 0 ${INK})"><svg x="10" y="9" width="44" height="44" viewBox="0 0 64 64" overflow="visible" style="color:#fff">${g}</svg></g>
+    ${medal ? `<g transform="translate(41 41)"><circle cx="8" cy="8" r="8.5" fill="${INK}" stroke="${rim}" stroke-width="1.4"/>${MEDAL[cat]}</g>` : ''}
   </svg>`;
 }
 

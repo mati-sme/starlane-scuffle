@@ -26,7 +26,7 @@ export class LevelUp {
     const mine = (h) => h === match.hero;
     bus.on('levelUp', (h) => {
       if (!mine(h)) return;
-      this.toast.textContent = h.level === HERO.ultLevel ? `LEVEL ${h.level} · R UNLOCKED · +1 POINT` : `LEVEL ${h.level} · +1 POINT`;
+      this.toast.textContent = h.level === HERO.ultLevel ? `Lv ${h.level} · R ready` : `Lv ${h.level} · +1`;
       this._pop(this.toast, 'pop');
       this._pop(this.pill, 'bump');
     });
