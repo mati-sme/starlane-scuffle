@@ -41,7 +41,8 @@ export class Abilities {
       // '+' is a tap, not a drag: rank on pointerdown. iOS / WebKit may send pointercancel (or no click, after preventDefault) instead of pointerup,
       // and a synthesized click is dropped while other fingers are down. The click only covers keyboard / assistive taps.
       let lastSpend = -1e9;
-      const spend = () => { lastSpend = performance.now(); this.match.hero.spendPoint(i); };
+      // v10: rank up through the input queue (like keys 1-4) so an online guest's tap reaches the host; the host applies it locally the same frame.
+      const spend = () => { lastSpend = performance.now(); if (this.match.role === 'guest') input.spend[i] = true; else this.match.hero.spendPoint(i); };
       up.addEventListener('pointerdown', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -204,7 +205,7 @@ export class Abilities {
       const left = locked ? 0 : Math.max(0, h.cds[i]);
       const p = left > 0 ? Math.round((left / (h.cdTotal[i] || 1)) * 1000) / 10 : 0;
       if (p !== b.p) { b.cd.style.setProperty('--p', p); b.p = p; }
-      const n = locked ? `Lv${HERO.ultLevel}` : left > 0 && left <= 3 ? Math.ceil(left) : '';
+      const n = locked ? `Lv${HERO.ultLevel}` : left <= 0 ? '' : left < 1 ? left.toFixed(1) : Math.ceil(left); // v10: full countdown, not just the last 3 s
       if (n !== b.n) { b.num.textContent = n; b.n = n; }
       b.el.classList.toggle('locked', locked);
       b.el.classList.toggle('dead', !h.alive);

@@ -4,8 +4,8 @@ export const PAL = { // grounded sci-fi: slightly desaturated neon, deeper shado
   voidTop: 0x05080F, voidBottom: 0x172238,
   nebulaA: 0x2A4FA8, nebulaB: 0x1A9E94,
   star: 0xE2EEF8, gold: 0xF0BE48,
-  grassLight: 0x4E6352, grassDark: 0x2E3E34,
-  lane: 0x666D76, laneGlow: 0x6FCBE4,
+  grassLight: 0x5C7A4C, grassDark: 0x33502F, // v10: brighter spring meadow + warm sandstone lanes (the bigger v10 arena)
+  lane: 0x7D766A, laneGlow: 0x6FCBE4,
   cliffLight: 0x6A6A70, cliffDark: 0x24252D,
   sunny: 0x3A9BF0, sunnyDeep: 0x1D57A3,
   gloom: 0xF04C5A, gloomDeep: 0xA02436,
@@ -24,10 +24,11 @@ export const GROUND = 0.08;
 export const SIM_STEP = 1 / 30;
 
 // v9.1: the arena is 0.7x the old 180x112 map (126x78): shorter lanes, quicker rotations. All quadrant data below is authored at the old size and scaled once here.
-export const MAP_SCALE = 0.7;
+// v10: back up to 0.85x (153x94) - a bigger arena with the blocking stones removed.
+export const MAP_SCALE = 0.85;
 const S = MAP_SCALE, sp = ([x, z, ...r]) => [+(x * S).toFixed(2), +(z * S).toFixed(2), ...r], sl = (l) => l.map(sp);
 const sbox = ([cx, cz, w, d]) => [+(cx * S).toFixed(2), +(cz * S).toFixed(2), +Math.max(1.6, w * S).toFixed(2), +Math.max(1.6, d * S).toFixed(2)];
-export const MAP = { halfX: 63, halfZ: 39, heroX: 56, heroBound: { x: 61, z: 37 }, laneW: 8 };
+export const MAP = { halfX: 76, halfZ: 47, heroX: 68, heroBound: { x: 74, z: 45 }, laneW: 9 };
 
 // Quadrant data (x < 0, z < 0), mirrored 4x by world/arena.js. Team 0 (Sunny) owns -x; the top lane is z < 0.
 const ARENA_RAW = {
@@ -43,8 +44,8 @@ const ARENA_RAW = {
   core: [-74, 0],
   fountain: [-84, 0], fountainR: 6,
   pads: [[-80, -7], [-82, -3.5], [-78, 0], [-82, 3.5], [-80, 7]],
-  cover: [[-44, -24, 10, 2], [-20, -26, 2, 10], [-14, -12, 6, 2], [-56, -30, 2, 8], [-12, -41, 3, 2], [-16, -4, 2, 2]], // cx, cz, w, d
-  brush: [[-26, -34, 8, 4], [-40, -14, 6, 6], [-10, -6, 6, 3], [-3, -22, 5, 5]],
+  cover: [], // v10: no blocking stones - every lane and jungle path is clear to walk (was 6 rock / crate walls per quadrant)
+  brush: [[-26, -34, 8, 4], [-40, -14, 6, 6], [-10, -6, 6, 3], [-3, -22, 5, 5], [-44, -24, 8, 3], [-18, -14, 5, 4]], // cx, cz, w, d
   pockets: [[-30, -19, 44, 22]], // jungle: cx, cz, w, d (quadrant)
   camps: [[-30, -18]],
   pits: [[0, 29, 'dragon'], [0, -29, 'titan']], // epic boss pits on the centre line (x, z); the Herald shares the Titan pit
@@ -54,14 +55,16 @@ export const ARENA = {
   lanes: ARENA_RAW.lanes.map(sl), outer: sl(ARENA_RAW.outer), inner: sl(ARENA_RAW.inner), inhib: sl(ARENA_RAW.inhib), guard: sl(ARENA_RAW.guard),
   core: sp(ARENA_RAW.core), fountain: sp(ARENA_RAW.fountain), fountainR: 5, pads: sl(ARENA_RAW.pads),
   cover: ARENA_RAW.cover.map(sbox), brush: ARENA_RAW.brush.map(sbox), pockets: ARENA_RAW.pockets.map(sbox), camps: sl(ARENA_RAW.camps),
-  pits: [[0, 17, 'dragon'], [0, -17, 'titan']], // pits sit closer to the lanes than a plain 0.7 scale would put them (clear of the side lanes)
+  pits: [[0, 21, 'dragon'], [0, -21, 'titan']], // pits sit closer to the lanes than a plain 0.7 scale would put them (clear of the side lanes)
   brushSeeRange: 3.0, brushRevealT: 1.2,
 };
 
 export const MATCH = {
   waveEvery: 20, stormWaveEvery: 15, firstWave: 15, siegeFrom: 90, siegeEvery: 2,
-  storm: 540, tieBreak: 900, stormStructMul: 2.5, stormXpMul: 1.5, stormSiege: 1, // Overdrive at 9:00 (tie-break 15:00): extra siege blob per wave, 2.5x structure damage, 1.5x XP, half respawn
-  respawnBase: 4, respawnPerLevel: 1.5, starTime: 600,
+  // v10: no time limit any more - a match ends ONLY when a Nexus falls. Overdrive at 9:00 (extra siege blob per wave, 2.5x structure damage, 1.5x XP, half respawn)
+  // keeps long games moving toward a Nexus.
+  storm: 540, tieBreak: Infinity, stormStructMul: 2.5, stormXpMul: 1.5, stormSiege: 1,
+  respawnBase: 4, respawnPerLevel: 1.2, starTime: 600,
   campFirst: 60, campRespawn: 75,
 };
 
@@ -75,11 +78,11 @@ export const UNITS = {
 export const CAMP = { hp: 900, dmg: 30, cd: 1.2, range: 5, leash: 8, xp: 75, xpRange: 12, heal: 0.25, radius: 1.3, buffT: 12 };
 
 export const HERO = {
-  maxLevel: 9, ultLevel: 4, dmgPerLevel: 0.05, maxRank: [3, 3, 3, 3], // v9: Q W E (normal skills) + R (ultimate), rank 1-3 each
-  // Q / W / E start at rank 1 (usable from Lv 1); rank 2 needs Lv 2, rank 3 Lv 4. R rank 1 is free at Lv 4, R2 needs Lv 6, R3 Lv 8.
-  // 1 skill point per level from Lv 2 = 8 points = 6 normal ranks + R2 + R3: nothing is ever stuck waiting for a point.
-  gate: (slot, rank) => (slot < 3 ? 2 * (rank - 1) : [0, 4, 6, 8][rank]),
-  xpNeed: (lv) => 80 + 30 * (lv - 1) + 8 * (lv - 1) ** 2, // ~2600 total to lv 9 (was 880)
+  // v10: level cap 15. Q W E rank 1-5, R rank 1-3. Q / W / E start at rank 1; rank 2 needs Lv 2, 3 Lv 4, 4 Lv 7, 5 Lv 10.
+  // R rank 1 is free at Lv 4, R2 needs Lv 9, R3 Lv 13. 1 point per level from Lv 2 = 14 points = 12 normal ranks + R2 + R3.
+  maxLevel: 15, ultLevel: 4, dmgPerLevel: 0.04, hpLvMul: 0.75, maxRank: [5, 5, 5, 3],
+  gate: (slot, rank) => (slot < 3 ? [0, 0, 2, 4, 7, 10][rank] : [0, 4, 9, 13][rank]),
+  xpNeed: (lv) => 80 + 24 * (lv - 1) + 5 * (lv - 1) ** 2, // ~2000 total to Lv 9, ~7400 to Lv 15
   xpRange: 9, xpHeroRange: 14, xp: { blobling: 14, zapper: 16, bigblob: 34, hero: 60, heroPerLevel: 10 },
   baseHeal: { rate: 0.2 }, // fountain: 20% max HP / s (full heal in ~5 s)
   // v9 out-of-combat regen: base + perLevel HP/s once `delay` s have passed without taking damage (was a flat 40 HP/s after 3 s). Going home still matters.

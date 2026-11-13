@@ -47,6 +47,8 @@ export function encodeSnap(match, seq, events) {
     c: match.camps.list.map((c) => [c.alive ? 1 : 0, Math.round(c.hp), r1(c.x), r1(c.z), Math.round(match.camps.eta(c, match.time)), c.variant]),
     bf: match.buffs.map((b) => [b.fire, b.ice, b.gale, Math.round(b.dragonT), Math.round(b.titanT), Math.round(b.heraldT)]),
   };
+  // v10: per-hero K / D / A / damage (guests used to show 0 / 0 / 0 because match.stats only lived on the host).
+  s.ks = match.heroes.map((h) => { const x = match.stats.get(h); return x ? [x.ko, x.d, x.a, Math.round(x.dmg)] : [0, 0, 0, 0]; });
   const se = match.seasons.encode();
   if (se) s.se = se; // additive: older guests ignore it
   if (match.over) { s.ov = 1; s.w = match.win ? 1 : 0; s.rr = match.rawReason; }
@@ -111,6 +113,8 @@ export function applySnap(match, s) {
     if (st.type === 'core') st.pulseT = f & 8 ? 0.5 : 0;
     if (!(f & 1) && st.alive) { st.alive = false; st.hp = 0; st.dying = DYING; bus.emit('down', st); }
   });
+
+  if (s.ks) s.ks.forEach(([ko, d, a, dmg], i) => { const h = match.heroes[i]; if (h) Object.assign(match._st(h), { ko, d, a, dmg }); });
 
   match.minions.netApply(s.m);
   match.camps.netApply(s.c);

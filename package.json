@@ -1,6 +1,6 @@
 {
   "name": "starlane-scuffle",
-  "version": "9.4.1",
+  "version": "10.0.0",
   "private": true,
   "type": "module",
   "scripts": {

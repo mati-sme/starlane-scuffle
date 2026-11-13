@@ -51,6 +51,16 @@ export class Minimap {
     for (const b of BRUSH) c.fillRect(this.px(b.x0), this.pz(b.z0), b.w * sx, b.d * sz);
     c.fillStyle = '#c4ccdb';
     for (const b of COVER) c.fillRect(this.px(b.x0), this.pz(b.z0), Math.max(1.5, b.w * sx), Math.max(1.5, b.d * sz));
+    // v10 lane role labels: TOP (tanks) / MID (blaster) / BOT (shooter + support)
+    const fs = Math.max(8, Math.round(this.layer.height * 0.085));
+    c.font = `800 ${fs}px system-ui, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+    const tag = [['TOP', '#FF9A4D', ARENA.lanes[0]], ['MID', '#B98CFF', ARENA.lanes[1]], ['BOT', '#4FE0C2', ARENA.lanes[2]]];
+    for (const [t, col, lane] of tag) {
+      const z = lane.reduce((a, p) => (Math.abs(p[1]) > Math.abs(a) ? p[1] : a), 0), x = t === 'MID' ? -MAP.halfX * 0.32 : 0;
+      const yy = this.pz(z) + (t === 'TOP' ? fs * 0.9 : t === 'BOT' ? -fs * 0.9 : -fs * 0.9);
+      c.lineWidth = 3; c.strokeStyle = 'rgba(8,12,24,.9)'; c.strokeText(t, this.px(x), yy);
+      c.fillStyle = col; c.fillText(t, this.px(x), yy);
+    }
   }
 
   // Can `team` see e? (not in brush; within sight of an ally hero / tower / minion)

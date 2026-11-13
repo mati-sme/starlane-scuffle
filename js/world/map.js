@@ -347,9 +347,12 @@ function bushGeo() {
 function buildCover(group) {
   const rocks = [], crates = [];
   COVER.forEach((b, i) => coverParts(b, i, rocks, crates));
-  const rockMesh = new THREE.Mesh(mergeParts(rocks), terrainMat(tex().rock, 0.45, true, { finish: true, bump: 0.12 }));
-  rockMesh.castShadow = rockMesh.receiveShadow = true;
-  group.add(rockMesh, toonMesh(mergeParts(crates), toonMat({ vertexColors: true, finish: true }), 0));
+  if (rocks.length) { // v10: the arena has no cover blocks (empty), so this is skipped
+    const rockMesh = new THREE.Mesh(mergeParts(rocks), terrainMat(tex().rock, 0.45, true, { finish: true, bump: 0.12 }));
+    rockMesh.castShadow = rockMesh.receiveShadow = true;
+    group.add(rockMesh);
+  }
+  if (crates.length) group.add(toonMesh(mergeParts(crates), toonMat({ vertexColors: true, finish: true }), 0));
 
   const spots = [];
   for (const b of BRUSH) for (let x = b.x0 + 0.65; x < b.x1; x += 1.3) for (let z = b.z0 + 0.65; z < b.z1; z += 1.3) spots.push([x + (hash(x, 1, z) - 0.5) * 0.5, z + (hash(z, 2, x) - 0.5) * 0.5]);

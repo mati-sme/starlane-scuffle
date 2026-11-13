@@ -1,14 +1,20 @@
 # Starlane Scuffle
 
 A sci-fi team-arena brawler for phones and desktops: 5v5 on a three-lane arena, 24 armored champions with portraits, a ban-then-pick draft (every champion unique across both teams), two summoner spells (Flash / Barrier / Ignite), no unlocks.
-Built with three.js, no build step. All art, icons and sound are procedural.
+Built with three.js, no build step. Art is procedural; sound effects are Kenney CC0 samples (`assets/sfx/CREDITS.md`) with a procedural fallback.
+
+## v10.0.0
+- 83 champions (13 new: Quasar, Vega, Rivet, Juniper, Pepper, Rampart, Tusk, Lullaby, Sprig, Kelvin, Sol, Zinnia and the free scout Fennec). 18 are free from the start (3 tanks, 2 bruisers, 2 assassins, 3 blasters, 5 shooters, 3 supports); the rest unlock with coins.
+- Lanes: top = 2 tanks, mid = blaster, bottom = shooter + support. Role/lane tags on champion select, lane labels on the minimap, a lane hint at match start. Bots stay out of lanes humans are in.
+- Bigger map, no path-blocking stones, level cap 15, matches end only when a nexus falls (no time limit).
+- Range-limited sounds (online too), cooldown seconds on skill buttons, slimmer top HUD, guest KDA sync and guest skill `+` fixed.
 
 ## Play
 
 - **Champions:** all 24 are unlocked from the start. Ban one, then pick one on the select screen (no champion appears twice in a match); your last pick is remembered. You get 4 bot allies and face 5 bot enemies. Both teams always have a blaster, a shooter and a support (each pair is split between the teams, your pick stays on Sunny); the melee slots are random. `?hero=<id>` picks your champion and `?bots=a,b,c,...` forces up to 9 ids (4 allies, then 5 enemies).
 - **Phone (landscape):** left thumb moves, the big button attacks and auto-aims, the three skill buttons cast Q / E / R. A gold `+` pops up above each skill button that can take a point; tap it to rank up.
 - **Desktop:** arrow keys move, right-click walks, `Space` (or left-click) attacks, `Q` `W` `E` `R` cast the four skills (`R` is the ultimate), `1`-`4` rank them up, `Esc` pauses.
-- **Skill upgrades:** every level gives a point (max level 9). A small gold `+` appears above each skill button that can be ranked up (Wild Rift style); tap it. On desktop, `1` / `2` / `3` or `Ctrl+Q` / `Ctrl+E` / `Ctrl+R` rank up Q / E / R. Q and E go to rank 4, R to rank 3 (R rank 1 is free at level 3). Rank 2+ adds damage / healing and shortens the cooldown; the max rank adds a perk. Higher ranks need a minimum level (a skill below its gate shows no `+`). Upgrading never pauses the game.
+- **Skill upgrades:** every level gives a point (max level 15). A small gold `+` appears above each skill button that can be ranked up (Wild Rift style); tap it. On desktop, `1` / `2` / `3` or `Ctrl+Q` / `Ctrl+E` / `Ctrl+R` rank up Q / E / R. Q and E go to rank 4, R to rank 3 (R rank 1 is free at level 3). Rank 2+ adds damage / healing and shortens the cooldown; the max rank adds a perk. Higher ranks need a minimum level (a skill below its gate shows no `+`). Upgrading never pauses the game.
 
 ## The match
 

@@ -15,7 +15,7 @@ const audit = await page.evaluate(async (NEW) => {
   const { FREE_CHAMPS, unlockPrice } = await import('/js/game/progress.js');
   const ids = new Set(ROSTER);
   const problems = [];
-  if (ROSTER.length !== 70) problems.push('roster is ' + ROSTER.length + ', expected 70');
+  if (ROSTER.length !== 83) problems.push('roster is ' + ROSTER.length + ', expected 83');
   if (ids.size !== ROSTER.length) problems.push('duplicate roster ids');
   for (const id of NEW) {
     if (!ids.has(id)) { problems.push('missing ' + id); continue; }
@@ -29,7 +29,7 @@ const audit = await page.evaluate(async (NEW) => {
   }
   return { count: ROSTER.length, price0: unlockPrice(0), problems };
 }, NEW);
-check('70 unique champions', audit.count === 70, String(audit.count));
+check('83 unique champions', audit.count === 83, String(audit.count));
 check('12 new champs are store-priced with unique 4-skill kits', audit.problems.length === 0, audit.problems.join('; '));
 check('unlock price is paid (not free)', audit.price0 > 0, String(audit.price0));
 

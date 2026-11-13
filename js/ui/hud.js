@@ -14,6 +14,7 @@ import { Shop } from './shop.js';
 import { BOSS } from '../config.js';
 import { TEAM_NAME } from '../net/protocol.js';
 import { SeasonUI, seasonMark } from './season.js';
+import { ROLE_LANE, LANE_PLAN, laneTag } from '../game/roles.js';
 
 const mmss = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
 
@@ -29,10 +30,10 @@ export class Hud {
       <div class="portrait"><div class="xp"></div><div class="ring"></div><div class="face"></div><b class="lvl" data-testid="hud-level">1</b></div>
       <canvas id="mini" data-testid="minimap"></canvas>
       <div class="top" data-testid="scorebar">
-        <div class="score"><b class="k0" data-testid="kills-blue">0</b><span class="clock" data-testid="clock">0:00</span><b class="k1" data-testid="kills-red">0</b></div>
-        <div class="kda" data-testid="player-kda" aria-label="Your kills, deaths, assists"><span>K / D / A</span><b data-testid="kda-k">0</b><i>/</i><b data-testid="kda-d">0</b><i>/</i><b data-testid="kda-a">0</b></div>
-        <div class="pips"><div class="t0" data-testid="pips-blue"></div><div class="t1" data-testid="pips-red"></div></div>
+        <div class="score"><div class="pips"><div class="t0" data-testid="pips-blue"></div></div><b class="k0" data-testid="kills-blue">0</b><span class="clock" data-testid="clock">0:00</span><b class="k1" data-testid="kills-red">0</b><div class="pips"><div class="t1" data-testid="pips-red"></div></div></div>
       </div>
+      <div class="kda mekda" data-testid="player-kda" aria-label="Your kills, deaths, assists"><span>KDA</span><b data-testid="kda-k">0</b><i>/</i><b data-testid="kda-d">0</b><i>/</i><b data-testid="kda-a">0</b></div>
+      <div class="lanehint" data-testid="lane-hint"></div>
       <div class="buffs" data-testid="buffs"></div>
       <div class="toast" data-testid="boss-toast"></div>
       <div class="gear" data-testid="gear"></div>
@@ -68,6 +69,7 @@ export class Hud {
     this.rsec = root.querySelector('.rsec');
     this.ko = root.querySelector('.ko');
     this.objective = root.querySelector('.objective');
+    this.laneHint = root.querySelector('.lanehint');
     this.rs = -1;
     this.clock = root.querySelector('.clock');
     this.kills = [root.querySelector('.k0'), root.querySelector('.k1')];
@@ -81,7 +83,7 @@ export class Hud {
     this.take = root.querySelector('.takedown');
 
     this.pipEls.forEach((el, t) => {
-      el.innerHTML = '<i></i>'.repeat(11) + '<i class="core"></i>';
+      el.innerHTML = t ? '<i class="core"></i>' + '<i></i>'.repeat(11) : '<i></i>'.repeat(11) + '<i class="core"></i>';
       this.pipKey[t] = '';
     });
     this.shop = new Shop(root.querySelector('.gear'), match);
@@ -166,6 +168,9 @@ export class Hud {
     this.objective.classList.remove('pop');
     void this.objective.offsetWidth;
     this.objective.classList.add('pop'); // once per match start
+    const lane = ROLE_LANE[this.match.hero.def.role] ?? 'mid'; // v10: lane suggestion for the player's role
+    this.laneHint.innerHTML = `${laneTag(this.match.hero.def)} ${LANE_PLAN[lane]}`;
+    this.laneHint.classList.remove('pop'); void this.laneHint.offsetWidth; this.laneHint.classList.add('pop');
   }
 
   // Floating damage: the player's hits (bigger; gold for skills) and big hits the player takes (red).
@@ -217,7 +222,8 @@ export class Hud {
       const alive = m.structures.filter((s) => s.team === t).map((s) => (s.alive ? 1 : 0)).join('');
       if (alive !== this.pipKey[t]) { // 9 lane towers (outer / inner / inhib x top / mid / bot), 2 guardians, core
         this.pipKey[t] = alive;
-        [...this.pipEls[t].children].forEach((el, i) => el.classList.toggle('dead', alive[i] === '0'));
+        const kids = [...this.pipEls[t].children]; if (t) kids.reverse(); // red pips mirror (core on the outside)
+        kids.forEach((el, i) => el.classList.toggle('dead', alive[i] === '0'));
       }
     }
 

@@ -33,7 +33,7 @@ await page.goto(BASE + '?gfx=low', { waitUntil: 'load', timeout: 90000 });
 check('title lists 3 daily quests', (await page.locator('[data-testid="quests-panel"] .quest').count()) === 3);
 if (process.env.TSHOT) await page.screenshot({ path: process.env.TSHOT });
 await tid('profile-btn').click({ force: true }); await tid('profile-root').waitFor({ timeout: 4000 });
-check('profile screen: level/coins/badge wall', (await tid('profile-level').textContent()).includes('1') && (await page.locator('[data-testid^="badge-"][data-earned]').count()) >= 8 && (await tid('stat-champs').textContent()).includes('10/58'));
+check('profile screen: level/coins/badge wall', (await tid('profile-level').textContent()).includes('1') && (await page.locator('[data-testid^="badge-"][data-earned]').count()) >= 8 && (await tid('stat-champs').textContent()).includes('18/83'));
 if (process.env.PSHOT) await page.screenshot({ path: process.env.PSHOT });
 await tid('profile-back').click({ force: true }); await tid('play-btn').waitFor({ timeout: 4000 });
 check('title shows level 1', (await tid('player-level').first().textContent()).includes('1'));
@@ -41,7 +41,7 @@ check('title shows 0 coins', (await tid('player-coins').first().textContent()).t
 await tid('play-btn').click({ force: true }); await tid('mode-normal').click({ force: true }); await tid('setup-next').click({ force: true, timeout: 4000 }).catch(() => {});
 await sleep(300);
 const info = await page.$$eval('[data-testid^="champion-card-"]', (els) => els.map((e) => [e.dataset.id, e.dataset.locked]));
-check('v9: pick grid shows only the 10 free champions', info.length === 10 && info.every(([, l]) => l === 'false'), String(info.length));
+check('v9: pick grid shows only the 18 free champions', info.length === 18 && info.every(([, l]) => l === 'false'), String(info.length));
 check('lumen + bulwark free', ['lumen', 'bulwark'].every((id) => info.find(([i]) => i === id)));
 check('locked champion is not in the pick grid', (await tid('champion-card-granite').count()) === 0);
 await tid('select-back').click({ force: true });

@@ -1,4 +1,5 @@
-// WebAudio synth: sfx + light music, no audio files. The context is created on the first user gesture.
+// WebAudio: sampled sfx (Kenney CC0 packs in assets/sfx, see assets/sfx/CREDITS.md) + a synth fallback and light music.
+// The context is created on the first user gesture. World sounds are range-limited around the local hero (or the camera when dead).
 import { bus } from './core/bus.js';
 import { save } from './save.js';
 
@@ -10,7 +11,8 @@ const ARP = [0, 2, 3, 4, 3, 2, 1, 2, 4, 3, 2, 3, 1, 2, 3, 2];
 
 let ctx, master, sfxBus, musicBus, crush, noise;
 // Positional sfx: world events are panned/attenuated against the local hero. Camera right vector on the ground plane (CAM.offset -7,20,15).
-const RIGHT_X = 0.906, RIGHT_Z = 0.423, PAN_RANGE = 16, HEAR_RANGE = 46, MIN_GAIN = 0.06;
+// v10: HEAR_RANGE is about one screen; nothing beyond it plays (it used to be audible map-wide at a 6% floor).
+const RIGHT_X = 0.906, RIGHT_Z = 0.423, PAN_RANGE = 14, HEAR_RANGE = 24;
 let listener = () => null, spot = null; // spot = per-event panner while a positional sfx is being built
 const out = () => spot ?? sfxBus;
 let voices = 0, muted = save.get('mute', false), wantMusic = false;
@@ -37,7 +39,38 @@ function build() {
   noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
   const d = noise.getChannelData(0);
   for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  loadSamples();
 }
+
+// ---- Samples (Kenney CC0) ----
+const SAMPLE_NAMES = ['shot1', 'shot2', 'shot3', 'shot4', 'tower', 'magic1', 'magic2', 'magic3', 'heal1', 'heal2', 'slash1', 'slash2', 'slash3', 'chop',
+  'hit1', 'hit2', 'hit3', 'thud1', 'thud2', 'clang', 'poof', 'towerdown', 'coredown', 'ult1', 'ult2', 'levelup', 'rankup', 'click', 'select', 'nope', 'coin'];
+const buf = {};
+function loadSamples() {
+  const base = new URL('../assets/sfx/', import.meta.url);
+  for (const n of SAMPLE_NAMES) {
+    fetch(new URL(`${n}.mp3`, base)).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject())).then((a) => ctx.decodeAudioData(a)).then((b) => { buf[n] = b; }).catch(() => {});
+  }
+}
+// Play a decoded sample into the current output (panned spot or the sfx bus). false when not loaded yet (callers fall back to synth).
+function smp(name, vol = 1, rate = 1, delay = 0) {
+  const b = buf[name];
+  if (!b) return false;
+  if (voices >= MAX_VOICES) return true;
+  const t = ctx.currentTime + delay, s = ctx.createBufferSource(), g = ctx.createGain();
+  s.buffer = b;
+  s.playbackRate.value = rate;
+  g.gain.value = vol;
+  s.connect(g).connect(out());
+  voices++;
+  s.onended = () => { voices--; g.disconnect(); };
+  s.start(t);
+  return true;
+}
+// Stable per-champion flavour: which variant of a sample set and a small pitch offset, so every champion sounds a bit different.
+const hash = (id = '') => { let x = 7; for (const c of id) x = (x * 31 + c.charCodeAt(0)) >>> 0; return x; };
+const flav = (h) => { const x = hash(h?.def?.id ?? h?.id); return { i: x, rate: 0.9 + ((x >> 4) % 21) / 100 }; };
+const pick = (arr, i) => arr[i % arr.length];
 
 // Bitcrusher: shared when centred, one per positional event so it lands in that event's panner.
 function crushOut() {
@@ -51,10 +84,12 @@ function crushOut() {
 // Returns a panner chain for a world source, or null when it is too far to hear.
 function place(src) {
   const me = listener();
-  if (!me || !src || src === me || src.isPlayer || src.x == null) return undefined; // centred
+  if (!me || !src || src === me || src.x == null) return undefined; // centred: the local hero's own sounds and UI
+  // (v10: no `isPlayer` shortcut any more - the other human in an online room was centred, i.e. heard from anywhere on the map)
   const dx = src.x - me.x, dz = src.z - me.z, d = Math.hypot(dx, dz);
   if (d > HEAR_RANGE) return null;
-  const gain = Math.max(MIN_GAIN, (1 - d / HEAR_RANGE) ** 1.6);
+  const gain = (1 - d / HEAR_RANGE) ** 1.5;
+  if (gain < 0.03) return null;
   const pan = Math.max(-1, Math.min(1, (dx * RIGHT_X + dz * RIGHT_Z) / PAN_RANGE)) * 0.85;
   return { gain, pan };
 }
@@ -128,28 +163,64 @@ const duck = () => {
   g.setTargetAtTime(0.6, t + 0.8, 0.3);
 };
 
+// Basic attack per champion: shooters fire laser shots, blasters a magic zap, supports a soft chime, melee a slash / thud by swing style.
+function swingSample(h) {
+  const d = h?.def, f = flav(h), mine = h === listener(), v = mine ? 0.55 : 0.4;
+  if (!d) return false;
+  const role = d.role, b = d.basic ?? {};
+  if (b.kind !== 'melee') {
+    if (role === 'blaster') return smp(pick(['magic1', 'magic2'], f.i), v * 0.55, f.rate * 1.35);
+    if (role === 'support') return smp('heal2', v * 0.45, f.rate * 1.15);
+    return smp(pick(['shot1', 'shot2', 'shot3', 'shot4'], f.i), v * 0.7, f.rate);
+  }
+  if (role === 'tank' || b.style === 'slam') return smp(pick(['thud1', 'thud2'], f.i), v, f.rate * 0.95);
+  if (role === 'assassin') return smp(pick(['slash2', 'slash3'], f.i), v * 0.85, f.rate * 1.15);
+  if (b.style === 'upper') return smp('chop', v, f.rate);
+  return smp(pick(['slash1', 'slash2', 'slash3', 'chop'], f.i), v * 0.85, f.rate);
+}
+function skillSample(h) {
+  const d = h?.def, f = flav(h), v = h === listener() || h?.isPlayer && h.x == null ? 0.6 : 0.45;
+  if (!d) return false;
+  switch (d.role) {
+    case 'blaster': return smp(pick(['magic3', 'magic1', 'magic2'], f.i), v * 0.6, f.rate);
+    case 'support': return smp('heal1', v * 0.55, f.rate);
+    case 'shooter': smp('shot3', v * 0.6, f.rate * 0.8); return smp('shot1', v * 0.5, f.rate * 0.9, 0.07);
+    case 'tank': smp('thud1', v, f.rate * 0.8); return smp('clang', v * 0.4, f.rate * 0.9, 0.03);
+    case 'assassin': return smp('slash2', v * 0.8, f.rate * 1.25);
+    default: smp('chop', v * 0.8, f.rate * 0.9); return smp('slash1', v * 0.6, f.rate, 0.05);
+  }
+}
+
 const SFX = {
-  click: () => tone('triangle', 500, 800, 0.08, 0.25),
-  tick: () => tone('triangle', 600, 300, 0.06, 0.15),
-  swing: (h) => voice(h)(420, 0.08, h?.isPlayer ? 0.3 : 0.12, 0),
+  click: () => smp('click', 0.35) || tone('triangle', 500, 800, 0.08, 0.25),
+  tick: (t) => smp(pick(['hit1', 'hit2', 'hit3'], (Math.random() * 3) | 0), t?.type === 'hero' ? 0.32 : 0.22, 0.95 + Math.random() * 0.15) || tone('triangle', 600, 300, 0.06, 0.15),
+  nope: () => smp('nope', 0.3),
+  coin: () => smp('coin', 0.35),
+  swing: (h) => swingSample(h) || voice(h)(420, 0.08, h?.isPlayer ? 0.3 : 0.12, 0),
   skill: (h) => {
+    if (skillSample(h)) return;
     const v = voice(h);
     v(300, 0.18, 0.3, 0);
     v(450, 0.18, 0.2, 0.06);
   },
   ult: (h) => {
+    if (h === listener()) duck();
+    if (smp('ult1', 0.5, flav(h).rate)) { smp('ult2', 0.4, 1, 0.12); return; }
     tone('sawtooth', 120, 520, 0.5, 0.18, 0, out(), 0.3);
     tone('sawtooth', 124, 530, 0.5, 0.18, 0, out(), 0.3);
     tone('sine', 90, 35, 0.35, 0.6, 0.45);
     if (h?.isPlayer) duck();
   },
   poof: () => {
+    if (smp('poof', 0.55)) { [NOTE.c6, NOTE.e6, NOTE.g6].forEach((f, i) => tone('sine', f, f, 0.12, 0.06, 0.04 + i * 0.05)); return; }
     hiss(0.15, 0.3, 2000, 6000);
     [NOTE.c6, NOTE.e6, NOTE.g6].forEach((f, i) => tone('sine', f, f, 0.12, 0.1, 0.04 + i * 0.05));
   },
-  level: () => [NOTE.c5, NOTE.d5, NOTE.e5, NOTE.g5, NOTE.a5, NOTE.c6].forEach((f, i) => tone('triangle', f, f, 0.14, 0.2, i * 0.065)),
-  tower: () => tone('square', 700, 250, 0.12, 0.1),
+  level: () => smp('levelup', 0.5) || [NOTE.c5, NOTE.d5, NOTE.e5, NOTE.g5, NOTE.a5, NOTE.c6].forEach((f, i) => tone('triangle', f, f, 0.14, 0.2, i * 0.065)),
+  rank: () => smp('rankup', 0.45) || SFX.level(),
+  tower: () => smp('tower', 0.35, 0.8) || tone('square', 700, 250, 0.12, 0.1),
   shatter: (big) => {
+    if (smp(big ? 'coredown' : 'towerdown', big ? 0.75 : 0.6)) { bell(NOTE.e6, 0.8, 0.08, 0.15); return; }
     hiss(big ? 0.9 : 0.4, 0.5, 3000, 300, 0, 'lowpass');
     bell(NOTE.e6, big ? 1.8 : 0.8, 0.18, 0.1);
     if (big) { bell(1760, 1.8, 0.14, 0.25); bell(2093, 1.8, 0.1, 0.4); }
@@ -162,7 +233,7 @@ const SFX = {
 };
 
 function play(name, a, b, src) {
-  if (!ctx || muted) return;
+  if (!ctx || muted || !SFX[name]) return;
   const where = src ? place(src) : undefined;
   if (where === null) return; // out of earshot: don't spend a voice or the retrigger slot
   const now = performance.now();
@@ -211,10 +282,12 @@ for (const type of ['pointerdown', 'keydown']) addEventListener(type, unlock, { 
 
 bus.on('swing', (h) => play('swing', h, undefined, h));
 bus.on('cast', ({ hero, slot }) => play(slot === 3 ? 'ult' : 'skill', hero, undefined, hero));
-bus.on('hit', (t) => { if (t.type !== 'minion') play('tick', undefined, undefined, t); });
+bus.on('hit', (t) => { if (t.type !== 'minion') play('tick', t, undefined, t); });
+bus.on('noCast', ({ hero }) => { if (hero === listener()) play('nope'); });
+bus.on('buy', (h) => { if (h === listener()) play('coin'); });
 bus.on('down', (t) => play(t.type === 'tower' || t.type === 'core' ? 'shatter' : 'poof', t.type === 'core', undefined, t));
-bus.on('levelUp', (h) => { if (h.isPlayer) play('level'); });
-bus.on('rankUp', ({ hero }) => { if (hero.isPlayer) play('level'); });
+bus.on('levelUp', (h) => { if (h === listener()) play('level'); });
+bus.on('rankUp', ({ hero }) => { if (hero === listener()) play('rank'); });
 bus.on('towerShot', (t) => play('tower', undefined, undefined, t));
 bus.on('storm', () => { bpm = 120; });
 bus.on('end', ({ win }) => {
@@ -225,6 +298,7 @@ bus.on('end', ({ win }) => {
 export const audio = {
   get muted() { return muted; },
   sfx: play,
+  where: (src) => place(src), // test hook: undefined = centred, null = out of earshot, else { gain, pan }
   set listener(fn) { listener = fn; }, // () => local hero, for positional sfx
   toggleMute() {
     muted = !muted;

@@ -1,4 +1,4 @@
-// Line-ups of 1-5 per side (default 5v5). Both teams get one blaster, one shooter and one support where the roster allows: each role's pair
+// Line-ups of 1-5 per side (default 5v5). Both teams get one blaster, one shooter and one support (+ v10: up to two tanks) where the roster allows: each role's pair
 // is split between the teams (the player's pick stays on Sunny, Gloom gets its partner). Melee slots are random.
 import { HEROES, ROSTER } from '../heroes/index.js';
 
@@ -28,6 +28,8 @@ export function composeTeams(playerId, forced = [], banned = [], size = [5, 5], 
     for (const team of [blue, red]) if (team.length < cap(team) && !team.some((id) => role(id) === r)) take(team, ROSTER.filter((id) => role(id) === r));
   }
   for (const team of [blue, red]) {
+    // v10 lane plan: top lane wants two tanks, so fill tanks first (up to two), then any melee
+    while (team.length < cap(team) && team.filter((id) => role(id) === 'tank').length < 2 && take(team, ROSTER.filter((id) => role(id) === 'tank'))) { /* top tanks */ }
     while (team.length < cap(team) && take(team, ROSTER.filter((id) => MELEE.includes(role(id))))) { /* fill melee */ }
     while (team.length < cap(team) && take(team, ROSTER)) { /* anything left */ }
   }
@@ -61,6 +63,7 @@ export function composeOnline(picks, rng = Math.random, banned = [], size = [5, 
   teams.forEach((team, t) => {
     const n = Math.max(size[t], team.length);
     for (const r of CORE_ROLES) if (team.length < n && !team.some((id) => role(id) === r)) take(team, ROSTER.filter((id) => role(id) === r));
+    while (team.length < n && team.filter((id) => role(id) === 'tank').length < 2 && take(team, ROSTER.filter((id) => role(id) === 'tank'))) { /* top tanks */ }
     while (team.length < n && take(team, ROSTER.filter((id) => MELEE.includes(role(id))))) { /* fill melee */ }
     while (team.length < n && take(team, ROSTER)) { /* anything left */ }
   });

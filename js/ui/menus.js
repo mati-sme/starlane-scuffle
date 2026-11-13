@@ -7,7 +7,7 @@ import { HEROES, ROSTER } from '../heroes/index.js';
 import { TEAM_NAME } from '../net/protocol.js';
 import { SPELLS, SPELL_IDS } from '../game/spells.js';
 import { factionDef } from '../game/factions.js';
-import { ROLE_BLURB } from '../game/roles.js';
+import { ROLE_BLURB, ROLE_LANE, LANE_PLAN, laneTag, dmgType } from '../game/roles.js';
 import { matchupsOf } from '../game/matchups.js';
 import { LEVELS, MAX_TEAM, applyPreset, presetOf, summary } from '../game/setup.js';
 import { PALETTES, SKIN_IDS, SKIN_PRICE, equipped, ownsSkin, equip, buySkin, portraitShift } from '../game/skins.js';
@@ -82,7 +82,8 @@ function detailBody(id) {
       <div><h3 data-testid="detail-name">${def.name}</h3><p class="dtitle" data-testid="detail-title">${def.title}</p>
       <span class="drole" data-testid="detail-role">${upper(def.role)}</span> <span data-testid="detail-faction">${chip(id)}</span></div></div>
     ${statBars(def)}
-    <p class="dnote" data-testid="detail-role-blurb"><b>${def.role[0].toUpperCase() + def.role.slice(1)}</b> — ${ROLE_BLURB[def.role] ?? ''}</p>
+    <p class="dnote" data-testid="detail-role-blurb"><b>${def.role[0].toUpperCase() + def.role.slice(1)} (${dmgType(def)})</b> — ${ROLE_BLURB[def.role] ?? ''}</p>
+    <p class="dlane" data-testid="detail-lane">${laneTag(def)} ${LANE_PLAN[ROLE_LANE[def.role] ?? 'mid']}</p>
     <ul class="skills">${skillRows(def)}</ul>
     ${passiveRow(def)}
     <p class="dnote" data-testid="detail-passive"><b>${factionDef(id).passive}</b> (faction) — ${factionDef(id).blurb}</p>
@@ -286,7 +287,7 @@ export function createMenus(root) {
         const def = HEROES[id], gone = out.has(id), locked = false; // v9: only owned champions are listed when picking (the Store sells the rest)
         return `<button type="button" class="hcard ${gone ? 'out banned' : ''} ${locked && !gone ? 'lockd' : ''}" data-id="${id}" data-testid="champion-card-${id}" data-locked="${locked}" data-stamp="${gone ? stamp('banned') : ''}" aria-pressed="false" ${gone ? 'disabled' : ''} style="--c:${def.css}">
           <span class="pic">${portrait(id)}</span><b>${def.name}</b>
-          <span class="role"><i>${icons.role(def.role)}</i>${upper(def.role)}</span>${chip(id)}</button>`;
+          <span class="role"><i>${icons.role(def.role)}</i>${upper(def.role)}</span>${laneTag(def)}${chip(id)}</button>`;
       };
       const shown = banning ? ROSTER : ROSTER.filter(isOwned); // ban phase: you may ban anyone the bots could pick; pick phase: only yours
       const cards = shown.map(cardHtml).join('');
@@ -383,7 +384,7 @@ export function createMenus(root) {
         const st = state(id), gone = !!st, def = HEROES[id], locked = !banning && !isOwned(id) && !gone; // online: you can only pick champions you own (bans are open to all)
         return `<button type="button" class="hcard ${id === sel ? 'sel' : ''} ${gone ? `out ${st}` : ''} ${locked ? 'lockd' : ''}" data-id="${id}" data-testid="lobby-champ-${id}" data-locked="${locked}" data-stamp="${stamp(st)}" aria-pressed="${id === sel}" style="--c:${def.css}" ${gone || locked || (banning && mine?.ban) ? 'disabled' : ''}>
           <span class="pic">${portrait(id)}</span><b>${def.name}</b>
-          <span class="role"><i>${icons.role(def.role)}</i>${upper(def.role)}</span>${chip(id)}${locked ? `<span class="lockbadge">${LOCK}</span>` : ''}</button>`;
+          <span class="role"><i>${icons.role(def.role)}</i>${upper(def.role)}</span>${laneTag(def)}${chip(id)}${locked ? `<span class="lockbadge">${LOCK}</span>` : ''}</button>`;
       }).join('');
       const canStart = isHost && phase === 'lobby' && stage === 'pick' && two && players.every((p) => p.connected && p.hero);
       const help = !banning ? 'Banned champions are locked. Now pick yours!' : mine?.ban ? (two && !other?.ban ? 'Waiting for your friend to ban…' : '') : HELP;

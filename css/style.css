@@ -837,3 +837,43 @@ body.playing #passive:not([hidden]) { display: block; }
 @media (max-height: 420px) { #passive { top: calc(86px + var(--st)); width: 40px; height: 40px; } }
 .skills li .si .skart { width: 100%; height: 100%; display: block; }
 .skills li.passive-row .si .psart { width: 100%; height: 100%; display: block; }
+
+/* v10 lane role tags (champion select, store, detail panel) */
+.lanetag { display: inline-flex; align-items: center; padding: 0 5px; border-radius: 6px; font-size: 9px; font-weight: 800; letter-spacing: .08em; line-height: 14px; color: #0B1020; background: #FFC83D; }
+.lanetag.l-top { background: #FF9A4D; }
+.lanetag.l-mid { background: #B98CFF; }
+.lanetag.l-bot { background: #4FE0C2; }
+.hcard .lanetag { position: absolute; top: 6px; left: 10px; z-index: 2; font-size: 8px; line-height: 12px; padding: 0 4px; box-shadow: 0 1px 0 rgba(0,0,0,.35); }
+.dlane { margin: 2px 0 4px; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: rgba(255,255,255,.85); }
+.dlane .lanetag { font-size: 10px; line-height: 16px; }
+
+/* ---------- v10 HUD layout: one clean row per corner ----------
+   top-left: minimap, then a compact "me" strip (portrait + level pill + KDA) under it
+   top-centre: a single slim score pill (structure pips | kills · clock · kills | structure pips)
+   top-right: smaller icon buttons. Toasts / hints sit lower so nothing stacks on the score. */
+:root { --mw: min(21vw, 196px); --mh: calc(var(--mw) * 0.619); --metop: calc(var(--st, 0px) + 10px + var(--mh) + 8px); }
+#mini { left: calc(12px + var(--sl)); top: calc(10px + var(--st)); width: var(--mw); border-radius: 10px; }
+.portrait { left: calc(12px + var(--sl)); top: var(--metop); width: 54px; height: 54px; }
+.portrait .face { inset: 5px; }
+.portrait .xp { inset: -4px; }
+.portrait .lvl { min-width: 22px; height: 22px; font-size: 12px; right: -4px; bottom: -4px; border-width: 2px; }
+#lvinfo, body.playing #lvinfo { left: calc(76px + var(--sl)); top: var(--metop); max-width: 120px; }
+@media (max-height: 420px) { #lvinfo { left: calc(76px + var(--sl)); top: var(--metop); } }
+#hud .mekda { position: absolute; left: calc(76px + var(--sl)); top: calc(var(--metop) + 30px); padding: 0 9px; font-size: 13px; gap: 4px; }
+#hud .mekda span { font-size: 9px; }
+.top { top: calc(8px + var(--st)); gap: 0; }
+.top .score { gap: 10px; padding: 2px 12px; border-radius: 14px; clip-path: none; font-size: 17px; line-height: 26px; }
+.top .score .pips { display: flex; }
+.top .pips div { gap: 1px; }
+.top .pips i { width: 3px; height: 8px; border-width: 1px; border-radius: 1px; }
+.top .pips i.core { width: 7px; height: 7px; margin: 0 2px; }
+.buffs { top: calc(42px + var(--st)); }
+.toast { top: calc(64px + var(--st)); }
+.objective { top: calc(64px + var(--st)); }
+.ko { top: calc(26% + var(--st)); }
+#topbtns { gap: 6px; top: calc(10px + var(--st)); right: calc(12px + var(--sr)); }
+#topbtns button { width: 42px; height: 42px; padding: 9px; }
+#topbtns #unstuck { height: 42px; min-width: 70px; padding: 6px 9px; font-size: 10px; }
+.lanehint { position: absolute; left: 50%; top: calc(40% + var(--st)); translate: -50% 0; opacity: 0; display: flex; align-items: center; gap: 8px; padding: 5px 14px; border-radius: 14px; background: rgba(10,16,30,.78); border: 1px solid rgba(255,255,255,.18); color: #fff; font-weight: 800; font-size: 14px; white-space: nowrap; }
+.lanehint .lanetag { font-size: 11px; line-height: 17px; }
+.lanehint.pop { animation: kopop 5.5s ease-out; }

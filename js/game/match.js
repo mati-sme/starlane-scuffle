@@ -1,6 +1,6 @@
 // Match orchestration: heroes, waves, timer, Starstorm, XP, structure rules, win/lose, per-frame rendering.
 import * as THREE from 'three';
-import { MATCH, HERO, PAL, CAMP, TOWER, GOLD, BOSS } from '../config.js';
+import { MATCH, HERO, PAL, CAMP, TOWER, GOLD, BOSS, MAP } from '../config.js';
 import { clamp, damp, rand } from '../core/math.js';
 import { bus } from '../core/bus.js';
 import { input, readMove } from '../core/input.js';
@@ -13,7 +13,7 @@ import { buildRecap } from './recap.js';
 import { addBuff, heal, sim, tickStatus, tickHitFx, poof } from './combat.js';
 import { composeTeams } from './compose.js';
 import { cleanSetup, defaultSetup } from './setup.js';
-import { inBrush } from '../world/arena.js';
+import { inBrush, laneOf } from '../world/arena.js';
 import { ARENA } from '../config.js';
 import { Camps } from '../world/camps.js';
 import { Tower } from '../world/tower.js';
@@ -118,6 +118,7 @@ export class Match {
     this.hero = this.heroAt(setup.side, 0);
     this.hero.spells = [...spells];
     this.heroId = id;
+    this.humanLane = new Map(); this._laneT = 0;
     assignLanes(this.heroes);
     this.reset();
   }
@@ -152,6 +153,7 @@ export class Match {
     this.hero.spells = [...(me.spells ?? DEFAULT_SPELLS)];
     if (this.peerHero) this.peerHero.spells = [...(peer.spells ?? DEFAULT_SPELLS)];
     this.heroId = this.hero.id;
+    this.humanLane = new Map(); this._laneT = 0;
     assignLanes(this.heroes);
     this.reset();
   }
@@ -179,6 +181,7 @@ export class Match {
     hero.brain = new Bot(hero);
     hero.isPlayer = false;
     if (hero === this.peerHero) this.peerHero = null;
+    this.humanLane = new Map(); this._laneT = 0;
     assignLanes(this.heroes);
   }
 
@@ -617,6 +620,7 @@ export class Match {
     this._factions(dt);
     this._brush();
     this._timers(dt);
+    this._laneWatch();
     this.zones.update(dt, this);
     for (const h of this.heroes) {
       const it = this.over ? IDLE : h === this.hero ? this._intent() : h === this.peerHero ? this._peerIntent() : h.brain.think(dt, this);
@@ -634,14 +638,23 @@ export class Match {
     this.push = damp(this.push, L.length ? clamp(sum / L.length / 30, -1, 1) : 0, 1.5, dt);
   }
 
+  // v10: every 2 s, note which lane each human is actually in (away from the bases); when it changes, bots re-plan so no AI
+  // teammate shares a human's lane.
+  _laneWatch() {
+    if (this.time < (this._laneT ?? 0)) return;
+    this._laneT = this.time + 2;
+    const map = (this.humanLane ??= new Map());
+    let changed = false;
+    for (const h of this.heroes) {
+      if (h.brain) continue;
+      if (h.alive && Math.abs(h.x) < MAP.heroX - 16) { const l = laneOf(h.z); if (map.get(h) !== l) { map.set(h, l); changed = true; } }
+    }
+    if (changed) assignLanes(this.heroes, map);
+  }
+
   _checkEnd() {
     for (const c of this.cores) if (!c.alive) return this._end(c.team === 1, 'core');
-    if (this.time < MATCH.tieBreak) return;
-    const [d0, d1] = this.destroyed, f0 = this.hpFrac(0), f1 = this.hpFrac(1), [k0, k1] = this.kills, mm = Math.floor(MATCH.tieBreak / 60);
-    if (d0 !== d1) this._end(d0 > d1, `structures destroyed at ${mm}:00`);
-    else if (Math.abs(f0 - f1) > 1e-6) this._end(f0 > f1, `structure health at ${mm}:00`);
-    else if (k0 !== k1) this._end(k0 > k1, `takedowns at ${mm}:00`);
-    else this._end(true, `a dead heat at ${mm}:00 (Sunny takes ties)`);
+    // v10: no time limit / tie-break - a destroyed Nexus is the only way a match ends.
   }
 
   // team0Wins: Sunny took it. The 'end' event's `win` is from the local player's side.

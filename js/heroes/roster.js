@@ -7,6 +7,7 @@ import { WAVE2A } from './wave2a.js';
 import { WAVE2B } from './wave2b.js';
 import { WAVE3 } from './wave3.js';
 import { WAVE4 } from './wave4.js';
+import { WAVE5 } from './wave5.js';
 
 export const ROLES = ['tank', 'bruiser', 'assassin', 'blaster', 'shooter', 'support'];
 
@@ -16,9 +17,9 @@ const SCALE = ['dmg', 'shield', 'allyShield', 'heal', 'allyHeal', 'healPs', 'dps
 export function rankStats(ab, rank, maxRank = 4) {
   const r = Math.max(1, rank), out = { ...ab };
   if (r > 1) {
-    const m = 1 + 0.2 * (r - 1);
+    const m = 1 + 0.15 * (r - 1); // v10: ranks go to 5 (Q/W/E), so each rank is a bit smaller (+15% / -6% cooldown)
     for (const k of SCALE) if (out[k] != null) out[k] *= m;
-    out.cd *= 1 - 0.08 * (r - 1);
+    out.cd *= 1 - 0.06 * (r - 1);
   }
   if (ab.perk && r >= Math.min(ab.perk.at, maxRank)) Object.assign(out, ab.perk); // perks fire at the skill's max rank
   return out;
@@ -323,4 +324,5 @@ export const ROSTER_DEFS = [
   ...WAVE2B,
   ...WAVE3,
   ...WAVE4,
+  ...WAVE5,
 ];

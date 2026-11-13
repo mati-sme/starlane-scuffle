@@ -24,13 +24,15 @@
 //   calmSpeed  { after, speed }                    out of combat for `after` s = faster
 //   brushSpeed { speed }                           faster inside bushes
 //   stillGuard { after, dr }                       standing still for `after` s = damage reduction
+//   camo       { after, aspd, t }                  v10: stand still (or sit in a bush) for `after` s out of combat = camouflaged (hidden);
+//                                                  the first moment you pop out you get +aspd attack speed for t s
 import { bus } from '../core/bus.js';
 import { sim, dealDamage, addBuff, giveShield, heal, applyStatus, forEachAlly } from './combat.js';
 import { inBrush } from '../world/arena.js';
 import { GOLD } from '../config.js';
 import { particles, FRAME } from '../render/particles.js';
 
-export const PASSIVE_KINDS = ['nthHit', 'firstStrike', 'hitHaste', 'hitCdr', 'hitSlow', 'hitHeal', 'execute', 'castHaste', 'castShield', 'castEmpower', 'castHeal', 'lowShield', 'thorns', 'stackDr', 'woundedHaste', 'killHeal', 'auraRegen', 'auraHaste', 'calmSpeed', 'brushSpeed', 'stillGuard'];
+export const PASSIVE_KINDS = ['nthHit', 'firstStrike', 'hitHaste', 'hitCdr', 'hitSlow', 'hitHeal', 'execute', 'castHaste', 'castShield', 'castEmpower', 'castHeal', 'lowShield', 'thorns', 'stackDr', 'woundedHaste', 'killHeal', 'auraRegen', 'auraHaste', 'calmSpeed', 'brushSpeed', 'stillGuard', 'camo'];
 
 const q = (h) => (h.ps ??= {}).q ??= [];
 const isFoe = (t) => t && (t.type === 'hero' || t.type === 'minion' || t.type === 'camp');
@@ -71,6 +73,15 @@ export function tickPassive(h, dt, ctx) {
     case 'woundedHaste': if (h.hp < h.maxHp * p.hp) addBuff(h, 'pspeed', p.speed, 0.4); break;
     case 'calmSpeed': if (h.sinceHit > p.after && h.atkAge > p.after) addBuff(h, 'pspeed', p.speed, 0.3); break;
     case 'brushSpeed': if (inBrush(h.x, h.z)) addBuff(h, 'pspeed', p.speed, 0.3); break;
+    case 'camo': {
+      if (h.moveAmt < 0.1 || inBrush(h.x, h.z)) st.still = (st.still ?? 0) + dt; else st.still = 0;
+      const calm = (h.atkAge ?? 9) > 1.2 && (h.sinceHit ?? 9) > 1.2;
+      if (st.still > p.after && calm) {
+        addBuff(h, 'hidden', 1, 0.35);
+        if (!st.camo) { st.camo = true; puff(h, hue(h)); }
+      } else if (st.camo && !h.buf.hidden) { st.camo = false; addBuff(h, 'aspd', p.aspd, p.t); puff(h, 0xFFFFFF); }
+      break;
+    }
     case 'stillGuard': {
       if (h.moveAmt < 0.1) st.still = (st.still ?? 0) + dt; else st.still = 0;
       if (st.still > p.after) addBuff(h, 'pdr', p.dr, 0.3);

@@ -1,6 +1,6 @@
 [package]
 name = "starlane-scuffle"
-version = "7.1.0"
+version = "10.0.0"
 description = "Starlane Scuffle"
 edition = "2021"
 

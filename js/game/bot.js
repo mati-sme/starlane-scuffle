@@ -15,20 +15,33 @@ const MELEE = { tank: 0, bruiser: 1, assassin: 2 };
 const SPACING = { tank: 1, bruiser: 0, assassin: 0, blaster: -3, shooter: -4, support: -2 };
 const ROAM = 3;
 
-// Lane plan per team (bots only; a human plays wherever they like and nobody is tied to them): top = the most durable melee,
-// mid = blaster, bot = shooter + support (one lone bot just holds mid). Anyone who does not fit (a second blaster, the other melee...) roams.
-const LANE_CAP = [1, 1, 2], LANE_OF = { tank: 0, bruiser: 0, assassin: 0, blaster: 1, shooter: 2, support: 2 };
-const PRIORITY = ['tank', 'bruiser', 'assassin', 'blaster', 'shooter', 'support'];
-export function assignLanes(heroes) {
+// v10 lane plan per team: top = two tanks (bruisers count as top), mid = one blaster (assassins too), bot = shooter + support.
+// Humans claim a lane (their role's lane at the start, then wherever they actually are - see Match._laneWatch), and bots NEVER
+// take a lane a human teammate is in: they pick another lane with room, else roam the jungle.
+export const LANE_OF = { tank: 0, bruiser: 0, assassin: 1, blaster: 1, shooter: 2, support: 2 };
+export const LANE_NAME = ['Top', 'Mid', 'Bot'];
+const LANE_CAP = [2, 1, 2];
+const PRIORITY = ['shooter', 'support', 'blaster', 'tank', 'bruiser', 'assassin'];
+
+export function assignLanes(heroes, humanLane = null) {
   for (const team of [0, 1]) {
+    const humans = heroes.filter((h) => h.team === team && !h.brain);
+    const taken = new Set(humans.map((h) => humanLane?.get(h) ?? LANE_OF[h.def.role] ?? 1));
     const used = [0, 0, 0];
     const bots = heroes.filter((h) => h.team === team && h.brain).sort((a, b) => PRIORITY.indexOf(a.def.role) - PRIORITY.indexOf(b.def.role));
+    const free = [1, 2, 0].filter((l) => !taken.has(l));
     for (const h of bots) {
-      if (bots.length === 1) { h.brain.lane = h.brain.roamLane = 1; continue; } // a lone bot (1v1, or next to a human) holds mid
-      const l = LANE_OF[h.def.role] ?? ROAM;
-      h.brain.lane = l !== ROAM && used[l] < LANE_CAP[l] ? l : ROAM;
-      if (h.brain.lane !== ROAM) used[l]++;
-      h.brain.roamLane = h.brain.lane === ROAM ? 1 : h.brain.lane;
+      h.brain.avoid = taken;
+      let l = bots.length === 1 && !humans.length ? 1 : LANE_OF[h.def.role] ?? ROAM;
+      if (l === ROAM || taken.has(l) || used[l] >= LANE_CAP[l]) {
+        l = ROAM;
+        let best = Infinity;
+        for (const f of free) if (used[f] < LANE_CAP[f] && used[f] < best) { best = used[f]; l = f; }
+        if (l !== ROAM && used[l] > 0 && h.def.role !== 'tank' && h.def.role !== 'support') l = ROAM; // don't double up an off-role bot; let it jungle
+      }
+      h.brain.lane = l;
+      if (l !== ROAM) used[l]++;
+      h.brain.roamLane = l === ROAM ? (free[0] ?? 1) : l;
     }
   }
 }
@@ -167,8 +180,9 @@ export class Bot {
       this.roamT = ctx.time + 10;
       const bal = [0, 0, 0];
       for (const o of ctx.heroes) if (o.alive) bal[laneOf(o.z)] += o.team === h.team ? -1 : 1;
-      let bl = this.roamLane;
-      for (let i = 0; i < 3; i++) if (bal[i] > bal[bl]) bl = i;
+      const ok = (i) => !this.avoid?.has(i); // never roam into a lane a human teammate holds
+      let bl = ok(this.roamLane) ? this.roamLane : [1, 0, 2].find(ok) ?? this.roamLane;
+      for (let i = 0; i < 3; i++) if (ok(i) && bal[i] > bal[bl]) bl = i;
       this.roamLane = bl;
     }
     this._laneGoal(ctx, this.roamLane, g);

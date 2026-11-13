@@ -2,8 +2,9 @@
 // All numbers live here so the economy is easy to tune (and unit-test in Node).
 import { save } from '../save.js';
 
-// The 10 champions everyone starts with: 2 tanks, 2 bruisers, 1 assassin, 2 blasters, 1 shooter, 2 supports.
-export const FREE_CHAMPS = ['bulwark', 'mossback', 'torque', 'corsa', 'glint', 'cinder', 'nyx', 'kade', 'aria', 'lumen'];
+// v10: the 18 champions everyone starts with - several real options per lane role:
+// 3 tanks, 2 bruisers, 2 assassins, 3 blasters, 5 shooters (incl. Fennec the scout), 3 supports. The rest unlock with coins.
+export const FREE_CHAMPS = ['bulwark', 'mossback', 'magnus', 'torque', 'corsa', 'glint', 'volt', 'cinder', 'nyx', 'prism', 'kade', 'flint', 'rico', 'longshot', 'fennec', 'aria', 'lumen', 'bloom'];
 
 export const PRICE_FIRST = 100, PRICE_STEP = 10, PRICE_MAX = 350;
 // Price of the next unlock, from how many champions were already bought with coins (steady: 100, 110, ... capped at 350).

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { FREE_CHAMPS, unlockPrice, xpNeeded, matchReward, resetProfile, profile, isOwned, buyChampion, awardMatch, nextPrice } from '../js/game/progress.js';
 import { ROSTER_DEFS } from '../js/heroes/roster.js';
-assert.equal(FREE_CHAMPS.length, 10); assert.equal(new Set(FREE_CHAMPS).size, 10);
+assert.equal(FREE_CHAMPS.length, 18); assert.equal(new Set(FREE_CHAMPS).size, 18);
 for (const id of ['lumen', 'bulwark', 'nyx']) assert.ok(FREE_CHAMPS.includes(id));
 const roles = new Set(FREE_CHAMPS.map((id) => ROSTER_DEFS.find((d) => d.id === id)?.role)); assert.ok(roles.size >= 5, [...roles].join());
 assert.equal(unlockPrice(0), 100); assert.equal(unlockPrice(5), 150); assert.equal(unlockPrice(99), 350);

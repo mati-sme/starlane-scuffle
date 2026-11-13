@@ -11,7 +11,7 @@ const res = await page.evaluate(async (only) => {
   const { input } = await import('/js/core/input.js');
   const { bus } = await import('/js/core/bus.js');
   const m = window.__starlane.match;
-  const NEED = { nthHit: ['n', 'bonus'], firstStrike: ['bonus', 'cool'], hitHaste: ['speed', 't', 'max'], hitCdr: ['sec'], hitSlow: ['t'], hitHeal: ['heal'], execute: ['hp', 'bonus'], castHaste: ['speed', 't'], castShield: ['shield', 't'], castEmpower: ['dmg', 't'], castHeal: ['heal'], lowShield: ['hp', 'shield', 't', 'cool'], thorns: ['dmg'], stackDr: ['per', 'max', 't'], woundedHaste: ['hp', 'speed'], killHeal: ['heal'], auraRegen: ['r', 'hps'], auraHaste: ['r', 'speed'], calmSpeed: ['after', 'speed'], brushSpeed: ['speed'], stillGuard: ['after', 'dr'] };
+  const NEED = { nthHit: ['n', 'bonus'], firstStrike: ['bonus', 'cool'], hitHaste: ['speed', 't', 'max'], hitCdr: ['sec'], hitSlow: ['t'], hitHeal: ['heal'], execute: ['hp', 'bonus'], castHaste: ['speed', 't'], castShield: ['shield', 't'], castEmpower: ['dmg', 't'], castHeal: ['heal'], lowShield: ['hp', 'shield', 't', 'cool'], thorns: ['dmg'], stackDr: ['per', 'max', 't'], woundedHaste: ['hp', 'speed'], killHeal: ['heal'], auraRegen: ['r', 'hps'], auraHaste: ['r', 'speed'], calmSpeed: ['after', 'speed'], brushSpeed: ['speed'], stillGuard: ['after', 'dr'], camo: ['after', 'aspd', 't'] };
   const out = [];
   for (const id of ROSTER) {
     if (only && !only.includes(id)) continue;

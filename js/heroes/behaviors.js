@@ -18,6 +18,7 @@ import { KITS_B } from './kits_b.js';
 import { KITS_C } from './kits_c.js';
 import { KITS_D } from './kits_d.js';
 import { KITS_E } from './kits_e.js';
+import { KITS_F } from './kits_f.js';
 
 const DEG = Math.PI / 180;
 // Ability VFX colors: a champion may override its body colors with `fx: { color, accent }` so skills stay distinct.
@@ -35,6 +36,10 @@ function affect(h, e, ab, o = {}) {
   if (ab.charm) { applyStatus(e, 'charm', ab.charm); e.charmSrc = h; } // kid-safe 'dance': the target wanders toward the caster and cannot attack
   if (ab.air || o.air) { applyStatus(e, 'air', AIR); applyStatus(e, 'stun', AIR); }
   if (ab.knock) shove(e, o.kdx ?? e.x - ox, o.kdz ?? e.z - oz, ab.knock, 0.25);
+  if (ab.blind && e.type === 'hero') { // v10 blinding dart: the hero cannot land basic attacks for a moment
+    e.effects.push({ t: 0, dur: ab.blind, update(e) { e.noAttack = true; } });
+    particles.burst(e.x, (e.hitY ?? 1) + 1.4, e.z, 8, { color: [0xFFFFFF, 0xFFE28A], speed: 1.5, up: 1, size: 0.5, life: ab.blind * 0.6, frame: FRAME.star, grav: 0 });
+  }
   if (ab.pull) {
     const d = Math.hypot(ox - e.x, oz - e.z);
     if (d > 0.3) shove(e, ox - e.x, oz - e.z, Math.min(ab.pull, d), 0.3);
@@ -911,6 +916,6 @@ const BASICS = {
   },
 };
 
-Object.assign(BEHAVIORS, WAVE2A_BEHAVIORS, WAVE2B_BEH, KITS_A, KITS_B, KITS_C, KITS_D, KITS_E);
+Object.assign(BEHAVIORS, WAVE2A_BEHAVIORS, WAVE2B_BEH, KITS_A, KITS_B, KITS_C, KITS_D, KITS_E, KITS_F);
 
 export { BEHAVIORS, BASICS };

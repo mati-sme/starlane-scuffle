@@ -145,7 +145,7 @@ export class Hero {
     this.armor = g.armor;
     this.basicRange = this.basic.range + (this.nextBasic?.range ?? 0);
     this.rs = this.ab.map((a, i) => rankStats(a, this.ranks[i], HERO.maxRank[i]));
-    const max = Math.round(this.baseHp + this.hpLv * L + g.hp);
+    const max = Math.round(this.baseHp + this.hpLv * L * (HERO.hpLvMul ?? 1) + g.hp);
     this.hp = full ? max : this.hp + (max - (this.maxHp ?? max));
     this.maxHp = max;
   }

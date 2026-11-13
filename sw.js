@@ -1,5 +1,5 @@
 // Network-first asset cache so the game still opens offline. Bump VERSION to drop old caches. WebSockets never pass through here.
-const VERSION = 'v9.4.1';
+const VERSION = 'v10.0.0';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(
   caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== VERSION).map((k) => caches.delete(k)))).then(() => self.clients.claim())));
